@@ -1,0 +1,6 @@
+node_modules
+.next
+styled-system
+dist
+.env*.local
+*.log
