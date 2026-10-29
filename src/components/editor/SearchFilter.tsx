@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { Search, ChevronDown, ChevronRight, CheckSquare, Square, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { useConfigStore } from "@/store/useConfigStore";
 
 export function SearchFilter() {
   const {
@@ -19,6 +20,8 @@ export function SearchFilter() {
     clearSelection,
     selectedIds,
   } = useSnapshotStore();
+
+  const { cascadeSelectChildren, setCascadeSelectChildren } = useConfigStore();
 
   const panels = rawSnapshot?.panels ? (Object.values(rawSnapshot.panels) as any[]) : [];
   const containers = rawSnapshot?.containers ? (Object.values(rawSnapshot.containers) as any[]) : [];
@@ -129,6 +132,33 @@ export function SearchFilter() {
 
       {/* Action buttons (pill style) */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+        {/* Cascade select children toggle in Workbench */}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.35rem",
+            padding: "0.3rem 0.75rem",
+            borderRadius: "9999px",
+            border: cascadeSelectChildren ? "1px solid #3b82f6" : "1px solid #334155",
+            backgroundColor: cascadeSelectChildren ? "rgba(37, 99, 235, 0.15)" : "#1e293b",
+            color: cascadeSelectChildren ? "#60a5fa" : "#94a3b8",
+            fontSize: "0.75rem",
+            cursor: "pointer",
+            userSelect: "none",
+            transition: "all 0.15s ease",
+          }}
+          title="勾选父级标签或组时，自动连带勾选其所包含的所有子标签"
+        >
+          <input
+            type="checkbox"
+            checked={cascadeSelectChildren}
+            onChange={(e) => setCascadeSelectChildren(e.target.checked)}
+            style={{ accentColor: "#2563eb", cursor: "pointer", width: 14, height: 14 }}
+          />
+          <span>包含子标签</span>
+        </label>
+
         <button
           onClick={expandAll}
           style={{

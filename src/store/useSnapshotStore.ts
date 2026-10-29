@@ -37,6 +37,7 @@ function findNodeAndDescendants(nodes: TabTreeNode[], targetId: string): string[
 interface SnapshotStoreState {
   rawSnapshot: SideberySnapshot | null;
   fileName: string;
+  rawFileSize: number;
   activeWindowId: string;
   activePanelId: string | null; // null = all panels
   rootNodes: TabTreeNode[];
@@ -93,6 +94,7 @@ interface SnapshotStoreState {
 export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
   rawSnapshot: null,
   fileName: "",
+  rawFileSize: 0,
   activeWindowId: "1",
   activePanelId: null,
   rootNodes: [],
@@ -126,6 +128,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     set({
       rawSnapshot: parsed.snapshot,
       fileName,
+      rawFileSize: new Blob([jsonString]).size,
       activeWindowId: primaryWinId,
       activePanelId: null,
       panelFilter: null,

@@ -1,0 +1,427 @@
+"use client";
+
+import React, { useRef, useState } from "react";
+import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  FileText,
+  Upload,
+  Download,
+  FolderArchive,
+  Layers,
+  Sparkles,
+  Check,
+  X,
+  FileCode,
+  List,
+  HardDrive,
+  Copy,
+  PlayCircle,
+  Loader2,
+} from "lucide-react";
+
+interface SnapshotFileHopupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function formatBytes(bytes: number, decimals = 1): string {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+}
+
+export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const {
+    rawSnapshot,
+    fileName,
+    rawFileSize,
+    rootNodes,
+    loadSnapshot,
+    getExportSnapshot,
+  } = useSnapshotStore();
+
+  const [loadingUserSnapshot, setLoadingUserSnapshot] = useState(false);
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+
+  const totalTabs = rawSnapshot
+    ? Object.values(rawSnapshot.windows).reduce((acc, w) => acc + (w.tabs?.length || 0), 0)
+    : 0;
+  const panelCount = rawSnapshot?.panels ? Object.keys(rawSnapshot.panels).length : 0;
+  const winCount = rawSnapshot?.windows ? Object.keys(rawSnapshot.windows).length : 0;
+  const containerCount = rawSnapshot?.containers ? Object.keys(rawSnapshot.containers).length : 0;
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        loadSnapshot(content, file.name);
+      } catch (err: any) {
+        alert(err.message || "读取文件失败");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleLoadUserSnapshot = async () => {
+    setLoadingUserSnapshot(true);
+    try {
+      const res = await fetch("/api/user-snapshot");
+      if (!res.ok) throw new Error("无法读取目录中的快照文件");
+      const jsonText = await res.text();
+      loadSnapshot(jsonText, "sidebery-snapshot-2026.10.22-00.48.27.json");
+    } catch (err: any) {
+      alert(err.message || "载入失败");
+    } finally {
+      setLoadingUserSnapshot(false);
+    }
+  };
+
+  const handleExportJSON = () => {
+    if (!rawSnapshot) return;
+    const exportData = getExportSnapshot("tree");
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = (fileName ? fileName.replace(/\.json$/i, "") : "sidebery-snapshot") + "-organized.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportUrls = (format: "txt" | "md") => {
+    if (!rawSnapshot) return;
+    function collectTabs(nodes: typeof rootNodes, list: { title: string; url: string }[] = []) {
+      for (const n of nodes) {
+        if (!n.isCategoryHeader && !n.tab.url.startsWith("about:") && !n.tab.url.startsWith("moz-extension:")) {
+          list.push({ title: n.tab.title, url: n.tab.url });
+        }
+        if (n.children) collectTabs(n.children, list);
+      }
+      return list;
+    }
+    const allTabs = collectTabs(rootNodes);
+    let output = "";
+    if (format === "txt") {
+      output = allTabs.map((t) => t.url).join("\n");
+    } else {
+      output = allTabs.map((t) => `- [${t.title}](${t.url})`).join("\n");
+    }
+
+    navigator.clipboard.writeText(output);
+    setCopiedType(format);
+    setTimeout(() => setCopiedType(null), 2000);
+  };
+
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Backdrop />
+      <Dialog.Positioner>
+        <Dialog.Content
+          style={{
+            width: "100%",
+            maxWidth: "580px",
+            maxHeight: "85vh",
+            overflowY: "auto",
+            padding: "1.5rem",
+          }}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: "none" }}
+            onChange={handleFileUpload}
+          />
+
+          {/* Modal Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(56, 189, 248, 0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#38bdf8",
+                }}
+              >
+                <FolderArchive size={18} />
+              </div>
+              <div>
+                <Dialog.Title>快照文件与数据管理</Dialog.Title>
+                <Dialog.Description>查看快照元信息、文件大小与导入导出操作</Dialog.Description>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#94a3b8",
+                cursor: "pointer",
+                padding: "4px",
+                borderRadius: "9999px",
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Snapshot Info Card */}
+          <div
+            style={{
+              padding: "1.25rem",
+              borderRadius: "0.85rem",
+              backgroundColor: "#1e293b",
+              border: "1px solid #334155",
+              marginBottom: "1.5rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <FileText size={16} color="#38bdf8" />
+                <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#f8fafc" }}>
+                  {fileName || "暂未载入快照文件"}
+                </span>
+              </div>
+              <Badge variant={rawSnapshot ? "subtle" : "outline"} style={{ color: rawSnapshot ? "#38bdf8" : "#94a3b8" }}>
+                {rawSnapshot ? "已就绪" : "未加载"}
+              </Badge>
+            </div>
+
+            {/* Metrics Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+              <div
+                style={{
+                  padding: "0.75rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: "#0f172a",
+                  border: "1px solid #334155",
+                }}
+              >
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                  配置文件数据大小
+                </div>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#38bdf8" }}>
+                  {rawFileSize > 0 ? formatBytes(rawFileSize) : "0 B"}
+                </div>
+                {rawFileSize > 0 && (
+                  <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.15rem" }}>
+                    {rawFileSize.toLocaleString()} 字节
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  padding: "0.75rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: "#0f172a",
+                  border: "1px solid #334155",
+                }}
+              >
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                  标签页总数
+                </div>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc" }}>
+                  {totalTabs.toLocaleString()} 个
+                </div>
+                <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.15rem" }}>
+                  {rootNodes.length} 个顶层根节点
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "0.75rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: "#0f172a",
+                  border: "1px solid #334155",
+                }}
+              >
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                  侧边栏面板 (Panels)
+                </div>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc" }}>
+                  {panelCount} 个
+                </div>
+              </div>
+
+              <div
+                style={{
+                  padding: "0.75rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: "#0f172a",
+                  border: "1px solid #334155",
+                }}
+              >
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                  容器环境与窗口
+                </div>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc" }}>
+                  {containerCount} 容器 / {winCount} 窗口
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Import */}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <h4 style={{ fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "0.6rem" }}>
+              导入新快照
+            </h4>
+            <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  borderColor: "#334155",
+                  backgroundColor: "#1e293b",
+                  color: "#f8fafc",
+                  padding: "0.45rem 1rem",
+                }}
+              >
+                <Upload size={14} />
+                <span>从本地上传 JSON</span>
+              </Button>
+
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={handleLoadUserSnapshot}
+                disabled={loadingUserSnapshot}
+                style={{
+                  backgroundColor: "rgba(2, 132, 199, 0.15)",
+                  color: "#38bdf8",
+                  borderColor: "#0284c7",
+                  padding: "0.45rem 1rem",
+                }}
+              >
+                {loadingUserSnapshot ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
+                <span>载入项目样本 (1,174 标签)</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Section: Export */}
+          {rawSnapshot && (
+            <div>
+              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "0.6rem" }}>
+                导出整理成果
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                <div
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "#1e293b",
+                    border: "1px solid #334155",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+                      导出 Sidebery Snapshot JSON
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+                      保留 v5 树形缩进与 Group 组折叠结构，可直接导入 Sidebery
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="solid"
+                    size="sm"
+                    onClick={handleExportJSON}
+                    style={{
+                      backgroundColor: "#2563eb",
+                      color: "#fff",
+                      padding: "0.4rem 1.1rem",
+                    }}
+                  >
+                    <Download size={14} />
+                    <span>下载文件</span>
+                  </Button>
+                </div>
+
+                <div
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "0.5rem",
+                    backgroundColor: "#1e293b",
+                    border: "1px solid #334155",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+                      快捷复制标签清单
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+                      复制所有有效标签为纯网址或 Markdown 链接列表
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "0.4rem" }}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExportUrls("txt")}
+                      style={{
+                        borderColor: "#334155",
+                        backgroundColor: "#0f172a",
+                        color: "#94a3b8",
+                        fontSize: "0.75rem",
+                        padding: "0.3rem 0.75rem",
+                      }}
+                    >
+                      {copiedType === "txt" ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                      <span>{copiedType === "txt" ? "已复制" : "复制网址"}</span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExportUrls("md")}
+                      style={{
+                        borderColor: "#334155",
+                        backgroundColor: "#0f172a",
+                        color: "#94a3b8",
+                        fontSize: "0.75rem",
+                        padding: "0.3rem 0.75rem",
+                      }}
+                    >
+                      {copiedType === "md" ? <Check size={13} color="#34d399" /> : <FileCode size={13} />}
+                      <span>{copiedType === "md" ? "已复制" : "Markdown"}</span>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </Dialog.Content>
+      </Dialog.Positioner>
+    </Dialog.Root>
+  );
+}
