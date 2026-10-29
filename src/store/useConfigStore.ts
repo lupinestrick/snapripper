@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { AIConfig } from "@/types/ai";
+import { AIConfig, AI_PROVIDERS } from "@/types/ai";
 import { CategorizationRule, RulesSettings } from "@/types/sidebery";
 import { DEFAULT_RULES_SETTINGS } from "@/services/ruleEngine";
 
@@ -34,11 +34,12 @@ export const useConfigStore = create<ConfigState>()(
     (set, get) => ({
       activePage: "workbench",
       aiConfig: {
-        provider: "custom",
-        baseURL: "https://api.openai.com/v1",
+        provider: "deepseek",
+        baseURL: AI_PROVIDERS.deepseek.baseUrl,
         apiKey: "",
-        model: "gpt-4o-mini",
+        model: AI_PROVIDERS.deepseek.model,
         temperature: 0.2,
+        type: AI_PROVIDERS.deepseek.type,
       },
       rulesSettings: DEFAULT_RULES_SETTINGS,
       exemptPinned: true,
@@ -123,7 +124,7 @@ export const useConfigStore = create<ConfigState>()(
       setPreserveSubtrees: (val) => set({ preserveSubtrees: val }),
     }),
     {
-      name: "snapripper_config_storage_v2",
+      name: "snapripper_config_storage_v3",
     }
   )
 );

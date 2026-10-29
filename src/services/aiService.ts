@@ -1,4 +1,4 @@
-import { AIConfig, CategoryProportion, ProportionReport, TabClassificationResult } from "@/types/ai";
+import { AIConfig, CategoryProportion, ProportionReport, AI_PROVIDERS, AIProviderKey } from "@/types/ai";
 import { SideberyTab } from "@/types/sidebery";
 import { cleanUrlForAI, extractDomain, isExemptUrl } from "@/utils/urlHelper";
 
@@ -14,42 +14,123 @@ const PRESET_COLORS = [
   "#f97316", // orange
 ];
 
-function normalizeChatUrl(baseURL: string): string {
-  let url = baseURL.trim().replace(/\/+$/, "");
-  if (url.endsWith("/chat/completions")) return url;
-  if (url.endsWith("/v1")) return `${url}/chat/completions`;
-  return `${url}/v1/chat/completions`;
-}
+/**
+ * 统一多协议模型通信驱动 (OpenAI, Anthropic Claude, Google Gemini)
+ */
+export async function sendAIChatRequest(
+  config: AIConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
+  const protocol = config.type || providerDef.type || "openai";
+  const apiKey = (config.apiKey || "").trim();
+  const model = config.model || providerDef.model;
+  const baseUrl = (config.baseURL || providerDef.baseUrl).trim().replace(/\/+$/, "");
 
-export async function testAIConnection(config: AIConfig): Promise<{ success: boolean; message: string }> {
-  try {
-    const endpoint = normalizeChatUrl(config.baseURL || "https://api.openai.com/v1");
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (config.apiKey) {
-      headers["Authorization"] = `Bearer ${config.apiKey.trim()}`;
-    }
-
+  // 1. Anthropic Claude Protocol
+  if (protocol === "anthropic") {
+    const endpoint = baseUrl.endsWith("/messages") ? baseUrl : `${baseUrl}/messages`;
     const res = await fetch(endpoint, {
       method: "POST",
-      headers,
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "dangerously-allow-browser": "true",
+      },
       body: JSON.stringify({
-        model: config.model || "gpt-4o-mini",
-        messages: [{ role: "user", content: "Respond with only the word OK" }],
-        max_tokens: 10,
+        model,
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        temperature: config.temperature ?? 0.2,
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      return {
-        success: false,
-        message: `HTTP ${res.status}: ${errText.substring(0, 150) || res.statusText}`,
-      };
+      throw new Error(`Claude API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
     }
 
-    return { success: true, message: "连接成功！AI 接口响应正常。" };
+    const data = await res.json();
+    return data.content?.[0]?.text || "";
+  }
+
+  // 2. Google Gemini Protocol
+  if (protocol === "gemini") {
+    const isNativeGemini = baseUrl.includes("generativelanguage.googleapis.com");
+    if (isNativeGemini) {
+      const endpoint = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            temperature: config.temperature ?? 0.2,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Gemini API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+      }
+
+      const data = await res.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    }
+  }
+
+  // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Custom, etc.)
+  let endpoint = baseUrl;
+  if (!endpoint.endsWith("/chat/completions")) {
+    endpoint = endpoint.endsWith("/v1") ? `${endpoint}/chat/completions` : `${endpoint}/v1/chat/completions`;
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: config.temperature ?? 0.2,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`AI 服务响应错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || "";
+}
+
+export async function testAIConnection(config: AIConfig): Promise<{ success: boolean; message: string }> {
+  try {
+    const reply = await sendAIChatRequest(
+      config,
+      "You are a helpful assistant.",
+      "Respond with only the word OK"
+    );
+
+    if (reply) {
+      return { success: true, message: "连接成功！AI 接口响应正常。" };
+    }
+    return { success: false, message: "服务未返回有效内容" };
   } catch (err: any) {
     return { success: false, message: `网络连接失败: ${err.message || "无法访问指定端点"}` };
   }
@@ -80,8 +161,8 @@ export async function analyzeTabProportions(
 
   onProgress?.(`正在发送 ${nonExemptTabs.length} 个标签特征至 AI 分析比例...`);
 
-  const prompt = `你是一个专业的浏览器标签页管理专家。
-以下是用户的浏览器标签页列表摘要（包含 id、域名 domain、路径 path、标题 title）：
+  const systemPrompt = "你是一个专业的浏览器标签页管理专家。必须严格返回合法的 JSON 格式，不要包含任何闲聊文本。";
+  const userPrompt = `以下是用户的浏览器标签页列表摘要（包含 id、域名 domain、路径 path、标题 title）：
 
 ${JSON.stringify(tabFingerprints, null, 1)}
 
@@ -99,7 +180,7 @@ ${JSON.stringify(tabFingerprints, null, 1)}
 - 🎨 设计与创意灵感 (Design & Inspiration)
 （若有其他突出的垂直领域，如特定同人资源、游戏攻略等，也可单独归纳为专属类别）
 
-必须严格返回如下合法的 JSON 格式，不要包含任何额外的问候或闲聊内容：
+必须严格返回如下合法的 JSON 格式：
 {
   "categories": [
     {
@@ -112,35 +193,7 @@ ${JSON.stringify(tabFingerprints, null, 1)}
   "suggestedAction": "简短的整理建议"
 }`;
 
-  const endpoint = normalizeChatUrl(config.baseURL || "https://api.openai.com/v1");
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (config.apiKey) {
-    headers["Authorization"] = `Bearer ${config.apiKey.trim()}`;
-  }
-
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: config.model || "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are an intelligent data categorizer. Return strictly valid JSON only.",
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.2,
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`AI 服务响应错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const rawContent = data.choices?.[0]?.message?.content || "";
+  const rawContent = await sendAIChatRequest(config, systemPrompt, userPrompt);
 
   let parsed: any;
   try {
@@ -193,7 +246,8 @@ export async function classifyTabs(
 
     const categoryList = categories.map((c) => ({ id: c.id, name: c.name }));
 
-    const prompt = `请将以下标签页分配至最匹配的类别。
+    const systemPrompt = "You are a classifier. Return strictly JSON mapping id to category id.";
+    const userPrompt = `请将以下标签页分配至最匹配的类别。
 可选类别：${JSON.stringify(categoryList)}
 
 待分类标签列表：
@@ -202,33 +256,13 @@ ${JSON.stringify(chunkSummary)}
 返回格式必须为纯 JSON 键值对，键为标签 id，值为类别 id：
 { "tabId1": "catIdA", "tabId2": "catIdB" }`;
 
-    const endpoint = normalizeChatUrl(config.baseURL || "https://api.openai.com/v1");
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (config.apiKey) headers["Authorization"] = `Bearer ${config.apiKey.trim()}`;
-
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model: config.model || "gpt-4o-mini",
-          messages: [
-            { role: "system", content: "You are a classifier. Return strictly JSON mapping id to category id." },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.1,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const content = data.choices?.[0]?.message?.content || "";
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const mapping = JSON.parse(jsonMatch[0]);
-          for (const [tabId, catId] of Object.entries(mapping)) {
-            result.set(tabId, String(catId));
-          }
+      const content = await sendAIChatRequest(config, systemPrompt, userPrompt);
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const mapping = JSON.parse(jsonMatch[0]);
+        for (const [tabId, catId] of Object.entries(mapping)) {
+          result.set(tabId, String(catId));
         }
       }
     } catch {
