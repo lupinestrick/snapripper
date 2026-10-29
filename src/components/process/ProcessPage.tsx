@@ -6,9 +6,6 @@ import { useConfigStore } from "@/store/useConfigStore";
 import { computeSnapshotDiff } from "@/services/diffEngine";
 import { PanelDiffResult, SideberySnapshot } from "@/types/sidebery";
 import { DiffHopupModal } from "./DiffHopupModal";
-import { DiffSettingsModal } from "./DiffSettingsModal";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Trash2,
   FolderPlus,
@@ -16,12 +13,11 @@ import {
   AlertCircle,
   Sparkles,
   Globe,
-  SlidersHorizontal,
-  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 
 export function ProcessPage() {
-  const { rawSnapshot, duplicateUrls, applySnapshotUpdate } = useSnapshotStore();
+  const { rawSnapshot, applySnapshotUpdate } = useSnapshotStore();
   const {
     rulesSettings,
     domainMergeConfig,
@@ -33,7 +29,6 @@ export function ProcessPage() {
   } = useConfigStore();
 
   const [diffModalOpen, setDiffModalOpen] = useState(false);
-  const [domainSettingsModalOpen, setDomainSettingsModalOpen] = useState(false);
 
   const [activeProcessOptions, setActiveProcessOptions] = useState<{
     enableDedup: boolean;
@@ -77,8 +72,6 @@ export function ProcessPage() {
       </div>
     );
   }
-
-  const enabledRulesCount = rulesSettings.rules.filter((r) => r.enabled).length;
 
   const runDiffComputation = (options: {
     enableDedup: boolean;
@@ -137,19 +130,6 @@ export function ProcessPage() {
       setDiffModalOpen(false);
     }
   };
-
-  const panels = rawSnapshot?.panels
-    ? (Object.values(rawSnapshot.panels) as any[]).map((p) => ({ id: p.id, name: p.name || p.id }))
-    : [];
-
-  const domainModeLabel =
-    domainMergeConfig.matchMode === "suffix"
-      ? "主域后缀"
-      : domainMergeConfig.matchMode === "full"
-      ? "完整域名"
-      : domainMergeConfig.matchMode === "keyword"
-      ? "域名关键字"
-      : "自定义规则";
 
   return (
     <div style={{ padding: "2rem", maxWidth: "900px", margin: "0 auto", color: "#f8fafc" }}>
@@ -211,11 +191,8 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Badge variant="subtle" size="sm" style={{ color: "#60a5fa" }}>
-              全量综合优化
-            </Badge>
-            <ChevronRight size={16} color="#64748b" />
+          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+            <ChevronLeft size={18} />
           </div>
         </div>
 
@@ -265,11 +242,8 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Badge variant="subtle" size="sm" style={{ color: "#38bdf8" }}>
-              发现 {duplicateUrls.size} 个重复项
-            </Badge>
-            <ChevronRight size={16} color="#64748b" />
+          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+            <ChevronLeft size={18} />
           </div>
         </div>
 
@@ -319,24 +293,8 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Badge variant="subtle" size="sm" style={{ color: "#06b6d4" }}>
-              {domainModeLabel} (≥{domainMergeConfig.minThreshold || 2})
-            </Badge>
-            <Button
-              variant="outline"
-              size="xs"
-              pill
-              onClick={(e) => {
-                e.stopPropagation();
-                setDomainSettingsModalOpen(true);
-              }}
-              title="配置域名匹配方案与整理设置"
-            >
-              <SlidersHorizontal size={13} />
-              <span>设置</span>
-            </Button>
-            <ChevronRight size={16} color="#64748b" />
+          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+            <ChevronLeft size={18} />
           </div>
         </div>
 
@@ -386,11 +344,8 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Badge variant="subtle" size="sm" style={{ color: "#34d399" }}>
-              {enabledRulesCount} 条规则已启用
-            </Badge>
-            <ChevronRight size={16} color="#64748b" />
+          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+            <ChevronLeft size={18} />
           </div>
         </div>
 
@@ -440,11 +395,8 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Badge variant="subtle" size="sm" style={{ color: "#a855f7" }}>
-              大模型语义聚类
-            </Badge>
-            <ChevronRight size={16} color="#64748b" />
+          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+            <ChevronLeft size={18} />
           </div>
         </div>
       </div>
@@ -458,19 +410,6 @@ export function ProcessPage() {
         totalDeduped={diffResults.totalDeduped}
         totalGroupsCreated={diffResults.totalGroupsCreated}
         onRecomputeDiff={handleRecomputeCurrentDiff}
-      />
-
-      {/* Standalone Settings Hop-up Modal (Opened from Same Domain Merge Card) */}
-      <DiffSettingsModal
-        isOpen={domainSettingsModalOpen}
-        onClose={() => setDomainSettingsModalOpen(false)}
-        panels={panels}
-        onSave={() => {
-          // If diff is currently open or ready, recompute
-          if (diffModalOpen) {
-            handleRecomputeCurrentDiff();
-          }
-        }}
       />
     </div>
   );

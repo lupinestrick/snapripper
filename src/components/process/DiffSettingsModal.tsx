@@ -90,7 +90,7 @@ export function DiffSettingsModal({
   if (!isOpen) return null;
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(details) => !details.open && onClose()} lazyMount unmountOnExit>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Backdrop style={{ zIndex: 110 }} />
       <Dialog.Positioner style={{ zIndex: 120 }}>
         <Dialog.Content
