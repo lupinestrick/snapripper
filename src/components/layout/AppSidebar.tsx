@@ -9,6 +9,7 @@ import {
   Sparkles,
   SlidersHorizontal,
   Bot,
+  Settings,
   BarChart2,
   ChevronLeft,
   ChevronRight,
@@ -53,6 +54,7 @@ export function AppSidebar() {
     { page: "process", label: "处理比对", icon: <Sparkles size={18} /> },
     { page: "rules", label: "规则管理", icon: <SlidersHorizontal size={18} /> },
     { page: "ai", label: "AI 比例分析", icon: <Bot size={18} /> },
+    { page: "settings", label: "系统设置", icon: <Settings size={18} /> },
   ];
 
   // Mobile Bottom Bar Navigation

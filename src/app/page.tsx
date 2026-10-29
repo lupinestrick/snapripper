@@ -10,6 +10,7 @@ import { BatchBar } from "@/components/editor/BatchBar";
 import { ProcessPage } from "@/components/process/ProcessPage";
 import { RulesPage } from "@/components/rules/RulesPage";
 import { AIPage } from "@/components/ai/AIPage";
+import { SettingsPage } from "@/components/settings/SettingsPage";
 import { ExportDialog } from "@/components/export/ExportDialog";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
@@ -144,6 +145,8 @@ export default function WorkbenchPage() {
           {activePage === "rules" && <RulesPage />}
 
           {activePage === "ai" && <AIPage />}
+
+          {activePage === "settings" && <SettingsPage />}
         </main>
       </div>
 

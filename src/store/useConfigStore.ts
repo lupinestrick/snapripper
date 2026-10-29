@@ -4,7 +4,12 @@ import { AIConfig, AI_PROVIDERS } from "@/types/ai";
 import { CategorizationRule, RulesSettings } from "@/types/sidebery";
 import { DEFAULT_RULES_SETTINGS } from "@/services/ruleEngine";
 
-export type AppPage = "workbench" | "process" | "rules" | "ai";
+export type AppPage = "workbench" | "process" | "rules" | "ai" | "settings";
+
+export interface AIThresholds {
+  minTabsPerGroup: number;
+  maxCategories: number;
+}
 
 interface ConfigState {
   activePage: AppPage;
@@ -13,6 +18,8 @@ interface ConfigState {
   exemptPinned: boolean;
   exemptInternalPages: boolean;
   preserveSubtrees: boolean;
+  cascadeSelectChildren: boolean;
+  aiThresholds: AIThresholds;
 
   setActivePage: (page: AppPage) => void;
   setAIConfig: (config: Partial<AIConfig>) => void;
@@ -27,6 +34,8 @@ interface ConfigState {
   setExemptPinned: (val: boolean) => void;
   setExemptInternalPages: (val: boolean) => void;
   setPreserveSubtrees: (val: boolean) => void;
+  setCascadeSelectChildren: (val: boolean) => void;
+  setAiThresholds: (thresholds: Partial<AIThresholds>) => void;
 }
 
 export const useConfigStore = create<ConfigState>()(
@@ -45,6 +54,11 @@ export const useConfigStore = create<ConfigState>()(
       exemptPinned: true,
       exemptInternalPages: true,
       preserveSubtrees: true,
+      cascadeSelectChildren: true,
+      aiThresholds: {
+        minTabsPerGroup: 2,
+        maxCategories: 6,
+      },
 
       setActivePage: (page) => set({ activePage: page }),
 
@@ -122,9 +136,14 @@ export const useConfigStore = create<ConfigState>()(
       setExemptPinned: (val) => set({ exemptPinned: val }),
       setExemptInternalPages: (val) => set({ exemptInternalPages: val }),
       setPreserveSubtrees: (val) => set({ preserveSubtrees: val }),
+      setCascadeSelectChildren: (val) => set({ cascadeSelectChildren: val }),
+      setAiThresholds: (thresholds) =>
+        set((state) => ({
+          aiThresholds: { ...state.aiThresholds, ...thresholds },
+        })),
     }),
     {
-      name: "snapripper_config_storage_v3",
+      name: "snapripper_config_storage_v4",
     }
   )
 );

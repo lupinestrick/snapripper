@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { SideberySnapshot, SideberyTab, TabTreeNode } from "@/types/sidebery";
 import { ProportionReport } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
+import { useConfigStore } from "./useConfigStore";
 import {
   batchDeleteNodes,
   batchUpdatePanel,
@@ -10,6 +11,28 @@ import {
   reorganizeTreeIntoCategories,
   reorganizeTabsIntoPanels,
 } from "@/services/treeOperations";
+
+function findNodeAndDescendants(nodes: TabTreeNode[], targetId: string): string[] {
+  for (const n of nodes) {
+    if (n.id === targetId) {
+      const descendants: string[] = [n.id];
+      function collect(childList?: TabTreeNode[]) {
+        if (!childList) return;
+        for (const c of childList) {
+          descendants.push(c.id);
+          collect(c.children);
+        }
+      }
+      collect(n.children);
+      return descendants;
+    }
+    if (n.children && n.children.length > 0) {
+      const res = findNodeAndDescendants(n.children, targetId);
+      if (res.length > 0) return res;
+    }
+  }
+  return [];
+}
 
 interface SnapshotStoreState {
   rawSnapshot: SideberySnapshot | null;
@@ -123,18 +146,23 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
   },
 
   selectTab: (id, isMulti, isRange) => {
-    const { selectedIds } = get();
+    const { selectedIds, rootNodes } = get();
+    const shouldCascade = useConfigStore.getState().cascadeSelectChildren;
+    const targetIds = shouldCascade ? findNodeAndDescendants(rootNodes, id) : [id];
+    if (targetIds.length === 0) targetIds.push(id);
+
     const next = new Set(isMulti ? selectedIds : []);
 
     if (isMulti) {
-      if (next.has(id)) {
-        next.delete(id);
+      const isCurrentlySelected = next.has(id);
+      if (isCurrentlySelected) {
+        for (const tid of targetIds) next.delete(tid);
       } else {
-        next.add(id);
+        for (const tid of targetIds) next.add(tid);
       }
     } else {
       next.clear();
-      next.add(id);
+      for (const tid of targetIds) next.add(tid);
     }
 
     set({ selectedIds: next });
