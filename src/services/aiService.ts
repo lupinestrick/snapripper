@@ -3,15 +3,15 @@ import { SideberyTab } from "@/types/sidebery";
 import { cleanUrlForAI, extractDomain, isExemptUrl } from "@/utils/urlHelper";
 
 const PRESET_COLORS = [
-  "#2563eb", // blue
-  "#16a34a", // green
-  "#d97706", // amber
-  "#dc2626", // red
-  "#0891b2", // cyan
-  "#4f46e5", // indigo
-  "#059669", // emerald
-  "#ea580c", // orange
-  "#475569", // slate
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#ef4444", // red
+  "#06b6d4", // cyan
+  "#8b5cf6", // purple
+  "#f59e0b", // amber
+  "#ec4899", // pink
+  "#64748b", // slate
+  "#f97316", // orange
 ];
 
 function normalizeChatUrl(baseURL: string): string {
@@ -55,6 +55,8 @@ export async function testAIConnection(config: AIConfig): Promise<{ success: boo
   }
 }
 
+export const pingAIEndpoint = testAIConnection;
+
 export async function analyzeTabProportions(
   tabs: SideberyTab[],
   config: AIConfig,
@@ -78,20 +80,32 @@ export async function analyzeTabProportions(
 
   onProgress?.(`正在发送 ${nonExemptTabs.length} 个标签特征至 AI 分析比例...`);
 
-  const prompt = `你是一个专业的浏览器标签页整理专家。
+  const prompt = `你是一个专业的浏览器标签页管理专家。
 以下是用户的浏览器标签页列表摘要（包含 id、域名 domain、路径 path、标题 title）：
 
 ${JSON.stringify(tabFingerprints, null, 1)}
 
-请分析这批标签页的主题，归纳出 4 到 8 个高层次、互斥且覆盖全面的分类主题，并计算每个分类在当前标签库中的占比（比例总和必须为 100%）。
+请依据互联网主流用户的通用日常浏览与生产力习惯，对这批标签页进行语义分析，归纳出 4 到 8 个高层次、清晰且互斥的主题类别，并计算每个分类在当前标签库中的占比（各比例相加总和必须为 100%）。
 
-必须严格按照以下 JSON 格式返回，切勿包含任何 markdown 代码块外部的闲聊文本：
+分类建议参考互联网公认的标准习惯体系：
+- 💻 开发与技术 (Dev & Engineering)
+- 🤖 AI 与大模型 (AI & LLMs)
+- 🎬 影音与流媒体 (Media & Entertainment)
+- 💬 社交与社区 (Social & Community)
+- 📚 知识库与学术研究 (Research & Knowledge)
+- 💼 办公协作与文档 (Productivity & Work)
+- 🛒 电商与生活消费 (Shopping & Life)
+- 📰 科技与新闻资讯 (News & Feeds)
+- 🎨 设计与创意灵感 (Design & Inspiration)
+（若有其他突出的垂直领域，如特定同人资源、游戏攻略等，也可单独归纳为专属类别）
+
+必须严格返回如下合法的 JSON 格式，不要包含任何额外的问候或闲聊内容：
 {
   "categories": [
     {
-      "name": "类别名称（如：前端开发与工程、音视频娱乐、学术研究、购物消费、日常工具等）",
-      "ratio": 35,
-      "description": "简要说明该类别涵盖的网页特征",
+      "name": "类别名称（例如：💻 开发与技术）",
+      "ratio": 30,
+      "description": "涵盖的网站特征说明",
       "keywords": ["关键词1", "关键词2"]
     }
   ],
@@ -138,25 +152,20 @@ ${JSON.stringify(tabFingerprints, null, 1)}
   }
 
   const categories: CategoryProportion[] = (parsed.categories || []).map((cat: any, i: number) => ({
-    id: `cat_${i + 1}`,
+    id: `cat_${i}_${Date.now()}`,
     name: cat.name || `分类 ${i + 1}`,
     color: PRESET_COLORS[i % PRESET_COLORS.length],
-    ratio: Math.round(Number(cat.ratio) || 0),
+    ratio: typeof cat.ratio === "number" ? cat.ratio : 0,
+    targetRatio: typeof cat.ratio === "number" ? cat.ratio : 0,
     description: cat.description || "",
-    keywords: cat.keywords || [],
-    matchCount: Math.round((Number(cat.ratio) / 100) * nonExemptTabs.length),
+    matchCount: 0,
   }));
-
-  const currentSum = categories.reduce((sum, c) => sum + c.ratio, 0);
-  if (currentSum > 0 && currentSum !== 100 && categories.length > 0) {
-    categories[0].ratio += 100 - currentSum;
-  }
 
   return {
     totalAnalyzed: nonExemptTabs.length,
     excludedCount,
     categories,
-    suggestedAction: parsed.suggestedAction,
+    suggestedAction: parsed.suggestedAction || "建议按上述比例分类并折叠为分组。",
   };
 }
 
@@ -164,36 +173,34 @@ export async function classifyTabs(
   tabs: SideberyTab[],
   categories: CategoryProportion[],
   config: AIConfig,
-  onProgress?: (processed: number, total: number) => void
+  onProgress?: (current: number, total: number) => void
 ): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
   const nonExemptTabs = tabs.filter((t) => !isExemptUrl(t.url, t.pinned));
-  const categoryNames = categories.map((c) => c.name);
-  const resultMap = new Map<string, string>();
 
-  const CHUNK_SIZE = 60;
-  const chunks: SideberyTab[][] = [];
-  for (let i = 0; i < nonExemptTabs.length; i += CHUNK_SIZE) {
-    chunks.push(nonExemptTabs.slice(i, i + CHUNK_SIZE));
-  }
+  const chunkSize = 60;
+  const total = nonExemptTabs.length;
 
-  let processedCount = 0;
-  onProgress?.(0, nonExemptTabs.length);
+  for (let i = 0; i < total; i += chunkSize) {
+    const chunk = nonExemptTabs.slice(i, i + chunkSize);
+    onProgress?.(Math.min(i + chunkSize, total), total);
 
-  for (const chunk of chunks) {
-    const batchInput = chunk.map((t) => ({
+    const chunkSummary = chunk.map((t) => ({
       id: String(t.id),
-      d: extractDomain(t.url),
-      t: (t.title || "").slice(0, 40),
+      domain: extractDomain(t.url),
+      title: (t.title || "").slice(0, 45),
     }));
 
-    const prompt = `可选类别列表:
-${JSON.stringify(categoryNames)}
+    const categoryList = categories.map((c) => ({ id: c.id, name: c.name }));
 
-请将以下标签页分配至最匹配的上述类别之一：
-${JSON.stringify(batchInput)}
+    const prompt = `请将以下标签页分配至最匹配的类别。
+可选类别：${JSON.stringify(categoryList)}
 
-严格返回纯 JSON 数组，每个对象形如 {"id": "标签ID", "c": "匹配的类别名称"}:
-[{"id": "...", "c": "..."}]`;
+待分类标签列表：
+${JSON.stringify(chunkSummary)}
+
+返回格式必须为纯 JSON 键值对，键为标签 id，值为类别 id：
+{ "tabId1": "catIdA", "tabId2": "catIdB" }`;
 
     const endpoint = normalizeChatUrl(config.baseURL || "https://api.openai.com/v1");
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -205,31 +212,29 @@ ${JSON.stringify(batchInput)}
         headers,
         body: JSON.stringify({
           model: config.model || "gpt-4o-mini",
-          messages: [{ role: "user", content: prompt }],
+          messages: [
+            { role: "system", content: "You are a classifier. Return strictly JSON mapping id to category id." },
+            { role: "user", content: prompt },
+          ],
           temperature: 0.1,
         }),
       });
 
       if (res.ok) {
-        const json = await res.json();
-        const content = json.choices?.[0]?.message?.content || "";
-        const match = content.match(/\[[\s\S]*\]/);
-        if (match) {
-          const assignments = JSON.parse(match[0]);
-          for (const item of assignments) {
-            if (item.id && item.c) {
-              resultMap.set(String(item.id), String(item.c));
-            }
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content || "";
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const mapping = JSON.parse(jsonMatch[0]);
+          for (const [tabId, catId] of Object.entries(mapping)) {
+            result.set(tabId, String(catId));
           }
         }
       }
     } catch {
-      // Continue gracefully on chunk error
+      // Continue next chunk on error
     }
-
-    processedCount += chunk.length;
-    onProgress?.(processedCount, nonExemptTabs.length);
   }
 
-  return resultMap;
+  return result;
 }

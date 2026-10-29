@@ -4,14 +4,14 @@ import React, { useState } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { CategorizationRule, RuleScope } from "@/types/sidebery";
-import { Plus, Trash2, Download, Upload, Check, Sliders, Shield } from "lucide-react";
+import { RULE_PRESETS } from "@/services/ruleEngine";
+import { Plus, Trash2, Download, Upload, Sliders, Sparkles, RefreshCw } from "lucide-react";
 
 export function RulesPage() {
   const {
     rulesSettings,
     setRulesSettings,
     addRule,
-    updateRule,
     deleteRule,
     toggleRule,
     importRulesJSON,
@@ -32,6 +32,16 @@ export function RulesPage() {
     minThreshold: 2,
     color: "#38bdf8",
   });
+
+  const handleApplyPreset = (presetKey: string) => {
+    const preset = RULE_PRESETS[presetKey];
+    if (!preset) return;
+    if (confirm(`是否切换为预设：“${preset.name}”？这将会更新当前的规则列表。`)) {
+      setRulesSettings({
+        rules: preset.rules.map((r, idx) => ({ ...r, id: `rule_${presetKey}_${idx}_${Date.now()}` })),
+      });
+    }
+  };
 
   const handleExport = () => {
     const jsonStr = exportRulesJSON();
@@ -86,11 +96,11 @@ export function RulesPage() {
   return (
     <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "#f8fafc" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "2rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>规则与成组设置</h1>
           <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-            匹配域名与标题关键词自动聚类为 Sidebery Group，支持设定应用面板范围与最小阈值。
+            基于全球互联网通用浏览习惯（开发、AI、影音、社交、研究、办公等）自动分类整理，支持自定规则与阈值。
           </p>
         </div>
 
@@ -158,7 +168,55 @@ export function RulesPage() {
         </div>
       </div>
 
-      {/* Global General Options Card */}
+      {/* Preset Quick Selectors */}
+      <div
+        style={{
+          padding: "1rem 1.25rem",
+          borderRadius: "1rem",
+          backgroundColor: "#111827",
+          border: "1px solid #1f2937",
+          marginBottom: "1.5rem",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem", fontSize: "0.85rem", fontWeight: 600, color: "#e2e8f0" }}>
+          <Sparkles size={16} color="#38bdf8" />
+          <span>常用互联网习惯预设包</span>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem" }}>
+          {Object.entries(RULE_PRESETS).map(([key, p]) => (
+            <button
+              key={key}
+              onClick={() => handleApplyPreset(key)}
+              style={{
+                padding: "0.4rem 0.85rem",
+                borderRadius: "9999px",
+                border: "1px solid #334155",
+                backgroundColor: "#1e293b",
+                color: "#cbd5e1",
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#38bdf8";
+                e.currentTarget.style.color = "#38bdf8";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#334155";
+                e.currentTarget.style.color = "#cbd5e1";
+              }}
+              title={p.description}
+            >
+              <span>{p.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Global Options Card */}
       <div
         style={{
           padding: "1.25rem",
@@ -221,7 +279,7 @@ export function RulesPage() {
       {/* Rules List */}
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#94a3b8", marginBottom: "0.25rem" }}>
-          当前规则列表 ({rulesSettings.rules.length})
+          当前生效规则 ({rulesSettings.rules.length})
         </div>
 
         {rulesSettings.rules.map((rule) => {
@@ -269,15 +327,15 @@ export function RulesPage() {
                     </span>
                   </div>
 
-                  <div style={{ display: "flex", gap: "1rem", marginTop: "0.35rem", fontSize: "0.75rem", color: "#94a3b8" }}>
+                  <div style={{ display: "flex", gap: "1.25rem", marginTop: "0.35rem", fontSize: "0.75rem", color: "#94a3b8" }}>
                     {rule.matchDomain && (
-                      <div>
+                      <div style={{ maxWidth: "420px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         <span style={{ color: "#64748b" }}>域名: </span>
                         <span>{rule.matchDomain}</span>
                       </div>
                     )}
                     {rule.matchKeyword && (
-                      <div>
+                      <div style={{ maxWidth: "350px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         <span style={{ color: "#64748b" }}>关键词: </span>
                         <span>{rule.matchKeyword}</span>
                       </div>
@@ -348,7 +406,7 @@ export function RulesPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="例如: DLsite 作品 / Anime-Sharing"
+                  placeholder="例如: 💻 开源技术 / 📖 论文与专栏"
                   value={newRule.name}
                   onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
                   style={{
@@ -443,7 +501,7 @@ export function RulesPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="例如: dlsite.com, anime-sharing.com"
+                  placeholder="例如: github.com, stackoverflow.com"
                   value={newRule.matchDomain}
                   onChange={(e) => setNewRule({ ...newRule, matchDomain: e.target.value })}
                   style={{
@@ -464,7 +522,7 @@ export function RulesPage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="例如: RJ, 音声, 同人, GitHub"
+                  placeholder="例如: docs, tutorial, api, issue"
                   value={newRule.matchKeyword}
                   onChange={(e) => setNewRule({ ...newRule, matchKeyword: e.target.value })}
                   style={{
