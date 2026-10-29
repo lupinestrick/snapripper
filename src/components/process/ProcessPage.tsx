@@ -328,7 +328,7 @@ export function ProcessPage() {
                 width: "44px",
                 height: "44px",
                 borderRadius: "9999px",
-                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                backgroundColor: "rgba(168, 85, 247, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

@@ -276,7 +276,7 @@ export function DiffHopupModal({
                   color: viewMode === "git" ? "#38bdf8" : "#60a5fa",
                 }}
               >
-                <span>{viewMode === "git" ? "Git 变更差分 (+ / -)" : "处理后结构"}</span>
+                <span>{viewMode === "git" ? "变更差分(+ / -)" : "处理后结构"}</span>
                 <Badge variant="subtle" size="sm" style={{ color: "#38bdf8" }}>
                   {currentDiff?.afterTabs.length || 0} 标签
                 </Badge>

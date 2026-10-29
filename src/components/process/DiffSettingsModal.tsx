@@ -7,7 +7,7 @@ import { useConfigStore, ProcessScope } from "@/store/useConfigStore";
 import { DomainMatchMode } from "@/services/domainMergeEngine";
 import { X, SlidersHorizontal, Check, Globe } from "lucide-react";
 
-interface DiffSettingsModalProps {
+export interface DiffSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   activePanelId?: string;
