@@ -414,3 +414,5 @@ export function ProcessPage() {
     </div>
   );
 }
+
+export default ProcessPage;
