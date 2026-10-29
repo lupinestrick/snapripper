@@ -6,15 +6,47 @@ import { useConfigStore } from "@/store/useConfigStore";
 import { computeSnapshotDiff } from "@/services/diffEngine";
 import { PanelDiffResult, SideberySnapshot } from "@/types/sidebery";
 import { DiffHopupModal } from "./DiffHopupModal";
+import { DiffSettingsModal } from "./DiffSettingsModal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, FolderPlus, Bot, ArrowRight, AlertCircle, Sparkles } from "lucide-react";
+import {
+  Trash2,
+  FolderPlus,
+  Bot,
+  AlertCircle,
+  Sparkles,
+  Globe,
+  SlidersHorizontal,
+  ChevronRight,
+} from "lucide-react";
 
 export function ProcessPage() {
   const { rawSnapshot, duplicateUrls, applySnapshotUpdate } = useSnapshotStore();
-  const { rulesSettings } = useConfigStore();
+  const {
+    rulesSettings,
+    domainMergeConfig,
+    processScope,
+    selectedProcessPanelIds,
+    exemptPinned,
+    exemptInternalPages,
+    preserveSubtrees,
+  } = useConfigStore();
 
   const [diffModalOpen, setDiffModalOpen] = useState(false);
+  const [domainSettingsModalOpen, setDomainSettingsModalOpen] = useState(false);
+
+  const [activeProcessOptions, setActiveProcessOptions] = useState<{
+    enableDedup: boolean;
+    enableRules: boolean;
+    enableDomainMerge: boolean;
+    enableAI: boolean;
+  }>({
+    enableDedup: true,
+    enableRules: true,
+    enableDomainMerge: false,
+    enableAI: false,
+  });
+
   const [diffResults, setDiffResults] = useState<{
     panelDiffs: PanelDiffResult[];
     newSnapshot: SideberySnapshot | null;
@@ -48,13 +80,27 @@ export function ProcessPage() {
 
   const enabledRulesCount = rulesSettings.rules.filter((r) => r.enabled).length;
 
-  const handleRunDiff = (options: { enableDedup: boolean; enableRules: boolean; enableAI: boolean }) => {
+  const runDiffComputation = (options: {
+    enableDedup: boolean;
+    enableRules: boolean;
+    enableDomainMerge: boolean;
+    enableAI: boolean;
+  }) => {
+    setActiveProcessOptions(options);
+
     const result = computeSnapshotDiff(
       rawSnapshot,
       {
         enableDedup: options.enableDedup,
         enableRules: options.enableRules,
+        enableDomainMerge: options.enableDomainMerge,
+        domainMergeConfig,
         enableAICategorize: options.enableAI,
+        scope: processScope,
+        targetPanelIds: selectedProcessPanelIds,
+        exemptPinned,
+        exemptInternalPages,
+        preserveSubtrees,
       },
       rulesSettings
     );
@@ -63,12 +109,47 @@ export function ProcessPage() {
     setDiffModalOpen(true);
   };
 
+  const handleRecomputeCurrentDiff = () => {
+    if (!rawSnapshot) return;
+    const result = computeSnapshotDiff(
+      rawSnapshot,
+      {
+        enableDedup: activeProcessOptions.enableDedup,
+        enableRules: activeProcessOptions.enableRules,
+        enableDomainMerge: activeProcessOptions.enableDomainMerge,
+        domainMergeConfig: useConfigStore.getState().domainMergeConfig,
+        enableAICategorize: activeProcessOptions.enableAI,
+        scope: useConfigStore.getState().processScope,
+        targetPanelIds: useConfigStore.getState().selectedProcessPanelIds,
+        exemptPinned: useConfigStore.getState().exemptPinned,
+        exemptInternalPages: useConfigStore.getState().exemptInternalPages,
+        preserveSubtrees: useConfigStore.getState().preserveSubtrees,
+      },
+      useConfigStore.getState().rulesSettings
+    );
+
+    setDiffResults(result);
+  };
+
   const handleConfirmApply = () => {
     if (diffResults.newSnapshot) {
-      applySnapshotUpdate(diffResults.newSnapshot, "执行去重与规则整理");
+      applySnapshotUpdate(diffResults.newSnapshot, "执行处理中心变更");
       setDiffModalOpen(false);
     }
   };
+
+  const panels = rawSnapshot?.panels
+    ? (Object.values(rawSnapshot.panels) as any[]).map((p) => ({ id: p.id, name: p.name || p.id }))
+    : [];
+
+  const domainModeLabel =
+    domainMergeConfig.matchMode === "suffix"
+      ? "主域后缀"
+      : domainMergeConfig.matchMode === "full"
+      ? "完整域名"
+      : domainMergeConfig.matchMode === "keyword"
+      ? "域名关键字"
+      : "自定义规则";
 
   return (
     <div style={{ padding: "2rem", maxWidth: "900px", margin: "0 auto", color: "#f8fafc" }}>
@@ -84,7 +165,14 @@ export function ProcessPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         {/* Card 1: All-in-One Optimization */}
         <div
-          onClick={() => handleRunDiff({ enableDedup: true, enableRules: true, enableAI: false })}
+          onClick={() =>
+            runDiffComputation({
+              enableDedup: true,
+              enableRules: true,
+              enableDomainMerge: true,
+              enableAI: false,
+            })
+          }
           style={{
             padding: "1.25rem",
             borderRadius: "1rem",
@@ -115,23 +203,32 @@ export function ProcessPage() {
               <Sparkles size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>一键全量优化 (去重 + 规则建组)</div>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>
+                一键全量优化 (去重 + 同域名合并 + 规则建组)
+              </div>
               <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
-                同时执行 URL 智能去重与关键词规则自动折叠分组
+                同时执行 URL 智能去重、同域名折叠与关键词规则自动建组
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <Button variant="solid" size="xs" pill style={{ backgroundColor: "#2563eb", color: "#fff" }}>
-              <span>预览 Diff</span>
-              <ArrowRight size={13} />
-            </Button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Badge variant="subtle" size="sm" style={{ color: "#60a5fa" }}>
+              全量综合优化
+            </Badge>
+            <ChevronRight size={16} color="#64748b" />
           </div>
         </div>
 
         {/* Card 2: Deduplication */}
         <div
-          onClick={() => handleRunDiff({ enableDedup: true, enableRules: false, enableAI: false })}
+          onClick={() =>
+            runDiffComputation({
+              enableDedup: true,
+              enableRules: false,
+              enableDomainMerge: false,
+              enableAI: false,
+            })
+          }
           style={{
             padding: "1.25rem",
             borderRadius: "1rem",
@@ -168,20 +265,91 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Badge variant="subtle" size="sm" style={{ color: "#38bdf8" }}>
               发现 {duplicateUrls.size} 个重复项
             </Badge>
-            <Button variant="outline" size="xs" pill style={{ borderColor: "#334155", color: "#38bdf8" }}>
-              <span>去重 Diff</span>
-              <ArrowRight size={13} />
-            </Button>
+            <ChevronRight size={16} color="#64748b" />
           </div>
         </div>
 
-        {/* Card 3: Rule-based Grouping */}
+        {/* Card 3: Same Domain Tabs Merge */}
         <div
-          onClick={() => handleRunDiff({ enableDedup: false, enableRules: true, enableAI: false })}
+          onClick={() =>
+            runDiffComputation({
+              enableDedup: false,
+              enableRules: false,
+              enableDomainMerge: true,
+              enableAI: false,
+            })
+          }
+          style={{
+            padding: "1.25rem",
+            borderRadius: "1rem",
+            backgroundColor: "#1e293b",
+            border: "1px solid #334155",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: "pointer",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#06b6d4")}
+          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#334155")}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div
+              style={{
+                width: "44px",
+                height: "44px",
+                borderRadius: "9999px",
+                backgroundColor: "rgba(6, 182, 212, 0.15)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#06b6d4",
+              }}
+            >
+              <Globe size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>同域名标签合并</div>
+              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+                将同域名的标签页自动归类折叠为分组
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Badge variant="subtle" size="sm" style={{ color: "#06b6d4" }}>
+              {domainModeLabel} (≥{domainMergeConfig.minThreshold || 2})
+            </Badge>
+            <Button
+              variant="outline"
+              size="xs"
+              pill
+              onClick={(e) => {
+                e.stopPropagation();
+                setDomainSettingsModalOpen(true);
+              }}
+              title="配置域名匹配方案与整理设置"
+            >
+              <SlidersHorizontal size={13} />
+              <span>设置</span>
+            </Button>
+            <ChevronRight size={16} color="#64748b" />
+          </div>
+        </div>
+
+        {/* Card 4: Rule-based Grouping */}
+        <div
+          onClick={() =>
+            runDiffComputation({
+              enableDedup: false,
+              enableRules: true,
+              enableDomainMerge: false,
+              enableAI: false,
+            })
+          }
           style={{
             padding: "1.25rem",
             borderRadius: "1rem",
@@ -218,20 +386,24 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <Badge variant="subtle" size="sm" style={{ color: "#34d399" }}>
               {enabledRulesCount} 条规则已启用
             </Badge>
-            <Button variant="outline" size="xs" pill style={{ borderColor: "#334155", color: "#34d399" }}>
-              <span>建组 Diff</span>
-              <ArrowRight size={13} />
-            </Button>
+            <ChevronRight size={16} color="#64748b" />
           </div>
         </div>
 
-        {/* Card 4: AI Categorization */}
+        {/* Card 5: AI Categorization */}
         <div
-          onClick={() => handleRunDiff({ enableDedup: false, enableRules: false, enableAI: true })}
+          onClick={() =>
+            runDiffComputation({
+              enableDedup: false,
+              enableRules: false,
+              enableDomainMerge: false,
+              enableAI: true,
+            })
+          }
           style={{
             padding: "1.25rem",
             borderRadius: "1rem",
@@ -268,11 +440,11 @@ export function ProcessPage() {
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <Button variant="outline" size="xs" pill style={{ borderColor: "#334155", color: "#a855f7" }}>
-              <span>AI 重构 Diff</span>
-              <ArrowRight size={13} />
-            </Button>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Badge variant="subtle" size="sm" style={{ color: "#a855f7" }}>
+              大模型语义聚类
+            </Badge>
+            <ChevronRight size={16} color="#64748b" />
           </div>
         </div>
       </div>
@@ -285,6 +457,20 @@ export function ProcessPage() {
         panelDiffs={diffResults.panelDiffs}
         totalDeduped={diffResults.totalDeduped}
         totalGroupsCreated={diffResults.totalGroupsCreated}
+        onRecomputeDiff={handleRecomputeCurrentDiff}
+      />
+
+      {/* Standalone Settings Hop-up Modal (Opened from Same Domain Merge Card) */}
+      <DiffSettingsModal
+        isOpen={domainSettingsModalOpen}
+        onClose={() => setDomainSettingsModalOpen(false)}
+        panels={panels}
+        onSave={() => {
+          // If diff is currently open or ready, recompute
+          if (diffModalOpen) {
+            handleRecomputeCurrentDiff();
+          }
+        }}
       />
     </div>
   );

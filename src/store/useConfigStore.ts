@@ -3,8 +3,11 @@ import { persist } from "zustand/middleware";
 import { AIConfig, AI_PROVIDERS } from "@/types/ai";
 import { CategorizationRule, RulesSettings } from "@/types/sidebery";
 import { DEFAULT_RULES_SETTINGS } from "@/services/ruleEngine";
+import { DomainMergeConfig, DEFAULT_DOMAIN_MERGE_CONFIG } from "@/services/domainMergeEngine";
 
 export type AppPage = "workbench" | "process" | "rules" | "ai" | "settings";
+
+export type ProcessScope = "current" | "all" | "selected";
 
 export interface AIThresholds {
   minTabsPerGroup: number;
@@ -21,6 +24,11 @@ interface ConfigState {
   cascadeSelectChildren: boolean;
   aiThresholds: AIThresholds;
 
+  // Process & Diff Scope Settings
+  processScope: ProcessScope;
+  selectedProcessPanelIds: string[];
+  domainMergeConfig: DomainMergeConfig;
+
   setActivePage: (page: AppPage) => void;
   setAIConfig: (config: Partial<AIConfig>) => void;
   setRulesSettings: (settings: Partial<RulesSettings>) => void;
@@ -36,6 +44,10 @@ interface ConfigState {
   setPreserveSubtrees: (val: boolean) => void;
   setCascadeSelectChildren: (val: boolean) => void;
   setAiThresholds: (thresholds: Partial<AIThresholds>) => void;
+
+  setProcessScope: (scope: ProcessScope) => void;
+  setSelectedProcessPanelIds: (panelIds: string[]) => void;
+  setDomainMergeConfig: (config: Partial<DomainMergeConfig>) => void;
 }
 
 export const useConfigStore = create<ConfigState>()(
@@ -59,6 +71,9 @@ export const useConfigStore = create<ConfigState>()(
         minTabsPerGroup: 2,
         maxCategories: 6,
       },
+      processScope: "all",
+      selectedProcessPanelIds: [],
+      domainMergeConfig: DEFAULT_DOMAIN_MERGE_CONFIG,
 
       setActivePage: (page) => set({ activePage: page }),
 
@@ -140,6 +155,13 @@ export const useConfigStore = create<ConfigState>()(
       setAiThresholds: (thresholds) =>
         set((state) => ({
           aiThresholds: { ...state.aiThresholds, ...thresholds },
+        })),
+
+      setProcessScope: (processScope) => set({ processScope }),
+      setSelectedProcessPanelIds: (selectedProcessPanelIds) => set({ selectedProcessPanelIds }),
+      setDomainMergeConfig: (config) =>
+        set((state) => ({
+          domainMergeConfig: { ...state.domainMergeConfig, ...config },
         })),
     }),
     {

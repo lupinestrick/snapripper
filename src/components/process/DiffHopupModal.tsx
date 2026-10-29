@@ -6,8 +6,9 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
-import { X, Check, GitCommit, ListTree, Folder, Globe } from "lucide-react";
+import { X, Check, GitCommit, ListTree, Folder, Globe, SlidersHorizontal } from "lucide-react";
 import { extractDomain } from "@/utils/urlHelper";
+import { DiffSettingsModal } from "./DiffSettingsModal";
 
 interface DiffHopupModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface DiffHopupModalProps {
   panelDiffs: PanelDiffResult[];
   totalDeduped: number;
   totalGroupsCreated: number;
+  onRecomputeDiff?: () => void;
 }
 
 export function DiffHopupModal({
@@ -25,10 +27,12 @@ export function DiffHopupModal({
   panelDiffs,
   totalDeduped,
   totalGroupsCreated,
+  onRecomputeDiff,
 }: DiffHopupModalProps) {
   const [activePanelId, setActivePanelId] = useState<string>("");
   const [isNarrowScreen, setIsNarrowScreen] = useState(false);
   const [viewMode, setViewMode] = useState<"tree" | "git">("tree");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (panelDiffs.length > 0 && !activePanelId) {
@@ -97,19 +101,31 @@ export function DiffHopupModal({
               </div>
             </div>
 
-            {/* Only One X Button */}
-            <Dialog.CloseTrigger asChild>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="xs"
                 pill
-                onClick={onClose}
-                style={{ color: "#94a3b8", padding: "4px" }}
-                title="关闭"
+                onClick={() => setIsSettingsOpen(true)}
+                title="处理与整理设置"
               >
-                <X size={18} />
+                <SlidersHorizontal size={13} />
+                <span>设置</span>
               </Button>
-            </Dialog.CloseTrigger>
+
+              <Dialog.CloseTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  pill
+                  onClick={onClose}
+                  style={{ color: "#94a3b8", padding: "4px" }}
+                  title="关闭"
+                >
+                  <X size={18} />
+                </Button>
+              </Dialog.CloseTrigger>
+            </div>
           </div>
 
           {/* Panel Selector & Git Diff View Mode Toggle */}
@@ -308,6 +324,15 @@ export function DiffHopupModal({
           </div>
         </Dialog.Content>
       </Dialog.Positioner>
+
+      {/* Nested Settings Hop-up Modal */}
+      <DiffSettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        activePanelId={activePanelId}
+        panels={panelDiffs.map((p) => ({ id: p.panelId, name: p.panelName }))}
+        onSave={() => onRecomputeDiff?.()}
+      />
     </Dialog.Root>
   );
 }

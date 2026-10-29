@@ -8,6 +8,7 @@ import {
   batchUpdatePanel,
   batchUpdatePinned,
   getDuplicateUrlSet,
+  filterTree,
   reorganizeTreeIntoCategories,
   reorganizeTabsIntoPanels,
 } from "@/services/treeOperations";
@@ -172,15 +173,43 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
   },
 
   selectAll: () => {
-    const { rootNodes } = get();
+    const { rootNodes, searchQuery, panelFilter, containerFilter, onlyDuplicates, duplicateUrls } = get();
     const all = new Set<string>();
-    function collect(nodes: TabTreeNode[]) {
-      for (const n of nodes) {
-        all.add(n.id);
-        if (n.children) collect(n.children);
+
+    const hasFilter = searchQuery.trim() !== "" || !!panelFilter || !!containerFilter || onlyDuplicates;
+
+    if (hasFilter) {
+      const filtered = filterTree(rootNodes, searchQuery, {
+        panelId: panelFilter || undefined,
+        containerId: containerFilter || undefined,
+        showOnlyDuplicates: onlyDuplicates,
+        duplicateUrls,
+      });
+
+      function collectMatching(nodes: TabTreeNode[]) {
+        for (const n of nodes) {
+          if (onlyDuplicates) {
+            // Strictly select only nodes that are actual duplicate tabs
+            if (duplicateUrls.has(n.tab.url)) {
+              all.add(n.id);
+            }
+          } else {
+            all.add(n.id);
+          }
+          if (n.children) collectMatching(n.children);
+        }
       }
+      collectMatching(filtered);
+    } else {
+      function collect(nodes: TabTreeNode[]) {
+        for (const n of nodes) {
+          all.add(n.id);
+          if (n.children) collect(n.children);
+        }
+      }
+      collect(rootNodes);
     }
-    collect(rootNodes);
+
     set({ selectedIds: all });
   },
 
