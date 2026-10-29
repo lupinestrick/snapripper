@@ -1,22 +1,17 @@
 "use client";
 
-import React, { useRef } from "react";
-import { FolderUp, Sparkles, Download, Undo2, PlayCircle, Settings, Layers } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { FolderUp, Download, Undo2, PlayCircle, Loader2 } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
-import { useConfigStore } from "@/store/useConfigStore";
-import { MOCK_SIDEBERY_SNAPSHOT } from "@/utils/mockSnapshot";
-import { serializeSnapshot } from "@/services/snapshotParser";
 
 interface TopNavProps {
-  onOpenAIConfig: () => void;
   onOpenExport: () => void;
-  onTriggerAIAnalysis: () => void;
 }
 
-export function TopNav({ onOpenAIConfig, onOpenExport, onTriggerAIAnalysis }: TopNavProps) {
+export function TopNav({ onOpenExport }: TopNavProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { loadSnapshot, undoStack, undo, rawSnapshot, fileName } = useSnapshotStore();
-  const { aiConfig } = useConfigStore();
+  const [loadingUserSnapshot, setLoadingUserSnapshot] = useState(false);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,9 +30,18 @@ export function TopNav({ onOpenAIConfig, onOpenExport, onTriggerAIAnalysis }: To
     e.target.value = "";
   };
 
-  const handleLoadDemo = () => {
-    const demoJson = serializeSnapshot(MOCK_SIDEBERY_SNAPSHOT);
-    loadSnapshot(demoJson, "Sidebery_Demo_Snapshot.json");
+  const handleLoadUserSnapshot = async () => {
+    setLoadingUserSnapshot(true);
+    try {
+      const res = await fetch("/api/user-snapshot");
+      if (!res.ok) throw new Error("无法读取目录中的快照文件");
+      const jsonText = await res.text();
+      loadSnapshot(jsonText, "sidebery-snapshot-2026.10.22-00.48.27.json");
+    } catch (err: any) {
+      alert(err.message || "载入失败");
+    } finally {
+      setLoadingUserSnapshot(false);
+    }
   };
 
   const hasData = !!rawSnapshot;
@@ -48,12 +52,12 @@ export function TopNav({ onOpenAIConfig, onOpenExport, onTriggerAIAnalysis }: To
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "0.75rem 1.5rem",
-        backgroundColor: "var(--bg-surface)",
-        borderBottom: "1px solid var(--border-subtle)",
+        padding: "0.6rem 1.25rem",
+        backgroundColor: "#111827",
+        borderBottom: "1px solid #1e293b",
         position: "sticky",
         top: 0,
-        zIndex: 40,
+        zIndex: 30,
       }}
     >
       <input
@@ -64,172 +68,114 @@ export function TopNav({ onOpenAIConfig, onOpenExport, onTriggerAIAnalysis }: To
         onChange={handleFileUpload}
       />
 
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "2.25rem",
-            height: "2.25rem",
-            borderRadius: "0.5rem",
-            backgroundColor: "rgba(56, 189, 248, 0.15)",
-            color: "var(--accent)",
-          }}
-        >
-          <Layers size={20} />
-        </div>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ fontWeight: 700, fontSize: "1.1rem", letterSpacing: "-0.025em" }}>SnapRipper</span>
-            <span
-              style={{
-                fontSize: "0.7rem",
-                padding: "0.1rem 0.4rem",
-                borderRadius: "0.25rem",
-                backgroundColor: "rgba(56, 189, 248, 0.2)",
-                color: "var(--accent)",
-                fontWeight: 600,
-              }}
-            >
-              Sidebery 快照工具
-            </span>
-          </div>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            {fileName ? `当前快照: ${fileName}` : "本地安全编辑 · AI 比例归类 · 无损导出"}
-          </p>
-        </div>
+      {/* Snapshot Info */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+          {fileName ? fileName : "未加载快照"}
+        </span>
+        {rawSnapshot && (
+          <span
+            style={{
+              fontSize: "0.7rem",
+              padding: "2px 8px",
+              borderRadius: "9999px",
+              backgroundColor: "rgba(56, 189, 248, 0.15)",
+              color: "#38bdf8",
+              fontWeight: 600,
+            }}
+          >
+            已就绪
+          </span>
+        )}
       </div>
 
+      {/* Action Buttons (Pill / Round style) */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        {!hasData && (
+          <button
+            onClick={handleLoadUserSnapshot}
+            disabled={loadingUserSnapshot}
+            style={{
+              padding: "0.4rem 1rem",
+              borderRadius: "9999px",
+              border: "1px solid #0284c7",
+              backgroundColor: "rgba(2, 132, 199, 0.15)",
+              color: "#38bdf8",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              cursor: loadingUserSnapshot ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+            }}
+          >
+            {loadingUserSnapshot ? <Loader2 size={14} /> : <PlayCircle size={14} />}
+            <span>载入目录快照 (1,174 标签)</span>
+          </button>
+        )}
+
         <button
           onClick={() => fileInputRef.current?.click()}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.4rem",
-            padding: "0.45rem 0.85rem",
-            borderRadius: "0.375rem",
-            fontSize: "0.85rem",
+            padding: "0.4rem 0.9rem",
+            borderRadius: "9999px",
+            border: "1px solid #334155",
+            backgroundColor: "#1e293b",
+            color: "#94a3b8",
+            fontSize: "0.8rem",
             fontWeight: 500,
             cursor: "pointer",
-            border: "1px solid var(--border-subtle)",
-            backgroundColor: "var(--bg-subtle)",
-            color: "var(--text-main)",
-            transition: "all 0.15s",
-          }}
-        >
-          <FolderUp size={16} />
-          导入快照 JSON
-        </button>
-
-        <button
-          onClick={handleLoadDemo}
-          title="加载包含多样测试标签的模拟快照"
-          style={{
             display: "flex",
             alignItems: "center",
             gap: "0.4rem",
-            padding: "0.45rem 0.85rem",
-            borderRadius: "0.375rem",
-            fontSize: "0.85rem",
-            fontWeight: 500,
-            cursor: "pointer",
-            border: "1px solid rgba(56, 189, 248, 0.4)",
-            backgroundColor: "rgba(56, 189, 248, 0.1)",
-            color: "var(--accent)",
-            transition: "all 0.15s",
           }}
         >
-          <PlayCircle size={16} />
-          演示样本
-        </button>
-
-        {undoStack.length > 0 && (
-          <button
-            onClick={undo}
-            title={`撤销上一次操作 (Ctrl+Z) - 剩余 ${undoStack.length} 步`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
-              padding: "0.45rem 0.75rem",
-              borderRadius: "0.375rem",
-              fontSize: "0.85rem",
-              cursor: "pointer",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "transparent",
-              color: "var(--text-main)",
-            }}
-          >
-            <Undo2 size={16} />
-            撤销 ({undoStack.length})
-          </button>
-        )}
-
-        <button
-          onClick={onOpenAIConfig}
-          title="配置 AI 模型与 API 端点"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.4rem",
-            padding: "0.45rem 0.75rem",
-            borderRadius: "0.375rem",
-            fontSize: "0.85rem",
-            cursor: "pointer",
-            border: "1px solid var(--border-subtle)",
-            backgroundColor: "transparent",
-            color: "var(--text-muted)",
-          }}
-        >
-          <Settings size={16} />
-          AI 设置
+          <FolderUp size={14} />
+          <span>上传 JSON</span>
         </button>
 
         {hasData && (
-          <button
-            onClick={onTriggerAIAnalysis}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.45rem 0.95rem",
-              borderRadius: "0.375rem",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              border: "none",
-              backgroundColor: "#2563eb",
-              color: "#ffffff",
-              boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)",
-            }}
-          >
-            <Sparkles size={16} />
-            AI 比例分析
-          </button>
-        )}
+          <>
+            <button
+              onClick={undo}
+              disabled={undoStack.length === 0}
+              style={{
+                width: "32px",
+                height: "32px",
+                borderRadius: "9999px",
+                border: "1px solid #334155",
+                backgroundColor: "#1e293b",
+                color: undoStack.length > 0 ? "#94a3b8" : "#475569",
+                cursor: undoStack.length > 0 ? "pointer" : "not-allowed",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              title="撤销 (Undo)"
+            >
+              <Undo2 size={15} />
+            </button>
 
-        {hasData && (
-          <button
-            onClick={onOpenExport}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.45rem 0.95rem",
-              borderRadius: "0.375rem",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              border: "none",
-              backgroundColor: "var(--accent)",
-              color: "#0f172a",
-            }}
-          >
-            <Download size={16} />
-            导出快照
-          </button>
+            <button
+              onClick={onOpenExport}
+              style={{
+                padding: "0.4rem 1.1rem",
+                borderRadius: "9999px",
+                border: "none",
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+              }}
+            >
+              <Download size={14} />
+              <span>导出快照</span>
+            </button>
+          </>
         )}
       </div>
     </header>

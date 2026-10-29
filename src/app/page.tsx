@@ -1,57 +1,43 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopNav } from "@/components/layout/TopNav";
 import { StatsHeader } from "@/components/layout/StatsHeader";
 import { SearchFilter } from "@/components/editor/SearchFilter";
 import { TabTreeView } from "@/components/editor/TabTreeView";
 import { BatchBar } from "@/components/editor/BatchBar";
-import { ProportionCard } from "@/components/ai/ProportionCard";
-import { AIConfigDialog } from "@/components/ai/AIConfigDialog";
-import { CategorizeModal } from "@/components/ai/CategorizeModal";
+import { ProcessPage } from "@/components/process/ProcessPage";
+import { RulesPage } from "@/components/rules/RulesPage";
+import { AIPage } from "@/components/ai/AIPage";
 import { ExportDialog } from "@/components/export/ExportDialog";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
-import { analyzeTabProportions } from "@/services/aiService";
-import { flattenTabTree } from "@/services/snapshotParser";
 import { Loader2 } from "lucide-react";
 
 export default function WorkbenchPage() {
-  const {
-    rawSnapshot,
-    rootNodes,
-    proportionReport,
-    setProportionReport,
-    isAnalyzing,
-    setIsAnalyzing,
-    progressStatus,
-    loadSnapshot,
-  } = useSnapshotStore();
+  const { rawSnapshot, loadSnapshot } = useSnapshotStore();
+  const { activePage } = useConfigStore();
 
-  const { aiConfig } = useConfigStore();
-
-  const [aiConfigOpen, setAiConfigOpen] = useState(false);
-  const [categorizeModalOpen, setCategorizeModalOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleTriggerAIAnalysis = async () => {
-    if (rootNodes.length === 0) return;
-    const allTabs = flattenTabTree(rootNodes);
-
-    setIsAnalyzing(true, "准备发送至 AI 分析...");
-    try {
-      const report = await analyzeTabProportions(allTabs, aiConfig, (status) => {
-        setIsAnalyzing(true, status);
-      });
-      setProportionReport(report);
-      setIsAnalyzing(false);
-    } catch (err: any) {
-      setIsAnalyzing(false);
-      alert(`AI 分析失败: ${err.message || "请检查 AI 设置中的端点与 API Key"}`);
-      setAiConfigOpen(true);
+  // Auto load project snapshot on first load if none is present
+  useEffect(() => {
+    if (!rawSnapshot) {
+      fetch("/api/user-snapshot")
+        .then((res) => {
+          if (res.ok) return res.text();
+          throw new Error("No default snapshot file found");
+        })
+        .then((jsonText) => {
+          loadSnapshot(jsonText, "sidebery-snapshot-2026.10.22-00.48.27.json");
+        })
+        .catch(() => {
+          // Ignore if user hasn't put snapshot or error
+        });
     }
-  };
+  }, [rawSnapshot, loadSnapshot]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -81,26 +67,29 @@ export default function WorkbenchPage() {
   };
 
   return (
-    <main
+    <div
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       style={{
         display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
-        backgroundColor: "var(--bg-primary)",
+        height: "100vh",
+        width: "100vw",
+        overflow: "hidden",
+        backgroundColor: "#0b1120",
+        color: "#f8fafc",
         position: "relative",
       }}
     >
+      {/* Drag & Drop Overlay */}
       {isDragOver && (
         <div
           style={{
             position: "fixed",
             inset: 0,
             backgroundColor: "rgba(56, 189, 248, 0.15)",
-            backdropFilter: "blur(2px)",
-            border: "3px dashed var(--accent)",
+            backdropFilter: "blur(4px)",
+            border: "3px dashed #38bdf8",
             zIndex: 999,
             display: "flex",
             alignItems: "center",
@@ -110,69 +99,55 @@ export default function WorkbenchPage() {
         >
           <div
             style={{
-              padding: "1.5rem 2.5rem",
-              backgroundColor: "var(--bg-surface)",
-              borderRadius: "0.75rem",
-              boxShadow: "0 20px 25px -5px rgba(0,0,0,0.5)",
-              color: "var(--accent)",
+              padding: "1.25rem 2.5rem",
+              backgroundColor: "#1e293b",
+              borderRadius: "9999px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.6)",
+              color: "#38bdf8",
               fontWeight: 700,
-              fontSize: "1.2rem",
+              fontSize: "1.1rem",
             }}
           >
-            松开鼠标以导入 Sidebery 快照 JSON
+            松开以导入 Sidebery 快照 JSON
           </div>
         </div>
       )}
 
-      <TopNav
-        onOpenAIConfig={() => setAiConfigOpen(true)}
-        onOpenExport={() => setExportDialogOpen(true)}
-        onTriggerAIAnalysis={handleTriggerAIAnalysis}
-      />
+      {/* Left Sidebar Navigation */}
+      <AppSidebar />
 
-      <StatsHeader />
+      {/* Main Content Area */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        <TopNav onOpenExport={() => setExportDialogOpen(true)} />
 
-      {rawSnapshot && <SearchFilter />}
+        <main style={{ flex: 1, overflowY: "auto", position: "relative", paddingBottom: "70px" }}>
+          {activePage === "workbench" && (
+            <>
+              <StatsHeader />
+              {rawSnapshot && <SearchFilter />}
+              <TabTreeView />
+              <BatchBar />
+            </>
+          )}
 
-      {isAnalyzing && (
-        <div
-          style={{
-            margin: "0.75rem 1.5rem",
-            padding: "0.75rem 1rem",
-            backgroundColor: "rgba(56, 189, 248, 0.1)",
-            border: "1px solid var(--accent)",
-            borderRadius: "0.5rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            fontSize: "0.85rem",
-            color: "var(--accent)",
-          }}
-        >
-          <Loader2 size={16} />
-          <span>{progressStatus || "正在进行智能比例探查与聚类分析..."}</span>
-        </div>
-      )}
+          {activePage === "process" && <ProcessPage />}
 
-      {proportionReport && (
-        <ProportionCard
-          onStartClassification={() => setCategorizeModalOpen(true)}
-          onClose={() => setProportionReport(null)}
-        />
-      )}
+          {activePage === "rules" && <RulesPage />}
 
-      <TabTreeView />
-
-      <BatchBar />
-
-      <AIConfigDialog isOpen={aiConfigOpen} onClose={() => setAiConfigOpen(false)} />
-
-      <CategorizeModal
-        isOpen={categorizeModalOpen}
-        onClose={() => setCategorizeModalOpen(false)}
-      />
+          {activePage === "ai" && <AIPage />}
+        </main>
+      </div>
 
       <ExportDialog isOpen={exportDialogOpen} onClose={() => setExportDialogOpen(false)} />
-    </main>
+    </div>
   );
 }

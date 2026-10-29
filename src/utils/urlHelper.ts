@@ -11,6 +11,8 @@ export function extractDomain(url: string): string {
   }
 }
 
+export const getDomain = extractDomain;
+
 export function isExemptUrl(url: string, pinned?: boolean): boolean {
   if (pinned) return true;
   if (!url) return true;

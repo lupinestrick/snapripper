@@ -1,12 +1,11 @@
 import { create } from "zustand";
-import { SideberySnapshot, SideberyTab, TabTreeNode, SideberyPanel, SideberyContainer } from "@/types/sidebery";
+import { SideberySnapshot, SideberyTab, TabTreeNode } from "@/types/sidebery";
 import { ProportionReport } from "@/types/ai";
-import { parseSnapshot, buildTabTree, flattenTabTree, serializeSnapshot } from "@/services/snapshotParser";
+import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
 import {
   batchDeleteNodes,
   batchUpdatePanel,
   batchUpdatePinned,
-  filterTree,
   getDuplicateUrlSet,
   reorganizeTreeIntoCategories,
   reorganizeTabsIntoPanels,
@@ -16,6 +15,7 @@ interface SnapshotStoreState {
   rawSnapshot: SideberySnapshot | null;
   fileName: string;
   activeWindowId: string;
+  activePanelId: string | null; // null = all panels
   rootNodes: TabTreeNode[];
   selectedIds: Set<string>;
   expandedIds: Set<string>;
@@ -31,9 +31,11 @@ interface SnapshotStoreState {
   progressStatus: string;
   classificationProgress: { current: number; total: number };
 
-  undoStack: TabTreeNode[][];
+  undoStack: SideberySnapshot[];
+  redoStack: SideberySnapshot[];
 
   loadSnapshot: (jsonString: string, fileName: string) => void;
+  setActivePanelId: (panelId: string | null) => void;
   selectTab: (id: string, isMulti?: boolean, isRange?: boolean) => void;
   selectAll: () => void;
   clearSelection: () => void;
@@ -48,7 +50,9 @@ interface SnapshotStoreState {
   deleteSelected: () => void;
   markSelectedPinned: (pinned: boolean) => void;
   moveSelectedToPanel: (targetPanelId: string) => void;
+  applySnapshotUpdate: (newSnapshot: SideberySnapshot, actionLabel?: string) => void;
   undo: () => void;
+  redo: () => void;
 
   setProportionReport: (report: ProportionReport | null) => void;
   updateCategoryName: (categoryId: string, newName: string) => void;
@@ -67,6 +71,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
   rawSnapshot: null,
   fileName: "",
   activeWindowId: "1",
+  activePanelId: null,
   rootNodes: [],
   selectedIds: new Set<string>(),
   expandedIds: new Set<string>(),
@@ -83,6 +88,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
   classificationProgress: { current: 0, total: 0 },
 
   undoStack: [],
+  redoStack: [],
 
   loadSnapshot: (jsonString, fileName) => {
     const parsed = parseSnapshot(jsonString);
@@ -98,149 +104,261 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
       rawSnapshot: parsed.snapshot,
       fileName,
       activeWindowId: primaryWinId,
-      rootNodes: tree,
-      selectedIds: new Set(),
-      expandedIds: initialExpanded,
-      duplicateUrls: duplicates,
-      proportionReport: null,
-      undoStack: [],
-      searchQuery: "",
+      activePanelId: null,
       panelFilter: null,
-      containerFilter: null,
+      rootNodes: tree,
+      duplicateUrls: duplicates,
+      expandedIds: initialExpanded,
+      selectedIds: new Set<string>(),
+      searchQuery: "",
       onlyDuplicates: false,
+      undoStack: [],
+      redoStack: [],
+      proportionReport: null,
     });
   },
 
-  selectTab: (id, isMulti = false) => {
+  setActivePanelId: (panelId) => {
+    set({ activePanelId: panelId, panelFilter: panelId });
+  },
+
+  selectTab: (id, isMulti, isRange) => {
     const { selectedIds } = get();
-    const next = new Set(selectedIds);
-    if (!isMulti) {
-      if (next.has(id) && next.size === 1) {
-        next.clear();
+    const next = new Set(isMulti ? selectedIds : []);
+
+    if (isMulti) {
+      if (next.has(id)) {
+        next.delete(id);
       } else {
-        next.clear();
         next.add(id);
       }
     } else {
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.clear();
+      next.add(id);
     }
+
     set({ selectedIds: next });
   },
 
   selectAll: () => {
-    const allIds = new Set<string>();
+    const { rootNodes } = get();
+    const all = new Set<string>();
     function collect(nodes: TabTreeNode[]) {
       for (const n of nodes) {
-        allIds.add(n.id);
+        all.add(n.id);
         if (n.children) collect(n.children);
       }
     }
-    collect(get().rootNodes);
-    set({ selectedIds: allIds });
+    collect(rootNodes);
+    set({ selectedIds: all });
   },
 
-  clearSelection: () => set({ selectedIds: new Set() }),
+  clearSelection: () => {
+    set({ selectedIds: new Set<string>() });
+  },
 
   toggleExpand: (id) => {
     const { expandedIds } = get();
     const next = new Set(expandedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
     set({ expandedIds: next });
   },
 
   expandAll: () => {
-    const allIds = new Set<string>();
+    const { rootNodes } = get();
+    const all = new Set<string>();
     function collect(nodes: TabTreeNode[]) {
       for (const n of nodes) {
-        if (n.children.length > 0) allIds.add(n.id);
-        collect(n.children);
+        if (n.children && n.children.length > 0) {
+          all.add(n.id);
+          collect(n.children);
+        }
       }
     }
-    collect(get().rootNodes);
-    set({ expandedIds: allIds });
+    collect(rootNodes);
+    set({ expandedIds: all });
   },
 
-  collapseAll: () => set({ expandedIds: new Set() }),
+  collapseAll: () => {
+    set({ expandedIds: new Set<string>() });
+  },
 
-  setSearchQuery: (query) => set({ searchQuery: query }),
-  setPanelFilter: (panelId) => set({ panelFilter: panelId }),
-  setContainerFilter: (containerId) => set({ containerFilter: containerId }),
-  setOnlyDuplicates: (val) => set({ onlyDuplicates: val }),
+  setSearchQuery: (searchQuery) => set({ searchQuery }),
+  setPanelFilter: (panelFilter) => set({ panelFilter, activePanelId: panelFilter }),
+  setContainerFilter: (containerFilter) => set({ containerFilter }),
+  setOnlyDuplicates: (onlyDuplicates) => set({ onlyDuplicates }),
 
-  deleteSelected: () => {
-    const { rootNodes, selectedIds, undoStack } = get();
-    if (selectedIds.size === 0) return;
+  applySnapshotUpdate: (newSnapshot, actionLabel) => {
+    const { rawSnapshot, undoStack } = get();
+    if (!rawSnapshot) return;
 
-    const nextTree = batchDeleteNodes(rootNodes, selectedIds, false);
-    const flatTabs = flattenTabTree(nextTree);
+    const winKeys = Object.keys(newSnapshot.windows);
+    const primaryWinId = winKeys[0] || "1";
+    const tabs = newSnapshot.windows[primaryWinId]?.tabs || [];
+    const tree = buildTabTree(tabs);
+    const duplicates = getDuplicateUrlSet(tabs);
 
     set({
-      undoStack: [rootNodes, ...undoStack.slice(0, 10)],
-      rootNodes: nextTree,
-      selectedIds: new Set(),
-      duplicateUrls: getDuplicateUrlSet(flatTabs),
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: [],
+      rawSnapshot: newSnapshot,
+      rootNodes: tree,
+      duplicateUrls: duplicates,
+      selectedIds: new Set<string>(),
+    });
+  },
+
+  deleteSelected: () => {
+    const { rootNodes, selectedIds, rawSnapshot, activeWindowId, undoStack } = get();
+    if (selectedIds.size === 0 || !rawSnapshot) return;
+
+    const updatedNodes = batchDeleteNodes(rootNodes, selectedIds);
+    const updatedTabs = flattenTabTree(updatedNodes);
+
+    const updatedSnapshot: SideberySnapshot = {
+      ...rawSnapshot,
+      windows: {
+        ...rawSnapshot.windows,
+        [activeWindowId]: { tabs: updatedTabs },
+      },
+    };
+
+    set({
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: [],
+      rawSnapshot: updatedSnapshot,
+      rootNodes: updatedNodes,
+      selectedIds: new Set<string>(),
+      duplicateUrls: getDuplicateUrlSet(updatedTabs),
     });
   },
 
   markSelectedPinned: (pinned) => {
-    const { rootNodes, selectedIds, undoStack } = get();
-    if (selectedIds.size === 0) return;
+    const { rootNodes, selectedIds, rawSnapshot, activeWindowId, undoStack } = get();
+    if (selectedIds.size === 0 || !rawSnapshot) return;
 
-    const nextTree = batchUpdatePinned(rootNodes, selectedIds, pinned);
+    const updatedNodes = batchUpdatePinned(rootNodes, selectedIds, pinned);
+    const updatedTabs = flattenTabTree(updatedNodes);
+
+    const updatedSnapshot: SideberySnapshot = {
+      ...rawSnapshot,
+      windows: {
+        ...rawSnapshot.windows,
+        [activeWindowId]: { tabs: updatedTabs },
+      },
+    };
+
     set({
-      undoStack: [rootNodes, ...undoStack.slice(0, 10)],
-      rootNodes: nextTree,
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: [],
+      rawSnapshot: updatedSnapshot,
+      rootNodes: updatedNodes,
     });
   },
 
   moveSelectedToPanel: (targetPanelId) => {
-    const { rootNodes, selectedIds, undoStack } = get();
-    if (selectedIds.size === 0) return;
+    const { rootNodes, selectedIds, rawSnapshot, activeWindowId, undoStack } = get();
+    if (selectedIds.size === 0 || !rawSnapshot) return;
 
-    const nextTree = batchUpdatePanel(rootNodes, selectedIds, targetPanelId);
+    const updatedNodes = batchUpdatePanel(rootNodes, selectedIds, targetPanelId);
+    const updatedTabs = flattenTabTree(updatedNodes, targetPanelId);
+
+    const updatedSnapshot: SideberySnapshot = {
+      ...rawSnapshot,
+      windows: {
+        ...rawSnapshot.windows,
+        [activeWindowId]: { tabs: updatedTabs },
+      },
+    };
+
     set({
-      undoStack: [rootNodes, ...undoStack.slice(0, 10)],
-      rootNodes: nextTree,
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: [],
+      rawSnapshot: updatedSnapshot,
+      rootNodes: updatedNodes,
+      selectedIds: new Set<string>(),
     });
   },
 
   undo: () => {
-    const { undoStack, rootNodes } = get();
-    if (undoStack.length === 0) return;
-    const [previous, ...rest] = undoStack;
-    const flatTabs = flattenTabTree(previous);
+    const { undoStack, redoStack, rawSnapshot, activeWindowId } = get();
+    if (undoStack.length === 0 || !rawSnapshot) return;
+
+    const prevSnapshot = undoStack[undoStack.length - 1];
+    const newUndo = undoStack.slice(0, -1);
+    const tabs = prevSnapshot.windows[activeWindowId]?.tabs || [];
+    const tree = buildTabTree(tabs);
 
     set({
-      rootNodes: previous,
-      undoStack: rest,
-      selectedIds: new Set(),
-      duplicateUrls: getDuplicateUrlSet(flatTabs),
+      rawSnapshot: prevSnapshot,
+      rootNodes: tree,
+      undoStack: newUndo,
+      redoStack: [...redoStack, rawSnapshot],
+      duplicateUrls: getDuplicateUrlSet(tabs),
+      selectedIds: new Set<string>(),
     });
   },
 
-  setProportionReport: (report) => set({ proportionReport: report }),
+  redo: () => {
+    const { redoStack, undoStack, rawSnapshot, activeWindowId } = get();
+    if (redoStack.length === 0 || !rawSnapshot) return;
+
+    const nextSnapshot = redoStack[redoStack.length - 1];
+    const newRedo = redoStack.slice(0, -1);
+    const tabs = nextSnapshot.windows[activeWindowId]?.tabs || [];
+    const tree = buildTabTree(tabs);
+
+    set({
+      rawSnapshot: nextSnapshot,
+      rootNodes: tree,
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: newRedo,
+      duplicateUrls: getDuplicateUrlSet(tabs),
+      selectedIds: new Set<string>(),
+    });
+  },
+
+  setProportionReport: (proportionReport) => set({ proportionReport }),
 
   updateCategoryName: (categoryId, newName) => {
     const { proportionReport } = get();
     if (!proportionReport) return;
-    const updated = proportionReport.categories.map((c) => (c.id === categoryId ? { ...c, name: newName } : c));
-    set({ proportionReport: { ...proportionReport, categories: updated } });
+    set({
+      proportionReport: {
+        ...proportionReport,
+        categories: proportionReport.categories.map((c) =>
+          c.id === categoryId ? { ...c, name: newName } : c
+        ),
+      },
+    });
   },
 
   updateCategoryRatio: (categoryId, newRatio) => {
     const { proportionReport } = get();
     if (!proportionReport) return;
-    const updated = proportionReport.categories.map((c) => (c.id === categoryId ? { ...c, ratio: newRatio } : c));
-    set({ proportionReport: { ...proportionReport, categories: updated } });
+    set({
+      proportionReport: {
+        ...proportionReport,
+        categories: proportionReport.categories.map((c) =>
+          c.id === categoryId ? { ...c, targetRatio: newRatio } : c
+        ),
+      },
+    });
   },
 
   removeCategory: (categoryId) => {
     const { proportionReport } = get();
     if (!proportionReport) return;
-    const filtered = proportionReport.categories.filter((c) => c.id !== categoryId);
-    set({ proportionReport: { ...proportionReport, categories: filtered } });
+    set({
+      proportionReport: {
+        ...proportionReport,
+        categories: proportionReport.categories.filter((c) => c.id !== categoryId),
+      },
+    });
   },
 
   addCategory: (name) => {
@@ -249,9 +367,9 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     const newCat = {
       id: `cat_${Date.now()}`,
       name,
-      color: "#0284c7",
+      color: "#38bdf8",
       ratio: 0,
-      description: "用户新增自定义分类",
+      description: "用户自定义分类",
       matchCount: 0,
     };
     set({
@@ -262,24 +380,36 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     });
   },
 
-  setIsAnalyzing: (val, status = "") => set({ isAnalyzing: val, progressStatus: status }),
-  setIsClassifying: (val, progress = { current: 0, total: 0 }) =>
-    set({ isClassifying: val, classificationProgress: progress }),
+  setIsAnalyzing: (isAnalyzing, status = "") => set({ isAnalyzing, progressStatus: status }),
+  setIsClassifying: (isClassifying, classificationProgress = { current: 0, total: 0 }) =>
+    set({ isClassifying, classificationProgress }),
 
   applyTreeCategorization: (classificationMap, categoryNames) => {
-    const { rootNodes, undoStack } = get();
+    const { rootNodes, rawSnapshot, activeWindowId, undoStack } = get();
+    if (!rawSnapshot) return;
+
     const nextTree = reorganizeTreeIntoCategories(rootNodes, classificationMap, categoryNames);
-    const newExpanded = new Set<string>(nextTree.map((n) => n.id));
+    const updatedTabs = flattenTabTree(nextTree);
+
+    const updatedSnapshot: SideberySnapshot = {
+      ...rawSnapshot,
+      windows: {
+        ...rawSnapshot.windows,
+        [activeWindowId]: { tabs: updatedTabs },
+      },
+    };
 
     set({
-      undoStack: [rootNodes, ...undoStack.slice(0, 10)],
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: [],
+      rawSnapshot: updatedSnapshot,
       rootNodes: nextTree,
-      expandedIds: newExpanded,
+      selectedIds: new Set<string>(),
     });
   },
 
   applyPanelCategorization: (classificationMap, categories) => {
-    const { rawSnapshot, rootNodes, undoStack, activeWindowId } = get();
+    const { rawSnapshot, rootNodes, activeWindowId, undoStack } = get();
     if (!rawSnapshot) return;
 
     const flatTabs = flattenTabTree(rootNodes);
@@ -291,7 +421,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     );
 
     const nextTree = buildTabTree(updatedTabs);
-    const nextSnapshot = {
+    const updatedSnapshot: SideberySnapshot = {
       ...rawSnapshot,
       panels: updatedPanels,
       windows: {
@@ -301,25 +431,23 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     };
 
     set({
-      undoStack: [rootNodes, ...undoStack.slice(0, 10)],
-      rawSnapshot: nextSnapshot,
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: [],
+      rawSnapshot: updatedSnapshot,
       rootNodes: nextTree,
+      selectedIds: new Set<string>(),
     });
   },
 
   getExportSnapshot: (mode) => {
     const { rawSnapshot, rootNodes, activeWindowId } = get();
-    if (!rawSnapshot) throw new Error("无快照数据");
-
-    const flatTabs = flattenTabTree(rootNodes);
+    if (!rawSnapshot) throw new Error("没有可导出的快照数据");
+    const tabs = flattenTabTree(rootNodes);
     return {
       ...rawSnapshot,
-      time: Date.now(),
       windows: {
         ...rawSnapshot.windows,
-        [activeWindowId]: {
-          tabs: flatTabs,
-        },
+        [activeWindowId]: { tabs },
       },
     };
   },

@@ -31,85 +31,90 @@ export function SearchFilter() {
         justifyContent: "space-between",
         flexWrap: "wrap",
         gap: "0.75rem",
-        padding: "0.75rem 1.5rem",
-        backgroundColor: "var(--bg-surface)",
-        borderBottom: "1px solid var(--border-subtle)",
+        padding: "0.6rem 1.5rem",
+        backgroundColor: "#0f172a",
+        borderBottom: "1px solid #1e293b",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: "260px" }}>
+        {/* Search bar (pill style) */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: "0.4rem",
-            padding: "0.35rem 0.65rem",
-            backgroundColor: "var(--bg-primary)",
-            borderRadius: "0.375rem",
-            border: "1px solid var(--border-subtle)",
+            padding: "0.35rem 0.85rem",
+            backgroundColor: "#1e293b",
+            borderRadius: "9999px",
+            border: "1px solid #334155",
             flex: 1,
-            maxWidth: "360px",
+            maxWidth: "340px",
           }}
         >
-          <Search size={15} color="var(--text-muted)" />
+          <Search size={14} color="#64748b" />
           <input
             type="text"
-            placeholder="按标题或 URL / 域名搜索..."
+            placeholder="按标题或域名搜索..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
               background: "transparent",
               border: "none",
               outline: "none",
-              color: "var(--text-main)",
-              fontSize: "0.85rem",
+              color: "#f8fafc",
+              fontSize: "0.8rem",
               width: "100%",
             }}
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)" }}
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
 
+        {/* Panel filter (pill style) */}
         {panels.length > 0 && (
           <select
             value={panelFilter || ""}
             onChange={(e) => setPanelFilter(e.target.value ? e.target.value : null)}
             style={{
-              padding: "0.35rem 0.5rem",
-              borderRadius: "0.375rem",
-              backgroundColor: "var(--bg-primary)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-main)",
+              padding: "0.35rem 0.85rem",
+              borderRadius: "9999px",
+              backgroundColor: "#1e293b",
+              border: "1px solid #334155",
+              color: "#f8fafc",
               fontSize: "0.8rem",
               cursor: "pointer",
+              outline: "none",
             }}
           >
             <option value="">所有面板</option>
             {panels.map((p) => (
               <option key={p.id} value={p.id}>
-                面板: {p.name}
+                面板: {p.name || p.id}
               </option>
             ))}
           </select>
         )}
 
+        {/* Container filter (pill style) */}
         {containers.length > 0 && (
           <select
             value={containerFilter || ""}
             onChange={(e) => setContainerFilter(e.target.value ? e.target.value : null)}
             style={{
-              padding: "0.35rem 0.5rem",
-              borderRadius: "0.375rem",
-              backgroundColor: "var(--bg-primary)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-main)",
+              padding: "0.35rem 0.85rem",
+              borderRadius: "9999px",
+              backgroundColor: "#1e293b",
+              border: "1px solid #334155",
+              color: "#f8fafc",
               fontSize: "0.8rem",
               cursor: "pointer",
+              outline: "none",
             }}
           >
             <option value="">所有容器</option>
@@ -122,65 +127,69 @@ export function SearchFilter() {
         )}
       </div>
 
+      {/* Action buttons (pill style) */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
         <button
           onClick={expandAll}
           style={{
-            padding: "0.3rem 0.6rem",
-            borderRadius: "0.25rem",
-            border: "1px solid var(--border-subtle)",
-            backgroundColor: "transparent",
-            color: "var(--text-muted)",
+            padding: "0.3rem 0.75rem",
+            borderRadius: "9999px",
+            border: "1px solid #334155",
+            backgroundColor: "#1e293b",
+            color: "#94a3b8",
             fontSize: "0.75rem",
             cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.25rem",
           }}
         >
-          <ChevronDown size={14} />
-          展开全部
+          全部展开
         </button>
 
         <button
           onClick={collapseAll}
           style={{
-            padding: "0.3rem 0.6rem",
-            borderRadius: "0.25rem",
-            border: "1px solid var(--border-subtle)",
-            backgroundColor: "transparent",
-            color: "var(--text-muted)",
+            padding: "0.3rem 0.75rem",
+            borderRadius: "9999px",
+            border: "1px solid #334155",
+            backgroundColor: "#1e293b",
+            color: "#94a3b8",
             fontSize: "0.75rem",
             cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.25rem",
           }}
         >
-          <ChevronRight size={14} />
-          折叠全部
+          全部折叠
         </button>
 
-        <span style={{ color: "var(--border-subtle)", margin: "0 0.2rem" }}>|</span>
-
-        <button
-          onClick={selectedIds.size > 0 ? clearSelection : selectAll}
-          style={{
-            padding: "0.3rem 0.6rem",
-            borderRadius: "0.25rem",
-            border: "1px solid var(--border-subtle)",
-            backgroundColor: "transparent",
-            color: selectedIds.size > 0 ? "var(--accent)" : "var(--text-muted)",
-            fontSize: "0.75rem",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.25rem",
-          }}
-        >
-          {selectedIds.size > 0 ? <Square size={14} /> : <CheckSquare size={14} />}
-          {selectedIds.size > 0 ? "取消全选" : "全选"}
-        </button>
+        {selectedIds.size > 0 ? (
+          <button
+            onClick={clearSelection}
+            style={{
+              padding: "0.3rem 0.75rem",
+              borderRadius: "9999px",
+              border: "1px solid #334155",
+              backgroundColor: "rgba(239, 68, 68, 0.15)",
+              color: "#f87171",
+              fontSize: "0.75rem",
+              cursor: "pointer",
+            }}
+          >
+            取消选中 ({selectedIds.size})
+          </button>
+        ) : (
+          <button
+            onClick={selectAll}
+            style={{
+              padding: "0.3rem 0.75rem",
+              borderRadius: "9999px",
+              border: "1px solid #334155",
+              backgroundColor: "#1e293b",
+              color: "#94a3b8",
+              fontSize: "0.75rem",
+              cursor: "pointer",
+            }}
+          >
+            全选当前
+          </button>
+        )}
       </div>
     </div>
   );
