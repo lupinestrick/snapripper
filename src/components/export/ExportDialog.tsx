@@ -4,6 +4,10 @@ import React, { useState } from "react";
 import { X, Download, FileJson, CheckCircle, Info, Layers } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { flattenTabTree } from "@/services/snapshotParser";
+import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface ExportDialogProps {
   isOpen: boolean;
@@ -14,7 +18,7 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
   const { rawSnapshot, rootNodes, fileName, getExportSnapshot } = useSnapshotStore();
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
-  if (!isOpen || !rawSnapshot) return null;
+  if (!rawSnapshot) return null;
 
   const allTabs = flattenTabTree(rootNodes);
   const panels = rawSnapshot.panels ? Object.values(rawSnapshot.panels) : [];
@@ -49,187 +53,122 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-        padding: "1rem",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          backgroundColor: "var(--bg-surface)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "0.75rem",
-          width: "100%",
-          maxWidth: "520px",
-          padding: "1.5rem",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-          color: "var(--text-main)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <div
-              style={{
-                padding: "0.4rem",
-                borderRadius: "0.375rem",
-                backgroundColor: "rgba(56, 189, 248, 0.15)",
-                color: "var(--accent)",
-              }}
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Backdrop />
+      <Dialog.Positioner>
+        <Dialog.Content
+          style={{
+            width: "100%",
+            maxWidth: "520px",
+            padding: "1.5rem",
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(56, 189, 248, 0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#38bdf8",
+                }}
+              >
+                <FileJson size={17} />
+              </div>
+              <Dialog.Title>导出 Sidebery 快照</Dialog.Title>
+            </div>
+            <Button
+              variant="ghost"
+              size="xs"
+              pill
+              onClick={onClose}
+              style={{ color: "#94a3b8", padding: "4px" }}
+              title="关闭"
             >
-              <FileJson size={18} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: "1.1rem", fontWeight: 600 }}>导出 Sidebery 快照</h2>
-              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                生成完全符合 Sidebery 导入规范的合法 JSON 快照
-              </p>
-            </div>
+              <X size={18} />
+            </Button>
           </div>
-          <button
-            onClick={onClose}
-            style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
-          >
-            <X size={20} />
-          </button>
-        </div>
 
-        <div
-          style={{
-            padding: "0.75rem 1rem",
-            backgroundColor: "var(--bg-primary)",
-            borderRadius: "0.5rem",
-            border: "1px solid var(--border-subtle)",
-            marginBottom: "1rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "0.5rem",
-            textAlign: "center",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>整理后标签</div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>{allTabs.length}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>顶层分组/子树</div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-main)" }}>{rootNodes.length}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>面板数量</div>
-            <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-main)" }}>{panels.length}</div>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: "1rem" }}>
-          <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", display: "block", marginBottom: "0.3rem" }}>
-            保存文件名:
-          </label>
-          <input
-            type="text"
-            value={exportFileName}
-            onChange={(e) => setExportFileName(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.5rem 0.75rem",
-              borderRadius: "0.375rem",
-              backgroundColor: "var(--bg-primary)",
-              border: "1px solid var(--border-subtle)",
-              color: "var(--text-main)",
-              fontSize: "0.85rem",
-            }}
-          />
-        </div>
-
-        <div
-          style={{
-            padding: "0.75rem",
-            backgroundColor: "rgba(56, 189, 248, 0.08)",
-            borderRadius: "0.375rem",
-            border: "1px solid rgba(56, 189, 248, 0.2)",
-            marginBottom: "1.25rem",
-            fontSize: "0.78rem",
-            color: "var(--text-muted)",
-            lineHeight: 1.5,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", color: "var(--accent)", fontWeight: 600, marginBottom: "0.25rem" }}>
-            <Info size={14} />
-            如何将快照导入 Firefox Sidebery:
-          </div>
-          <ol style={{ paddingLeft: "1.2rem", margin: 0 }}>
-            <li>打开 Firefox Sidebery 侧边栏，点击底部齿轮进入“设置 (Settings)”</li>
-            <li>在设置面板中选择 <strong>“快照 (Snapshots)”</strong></li>
-            <li>点击 <strong>“从文件导入快照 (Import from file)”</strong> 并选择下载的文件</li>
-            <li>点击 <strong>“恢复此快照 (Restore)”</strong> 即可完成</li>
-          </ol>
-        </div>
-
-        {downloadSuccess && (
+          {/* Snapshot Summary Box */}
           <div
             style={{
-              padding: "0.5rem 0.75rem",
-              borderRadius: "0.375rem",
-              backgroundColor: "rgba(34, 197, 94, 0.15)",
-              color: "var(--success)",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
+              backgroundColor: "#0f172a",
+              border: "1px solid #334155",
+              borderRadius: "0.5rem",
+              padding: "0.85rem",
+              marginBottom: "1.25rem",
               fontSize: "0.8rem",
-              marginBottom: "1rem",
-            }}
-          >
-            <CheckCircle size={16} />
-            <span>快照已成功下载到您的本地下载文件夹！</span>
-          </div>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: "0.45rem 0.85rem",
-              borderRadius: "0.375rem",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "transparent",
-              color: "var(--text-muted)",
-              fontSize: "0.85rem",
-              cursor: "pointer",
-            }}
-          >
-            关闭
-          </button>
-          <button
-            onClick={handleDownload}
-            style={{
               display: "flex",
-              alignItems: "center",
+              flexDirection: "column",
               gap: "0.4rem",
-              padding: "0.45rem 1.1rem",
-              borderRadius: "0.375rem",
-              border: "none",
-              backgroundColor: "var(--accent)",
-              color: "#0f172a",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              cursor: "pointer",
             }}
           >
-            <Download size={15} />
-            立即下载快照 JSON
-          </button>
-        </div>
-      </div>
-    </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#94a3b8" }}>
+              <span>标签总数:</span>
+              <strong style={{ color: "#f8fafc" }}>{allTabs.length} 个</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#94a3b8" }}>
+              <span>面板数量:</span>
+              <strong style={{ color: "#f8fafc" }}>{panels.length} 个</strong>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", color: "#94a3b8" }}>
+              <span>容器环境:</span>
+              <strong style={{ color: "#f8fafc" }}>{containers.length} 个</strong>
+            </div>
+          </div>
+
+          {/* Form */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem" }}>
+            <div>
+              <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
+                导出文件名
+              </label>
+              <Input
+                type="text"
+                value={exportFileName}
+                onChange={(e) => setExportFileName(e.target.value)}
+                style={{ backgroundColor: "#0f172a" }}
+              />
+            </div>
+          </div>
+
+          {downloadSuccess && (
+            <div
+              style={{
+                padding: "0.6rem 0.85rem",
+                borderRadius: "0.5rem",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                border: "1px solid #10b981",
+                color: "#34d399",
+                fontSize: "0.8rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <CheckCircle size={15} />
+              <span>快照文件导出成功，请在下载目录中查看！</span>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
+            <Button variant="outline" size="sm" onClick={onClose} style={{ borderColor: "#334155", color: "#94a3b8" }}>
+              取消
+            </Button>
+            <Button variant="solid" size="sm" onClick={handleDownload} style={{ backgroundColor: "#2563eb", color: "#fff" }}>
+              <Download size={14} />
+              <span>下载快照 JSON</span>
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Positioner>
+    </Dialog.Root>
   );
 }

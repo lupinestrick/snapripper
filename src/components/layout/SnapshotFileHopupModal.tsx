@@ -169,19 +169,16 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
               </div>
             </div>
 
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
+              pill
               onClick={onClose}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "#94a3b8",
-                cursor: "pointer",
-                padding: "4px",
-                borderRadius: "9999px",
-              }}
+              style={{ color: "#94a3b8", padding: "4px" }}
+              title="关闭"
             >
               <X size={18} />
-            </button>
+            </Button>
           </div>
 
           {/* Snapshot Info Card */}

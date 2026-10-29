@@ -4,6 +4,9 @@ import React, { useState } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { testAIConnection } from "@/services/aiService";
 import { AI_PROVIDERS, AIProviderKey } from "@/types/ai";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Bot,
   Sliders,
@@ -12,9 +15,6 @@ import {
   Loader2,
   Download,
   Upload,
-  Layers,
-  ShieldCheck,
-  FolderTree,
 } from "lucide-react";
 
 export function SettingsPage() {
@@ -126,25 +126,22 @@ export function SettingsPage() {
               const preset = AI_PROVIDERS[key];
               const isSelected = aiConfig.provider === key;
               return (
-                <button
+                <Button
                   key={key}
                   type="button"
+                  variant={isSelected ? "solid" : "outline"}
+                  size="sm"
                   onClick={() => handleSelectProvider(key)}
                   style={{
                     padding: "0.45rem 1.1rem",
-                    borderRadius: "9999px",
                     border: isSelected ? "1.5px solid #3b82f6" : "1px solid #334155",
                     backgroundColor: isSelected ? "#2563eb" : "#0f172a",
                     color: isSelected ? "#ffffff" : "#94a3b8",
-                    fontWeight: isSelected ? 600 : 400,
-                    fontSize: "0.825rem",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
                     boxShadow: isSelected ? "0 0 12px rgba(37, 99, 235, 0.4)" : "none",
                   }}
                 >
                   {preset.name}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -156,20 +153,10 @@ export function SettingsPage() {
             <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
               API Base URL
             </label>
-            <input
+            <Input
               type="text"
               value={aiConfig.baseURL}
               onChange={(e) => setAIConfig({ baseURL: e.target.value })}
-              style={{
-                width: "100%",
-                padding: "0.5rem 0.75rem",
-                borderRadius: "0.5rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #374151",
-                color: "#fff",
-                fontSize: "0.85rem",
-                outline: "none",
-              }}
             />
           </div>
 
@@ -183,43 +170,32 @@ export function SettingsPage() {
                   {currentPreset.models.map((m) => {
                     const isModelActive = aiConfig.model === m;
                     return (
-                      <button
+                      <Button
                         key={m}
                         type="button"
+                        variant={isModelActive ? "subtle" : "outline"}
+                        size="xs"
                         onClick={() => setAIConfig({ model: m })}
                         style={{
                           padding: "0.15rem 0.5rem",
-                          borderRadius: "9999px",
                           border: isModelActive ? "1px solid #3b82f6" : "1px solid #334155",
                           backgroundColor: isModelActive ? "rgba(37, 99, 235, 0.25)" : "transparent",
                           color: isModelActive ? "#60a5fa" : "#64748b",
                           fontSize: "0.7rem",
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
                         }}
                       >
                         {m}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
               )}
             </div>
-            <input
+            <Input
               type="text"
               placeholder="模型标识符"
               value={aiConfig.model}
               onChange={(e) => setAIConfig({ model: e.target.value })}
-              style={{
-                width: "100%",
-                padding: "0.5rem 0.75rem",
-                borderRadius: "0.5rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #374151",
-                color: "#fff",
-                fontSize: "0.85rem",
-                outline: "none",
-              }}
             />
           </div>
 
@@ -227,46 +203,30 @@ export function SettingsPage() {
             <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
               API Key {aiConfig.provider === "custom" ? "(根据自定义服务选填)" : ""}
             </label>
-            <input
+            <Input
               type="password"
               placeholder={aiConfig.provider === "claude" ? "sk-ant-..." : "sk-..."}
               value={aiConfig.apiKey}
               onChange={(e) => setAIConfig({ apiKey: e.target.value })}
-              style={{
-                width: "100%",
-                padding: "0.5rem 0.75rem",
-                borderRadius: "0.5rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #374151",
-                color: "#fff",
-                fontSize: "0.85rem",
-                outline: "none",
-              }}
             />
           </div>
         </div>
 
         {/* Test Connection Button */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "1.25rem" }}>
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleTestConnection}
             disabled={isTesting}
             style={{
-              padding: "0.45rem 1.1rem",
-              borderRadius: "9999px",
-              border: "1px solid #475569",
-              backgroundColor: "transparent",
+              borderColor: "#475569",
               color: "#94a3b8",
-              fontSize: "0.8rem",
-              cursor: isTesting ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
             }}
           >
             {isTesting ? <Loader2 size={14} className="animate-spin" /> : null}
             <span>测试连接</span>
-          </button>
+          </Button>
 
           {testResult && (
             <span
@@ -301,7 +261,6 @@ export function SettingsPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {/* Cascade select children toggle */}
           <label
             style={{
               display: "flex",
@@ -325,12 +284,11 @@ export function SettingsPage() {
                 勾选标签时默认级联勾选所有子标签（包含子标签）
               </div>
               <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
-                在工作台树状图中勾选父标签或组节点时，自动同时勾选其下层的所有子标签页；取消勾选时同理。
+                在工作台树状图中勾选父标签或组节点时，自动同时勾选其下层的所有子标签页；取消勾选时联动取消。
               </div>
             </div>
           </label>
 
-          {/* Preserve subtrees */}
           <label
             style={{
               display: "flex",
@@ -359,7 +317,6 @@ export function SettingsPage() {
             </div>
           </label>
 
-          {/* Treat existing groups as unit */}
           <label
             style={{
               display: "flex",
@@ -388,7 +345,6 @@ export function SettingsPage() {
             </div>
           </label>
 
-          {/* Exempt Pinned */}
           <label
             style={{
               display: "flex",
@@ -417,7 +373,6 @@ export function SettingsPage() {
             </div>
           </label>
 
-          {/* Exempt Internal Pages */}
           <label
             style={{
               display: "flex",
@@ -486,25 +441,19 @@ export function SettingsPage() {
               <input type="file" accept=".json" onChange={handleImportAll} style={{ display: "none" }} />
             </label>
 
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleExportAll}
               style={{
-                padding: "0.45rem 1.1rem",
-                borderRadius: "9999px",
-                border: "1px solid #334155",
+                borderColor: "#334155",
                 backgroundColor: "#0f172a",
                 color: "#94a3b8",
-                fontSize: "0.8rem",
-                fontWeight: 500,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
               }}
             >
               <Download size={14} />
               <span>导出配置</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>

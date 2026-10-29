@@ -6,16 +6,17 @@ import {
   ChevronDown,
   Pin,
   ExternalLink,
-  Trash2,
   Copy,
   Layers,
   Globe,
   Folder,
 } from "lucide-react";
-import { TabTreeNode, SideberyTab } from "@/types/sidebery";
+import { TabTreeNode } from "@/types/sidebery";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { filterTree } from "@/services/treeOperations";
 import { extractDomain, getFaviconUrl } from "@/utils/urlHelper";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export function TabTreeView() {
   const {
@@ -30,7 +31,6 @@ export function TabTreeView() {
     onlyDuplicates,
     duplicateUrls,
     rawSnapshot,
-    deleteSelected,
   } = useSnapshotStore();
 
   const filteredTree = React.useMemo(() => {
@@ -51,17 +51,17 @@ export function TabTreeView() {
           alignItems: "center",
           justifyContent: "center",
           height: "60vh",
-          color: "var(--text-muted)",
+          color: "#94a3b8",
           gap: "1rem",
         }}
       >
-        <Layers size={48} strokeWidth={1.5} color="var(--border-subtle)" />
+        <Layers size={48} strokeWidth={1.5} color="#334155" />
         <div style={{ textAlign: "center" }}>
-          <h3 style={{ color: "var(--text-main)", marginBottom: "0.25rem", fontSize: "1.1rem" }}>
+          <h3 style={{ color: "#f8fafc", marginBottom: "0.25rem", fontSize: "1.1rem" }}>
             暂未加载 Sidebery 快照
           </h3>
           <p style={{ fontSize: "0.85rem" }}>
-            点击顶部导航栏中的 <strong>“导入快照 JSON”</strong> 或 <strong>“演示样本”</strong> 开始
+            点击右上角文件图标打开 <strong>“快照管理”</strong> 导入 Sidebery 导出的快照文件或加载测试样本
           </p>
         </div>
       </div>
@@ -77,7 +77,7 @@ export function TabTreeView() {
           alignItems: "center",
           justifyContent: "center",
           height: "40vh",
-          color: "var(--text-muted)",
+          color: "#94a3b8",
           gap: "0.5rem",
         }}
       >
@@ -136,7 +136,6 @@ function TreeNodeRow({
   const isDuplicate = duplicateUrls.has(node.tab.url);
 
   const container = node.tab.containerId ? containers[node.tab.containerId] : null;
-  const panel = node.tab.panelId ? panels[node.tab.panelId] : null;
   const domain = extractDomain(node.tab.url);
   const favicon = getFaviconUrl(node.tab.url, node.tab.favIconUrl);
 
@@ -179,23 +178,23 @@ function TreeNodeRow({
       >
         <div style={{ width: "1.2rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {hasChildren ? (
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
+              pill
               onClick={(e) => {
                 e.stopPropagation();
                 toggleExpand(node.id);
               }}
               style={{
-                background: "transparent",
-                border: "none",
-                cursor: "pointer",
-                color: "var(--text-muted)",
-                display: "flex",
-                alignItems: "center",
                 padding: 0,
+                width: "18px",
+                height: "18px",
+                color: "#94a3b8",
               }}
             >
               {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-            </button>
+            </Button>
           ) : (
             <div style={{ width: "15px" }} />
           )}
@@ -209,7 +208,7 @@ function TreeNodeRow({
             e.stopPropagation();
             selectTab(node.id, true);
           }}
-          style={{ cursor: "pointer", accentColor: "var(--accent)" }}
+          style={{ cursor: "pointer", accentColor: "#38bdf8" }}
         />
 
         <div style={{ display: "flex", alignItems: "center", width: "1rem", flexShrink: 0 }}>
@@ -223,7 +222,7 @@ function TreeNodeRow({
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
           ) : (
-            <Globe size={15} color="var(--text-muted)" />
+            <Globe size={15} color="#94a3b8" />
           )}
         </div>
 
@@ -234,7 +233,7 @@ function TreeNodeRow({
             overflow: "hidden",
             textOverflow: "ellipsis",
             fontWeight: node.isCategoryHeader ? 600 : 400,
-            color: node.isCategoryHeader ? "var(--accent)" : "var(--text-main)",
+            color: node.isCategoryHeader ? "#38bdf8" : "#f8fafc",
           }}
           title={`${node.tab.title}\n${node.tab.url}`}
         >
@@ -243,96 +242,92 @@ function TreeNodeRow({
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
           {isDuplicate && (
-            <span
+            <Badge
+              variant="subtle"
+              size="sm"
               style={{
+                backgroundColor: "rgba(239, 68, 68, 0.2)",
+                color: "#f87171",
                 fontSize: "0.68rem",
                 padding: "0.1rem 0.35rem",
-                borderRadius: "0.25rem",
-                backgroundColor: "rgba(239, 68, 68, 0.2)",
-                color: "var(--danger)",
-                fontWeight: 600,
               }}
               title="存在重复 URL"
             >
               重复
-            </span>
+            </Badge>
           )}
 
           {node.tab.pinned && (
-            <span
+            <Badge
+              variant="subtle"
+              size="sm"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.2rem",
+                backgroundColor: "rgba(245, 158, 11, 0.2)",
+                color: "#fbbf24",
                 fontSize: "0.68rem",
                 padding: "0.1rem 0.35rem",
-                borderRadius: "0.25rem",
-                backgroundColor: "rgba(245, 158, 11, 0.2)",
-                color: "var(--warning)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.2rem",
               }}
             >
               <Pin size={11} />
-              置顶
-            </span>
+              <span>置顶</span>
+            </Badge>
           )}
 
           {container && (
-            <span
+            <Badge
+              variant="outline"
+              size="sm"
               style={{
-                fontSize: "0.68rem",
-                padding: "0.1rem 0.4rem",
-                borderRadius: "0.25rem",
                 backgroundColor: "rgba(255, 255, 255, 0.08)",
-                color: "var(--text-muted)",
-                borderLeft: `2px solid ${container.color || "var(--accent)"}`,
+                color: "#94a3b8",
+                borderLeft: `2px solid ${container.color || "#38bdf8"}`,
+                fontSize: "0.68rem",
               }}
             >
               {container.name}
-            </span>
+            </Badge>
           )}
 
           {domain && !node.isCategoryHeader && (
-            <span
+            <Badge
+              variant="outline"
+              size="sm"
               style={{
+                backgroundColor: "#1e293b",
+                color: "#94a3b8",
+                borderColor: "#334155",
                 fontSize: "0.7rem",
-                padding: "0.1rem 0.4rem",
-                borderRadius: "0.25rem",
-                backgroundColor: "var(--bg-subtle)",
-                color: "var(--text-muted)",
               }}
             >
               {domain}
-            </span>
+            </Badge>
           )}
 
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
+            pill
             onClick={handleCopyUrl}
             title="复制 URL"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              padding: "0.2rem",
-            }}
+            style={{ color: "#94a3b8", padding: "0.2rem" }}
           >
             <Copy size={13} />
-          </button>
+          </Button>
 
           {!node.isCategoryHeader && (
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
+              pill
               onClick={handleOpenUrl}
               title="在新窗口打开"
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                padding: "0.2rem",
-              }}
+              style={{ color: "#94a3b8", padding: "0.2rem" }}
             >
               <ExternalLink size={13} />
-            </button>
+            </Button>
           )}
         </div>
       </div>

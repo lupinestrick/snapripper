@@ -6,6 +6,9 @@ import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
 import { classifyTabs } from "@/services/aiService";
 import { flattenTabTree } from "@/services/snapshotParser";
+import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface CategorizeModalProps {
   isOpen: boolean;
@@ -27,7 +30,7 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
   const [restructureMode, setRestructureMode] = useState<"tree" | "panel">("tree");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  if (!isOpen || !proportionReport) return null;
+  if (!proportionReport) return null;
 
   const handleExecute = async () => {
     setErrorMsg(null);
@@ -69,184 +72,149 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
       : 0;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-        padding: "1rem",
-      }}
-      onClick={() => !isClassifying && onClose()}
-    >
-      <div
-        style={{
-          backgroundColor: "var(--bg-surface)",
-          border: "1px solid var(--border-subtle)",
-          borderRadius: "0.75rem",
-          width: "100%",
-          maxWidth: "520px",
-          padding: "1.5rem",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-          color: "var(--text-main)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <Dialog.Backdrop />
+      <Dialog.Positioner>
+        <Dialog.Content
+          style={{
+            width: "100%",
+            maxWidth: "520px",
+            padding: "1.5rem",
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(56, 189, 248, 0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#38bdf8",
+                }}
+              >
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <Dialog.Title>按 AI 探查比例自动重构</Dialog.Title>
+                <Dialog.Description>选择重组形式并将标签批量分配到对应目标</Dialog.Description>
+              </div>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="xs"
+              pill
+              onClick={onClose}
+              style={{ color: "#94a3b8", padding: "4px" }}
+              title="关闭"
+            >
+              <X size={18} />
+            </Button>
+          </div>
+
+          {/* Mode Selection Cards */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem" }}>
             <div
+              onClick={() => setRestructureMode("tree")}
               style={{
-                padding: "0.4rem",
-                borderRadius: "0.375rem",
-                backgroundColor: "rgba(34, 197, 94, 0.15)",
-                color: "var(--success)",
-              }}
-            >
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: "1.1rem", fontWeight: 600 }}>执行按比例智能分类与树重构</h2>
-              <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                共 {proportionReport.categories.length} 个分类，重构整理目标结构
-              </p>
-            </div>
-          </div>
-          {!isClassifying && (
-            <button
-              onClick={onClose}
-              style={{ background: "transparent", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
-            >
-              <X size={20} />
-            </button>
-          )}
-        </div>
-
-        {!isClassifying && (
-          <div style={{ marginBottom: "1.25rem" }}>
-            <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", display: "block", marginBottom: "0.5rem" }}>
-              选择在 Sidebery 中的重构组织方式:
-            </label>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
-              <div
-                onClick={() => setRestructureMode("tree")}
-                style={{
-                  padding: "0.75rem",
-                  borderRadius: "0.5rem",
-                  border: restructureMode === "tree" ? "1px solid var(--accent)" : "1px solid var(--border-subtle)",
-                  backgroundColor: restructureMode === "tree" ? "rgba(56, 189, 248, 0.1)" : "var(--bg-primary)",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.25rem" }}>
-                  <FolderTree size={16} color="var(--accent)" />
-                  <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>树形分组父标签</span>
-                </div>
-                <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", lineHeight: 1.3 }}>
-                  在原面板内为每个分类生成折叠父标签，保持原有子树完整性
-                </p>
-              </div>
-
-              <div
-                onClick={() => setRestructureMode("panel")}
-                style={{
-                  padding: "0.75rem",
-                  borderRadius: "0.5rem",
-                  border: restructureMode === "panel" ? "1px solid var(--accent)" : "1px solid var(--border-subtle)",
-                  backgroundColor: restructureMode === "panel" ? "rgba(56, 189, 248, 0.1)" : "var(--bg-primary)",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.25rem" }}>
-                  <PanelsTopLeft size={16} color="#38bdf8" />
-                  <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>拆分 Sidebery 面板</span>
-                </div>
-                <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", lineHeight: 1.3 }}>
-                  为每个分类创建独立的 Sidebery 侧边栏面板，彻底物理隔离
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isClassifying && (
-          <div style={{ padding: "1rem", backgroundColor: "var(--bg-primary)", borderRadius: "0.5rem", marginBottom: "1rem" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-              <span style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <Loader2 size={16} />
-                正在智能匹配并分配标签...
-              </span>
-              <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--accent)" }}>
-                {classificationProgress.current} / {classificationProgress.total} ({percent}%)
-              </span>
-            </div>
-
-            <div style={{ height: "0.5rem", backgroundColor: "var(--bg-subtle)", borderRadius: "0.25rem", overflow: "hidden" }}>
-              <div
-                style={{
-                  height: "100%",
-                  width: `${percent}%`,
-                  backgroundColor: "var(--accent)",
-                  transition: "width 0.2s ease",
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {errorMsg && (
-          <div
-            style={{
-              padding: "0.5rem 0.75rem",
-              borderRadius: "0.375rem",
-              backgroundColor: "rgba(239, 68, 68, 0.15)",
-              color: "var(--danger)",
-              fontSize: "0.8rem",
-              marginBottom: "1rem",
-            }}
-          >
-            {errorMsg}
-          </div>
-        )}
-
-        {!isClassifying && (
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-            <button
-              onClick={onClose}
-              style={{
-                padding: "0.45rem 0.85rem",
-                borderRadius: "0.375rem",
-                border: "1px solid var(--border-subtle)",
-                backgroundColor: "transparent",
-                color: "var(--text-muted)",
-                fontSize: "0.85rem",
+                padding: "1rem",
+                borderRadius: "0.75rem",
+                border: restructureMode === "tree" ? "2px solid #38bdf8" : "1px solid #334155",
+                backgroundColor: restructureMode === "tree" ? "rgba(56, 189, 248, 0.08)" : "#0f172a",
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.75rem",
+                transition: "all 0.15s ease",
               }}
+            >
+              <FolderTree size={20} color={restructureMode === "tree" ? "#38bdf8" : "#94a3b8"} style={{ marginTop: "2px" }} />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#f8fafc" }}>
+                  生成树形目录（创建分类 Group 组）
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                  在当前面板内创建对应类别的 Group 标签，并将同类标签移入作为子标签。保持子树整体。
+                </div>
+              </div>
+            </div>
+
+            <div
+              onClick={() => setRestructureMode("panel")}
+              style={{
+                padding: "1rem",
+                borderRadius: "0.75rem",
+                border: restructureMode === "panel" ? "2px solid #38bdf8" : "1px solid #334155",
+                backgroundColor: restructureMode === "panel" ? "rgba(56, 189, 248, 0.08)" : "#0f172a",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "0.75rem",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <PanelsTopLeft size={20} color={restructureMode === "panel" ? "#38bdf8" : "#94a3b8"} style={{ marginTop: "2px" }} />
+              <div>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#f8fafc" }}>
+                  分割为独立面板（创建侧边栏 Panels）
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                  为每个主题分类新建一个独立的侧边栏面板，将同类标签移入对应面板中，适合按领域彻底隔离。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          {isClassifying && (
+            <div style={{ marginBottom: "1.25rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "#38bdf8", marginBottom: "0.35rem" }}>
+                <span>AI 正在逐批归类标签...</span>
+                <span>
+                  {classificationProgress.current} / {classificationProgress.total} ({percent}%)
+                </span>
+              </div>
+              <div style={{ width: "100%", height: "6px", backgroundColor: "#0f172a", borderRadius: "9999px", overflow: "hidden" }}>
+                <div style={{ width: `${percent}%`, height: "100%", backgroundColor: "#38bdf8", transition: "width 0.2s ease" }} />
+              </div>
+            </div>
+          )}
+
+          {errorMsg && (
+            <div style={{ padding: "0.6rem 0.85rem", borderRadius: "0.5rem", backgroundColor: "rgba(239, 68, 68, 0.15)", border: "1px solid #ef4444", color: "#f87171", fontSize: "0.8rem", marginBottom: "1rem" }}>
+              {errorMsg}
+            </div>
+          )}
+
+          {/* Footer actions */}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              disabled={isClassifying}
+              style={{ borderColor: "#334155", color: "#94a3b8" }}
             >
               取消
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="solid"
+              size="sm"
               onClick={handleExecute}
-              style={{
-                padding: "0.45rem 1.1rem",
-                borderRadius: "0.375rem",
-                border: "none",
-                backgroundColor: "var(--accent)",
-                color: "#0f172a",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
+              disabled={isClassifying}
+              style={{ backgroundColor: isClassifying ? "#334155" : "#2563eb", color: "#fff" }}
             >
-              开始重构
-            </button>
+              {isClassifying ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+              <span>{isClassifying ? "正在重组..." : "确认并执行重构"}</span>
+            </Button>
           </div>
-        )}
-      </div>
-    </div>
+        </Dialog.Content>
+      </Dialog.Positioner>
+    </Dialog.Root>
   );
 }

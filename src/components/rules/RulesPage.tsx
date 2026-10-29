@@ -5,7 +5,11 @@ import { useConfigStore } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { CategorizationRule, RuleScope } from "@/types/sidebery";
 import { AIRulesChatModal } from "./AIRulesChatModal";
-import { Plus, Trash2, Download, Upload, Sliders, Sparkles, SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Download, Upload, Sparkles } from "lucide-react";
 
 export function RulesPage() {
   const {
@@ -97,30 +101,23 @@ export function RulesPage() {
 
         {/* Action Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <button
+          <Button
+            variant="subtle"
+            size="sm"
             onClick={() => setIsAIChatOpen(true)}
             style={{
-              padding: "0.5rem 1.1rem",
-              borderRadius: "9999px",
-              border: "1px solid #38bdf8",
               backgroundColor: "rgba(56, 189, 248, 0.1)",
+              borderColor: "#38bdf8",
               color: "#38bdf8",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              transition: "all 0.15s ease",
             }}
           >
             <Sparkles size={15} />
             <span>AI 生成规则</span>
-          </button>
+          </Button>
 
           <label
             style={{
-              padding: "0.5rem 1rem",
+              padding: "0.45rem 1rem",
               borderRadius: "9999px",
               border: "1px solid #334155",
               backgroundColor: "#1e293b",
@@ -138,45 +135,32 @@ export function RulesPage() {
             <input type="file" accept=".json" onChange={handleImport} style={{ display: "none" }} />
           </label>
 
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleExport}
             style={{
-              padding: "0.5rem 1rem",
-              borderRadius: "9999px",
-              border: "1px solid #334155",
+              borderColor: "#334155",
               backgroundColor: "#1e293b",
               color: "#94a3b8",
-              fontSize: "0.8rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
             }}
           >
             <Download size={14} />
             <span>导出设置</span>
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="solid"
+            size="sm"
             onClick={() => setIsAddOpen(true)}
             style={{
-              padding: "0.5rem 1.25rem",
-              borderRadius: "9999px",
-              border: "none",
               backgroundColor: "#2563eb",
               color: "#fff",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
             }}
           >
             <Plus size={15} />
             <span>添加规则</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -216,20 +200,15 @@ export function RulesPage() {
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <input
+            <Input
               type="number"
               min={1}
               max={20}
+              size="sm"
               value={rulesSettings.defaultMinThreshold}
               onChange={(e) => setRulesSettings({ defaultMinThreshold: Math.max(1, parseInt(e.target.value) || 1) })}
               style={{
                 width: "70px",
-                padding: "0.3rem 0.5rem",
-                borderRadius: "0.375rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #475569",
-                color: "#fff",
-                fontSize: "0.85rem",
                 textAlign: "center",
               }}
             />
@@ -256,20 +235,11 @@ export function RulesPage() {
               <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
                 Group 名称 (如: 🎬 视频流媒体)
               </label>
-              <input
+              <Input
                 type="text"
                 value={newRule.name}
                 onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
                 placeholder="例如: 💻 技术开发"
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #374151",
-                  color: "#fff",
-                  fontSize: "0.85rem",
-                }}
               />
             </div>
 
@@ -277,22 +247,14 @@ export function RulesPage() {
               <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
                 应用范围 (Scope)
               </label>
-              <select
+              <Select
                 value={newRule.scope}
                 onChange={(e) => setNewRule({ ...newRule, scope: e.target.value as RuleScope })}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #374151",
-                  color: "#fff",
-                  fontSize: "0.85rem",
-                }}
+                pill={false}
               >
                 <option value="all">全局所有面板</option>
                 <option value="panel">指定特定面板 (Panel)</option>
-              </select>
+              </Select>
             </div>
 
             {newRule.scope === "panel" && (
@@ -300,18 +262,10 @@ export function RulesPage() {
                 <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
                   目标面板
                 </label>
-                <select
+                <Select
                   value={newRule.targetScopeId}
                   onChange={(e) => setNewRule({ ...newRule, targetScopeId: e.target.value })}
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 0.75rem",
-                    borderRadius: "0.5rem",
-                    backgroundColor: "#0f172a",
-                    border: "1px solid #374151",
-                    color: "#fff",
-                    fontSize: "0.85rem",
-                  }}
+                  pill={false}
                 >
                   <option value="">请选择面板...</option>
                   {Object.entries(panels).map(([id, p]: [string, any]) => (
@@ -319,7 +273,7 @@ export function RulesPage() {
                       {p.name || id}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
 
@@ -327,20 +281,11 @@ export function RulesPage() {
               <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
                 匹配域名 (逗号分隔)
               </label>
-              <input
+              <Input
                 type="text"
                 value={newRule.matchDomain}
                 onChange={(e) => setNewRule({ ...newRule, matchDomain: e.target.value })}
                 placeholder="github.com, gitlab.com"
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #374151",
-                  color: "#fff",
-                  fontSize: "0.85rem",
-                }}
               />
             </div>
 
@@ -348,20 +293,11 @@ export function RulesPage() {
               <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
                 标题关键词 (逗号分隔)
               </label>
-              <input
+              <Input
                 type="text"
                 value={newRule.matchKeyword}
                 onChange={(e) => setNewRule({ ...newRule, matchKeyword: e.target.value })}
                 placeholder="react, vue, typescript"
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #374151",
-                  color: "#fff",
-                  fontSize: "0.85rem",
-                }}
               />
             </div>
 
@@ -369,55 +305,33 @@ export function RulesPage() {
               <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
                 成组阈值 (达到多少个才建组)
               </label>
-              <input
+              <Input
                 type="number"
                 min={1}
                 max={20}
                 value={newRule.minThreshold}
                 onChange={(e) => setNewRule({ ...newRule, minThreshold: parseInt(e.target.value) || 2 })}
-                style={{
-                  width: "100%",
-                  padding: "0.5rem 0.75rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #374151",
-                  color: "#fff",
-                  fontSize: "0.85rem",
-                }}
               />
             </div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setIsAddOpen(false)}
-              style={{
-                padding: "0.4rem 1rem",
-                borderRadius: "9999px",
-                border: "1px solid #475569",
-                backgroundColor: "transparent",
-                color: "#94a3b8",
-                fontSize: "0.8rem",
-                cursor: "pointer",
-              }}
+              style={{ borderColor: "#475569", color: "#94a3b8" }}
             >
               取消
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="solid"
+              size="sm"
               onClick={handleCreateRule}
-              style={{
-                padding: "0.4rem 1.25rem",
-                borderRadius: "9999px",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#fff",
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
+              style={{ backgroundColor: "#2563eb", color: "#fff" }}
             >
               保存规则
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -464,30 +378,12 @@ export function RulesPage() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{rule.name}</span>
-                    <span
-                      style={{
-                        fontSize: "0.7rem",
-                        padding: "0.15rem 0.5rem",
-                        borderRadius: "9999px",
-                        backgroundColor: "#0f172a",
-                        color: "#94a3b8",
-                        border: "1px solid #334155",
-                      }}
-                    >
+                    <Badge variant="outline" size="sm">
                       {rule.scope === "all" ? "全局" : `面板: ${rule.targetScopeId || "未指定"}`}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.7rem",
-                        padding: "0.15rem 0.5rem",
-                        borderRadius: "9999px",
-                        backgroundColor: "#0f172a",
-                        color: "#94a3b8",
-                        border: "1px solid #334155",
-                      }}
-                    >
+                    </Badge>
+                    <Badge variant="outline" size="sm">
                       阈值: {rule.minThreshold ?? rulesSettings.defaultMinThreshold}
-                    </span>
+                    </Badge>
                   </div>
 
                   <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.25rem" }}>
@@ -505,22 +401,19 @@ export function RulesPage() {
                 </div>
               </div>
 
-              <button
+              <Button
+                variant="ghost"
+                size="xs"
+                pill
                 onClick={() => deleteRule(rule.id)}
                 style={{
-                  background: "transparent",
-                  border: "none",
                   color: "#94a3b8",
-                  cursor: "pointer",
                   padding: "0.4rem",
-                  borderRadius: "9999px",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#f87171")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
                 title="删除规则"
               >
                 <Trash2 size={16} />
-              </button>
+              </Button>
             </div>
           ))}
         </div>

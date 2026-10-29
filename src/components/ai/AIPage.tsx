@@ -8,7 +8,9 @@ import { flattenTabTree } from "@/services/snapshotParser";
 import { AI_PROVIDERS } from "@/types/ai";
 import { ProportionCard } from "./ProportionCard";
 import { CategorizeModal } from "./CategorizeModal";
-import { Sliders, Sparkles, Loader2, Settings, ArrowRight, Layers } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Sliders, Sparkles, Loader2, Settings } from "lucide-react";
 
 export function AIPage() {
   const {
@@ -86,24 +88,18 @@ export function AIPage() {
             <span style={{ color: "#64748b" }}>({aiConfig.model || currentProviderDef.model})</span>
           </div>
 
-          <button
+          <Button
+            variant="outline"
+            size="xs"
             onClick={() => setActivePage("settings")}
             style={{
-              padding: "0.35rem 0.85rem",
-              borderRadius: "9999px",
-              border: "1px solid #475569",
-              backgroundColor: "transparent",
+              borderColor: "#475569",
               color: "#cbd5e1",
-              fontSize: "0.75rem",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.35rem",
             }}
           >
             <Settings size={13} />
             <span>配置接口</span>
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -227,27 +223,20 @@ export function AIPage() {
 
         {/* Start button row */}
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: "1.5rem", borderTop: "1px solid #334155", paddingTop: "1rem" }}>
-          <button
+          <Button
+            variant="solid"
+            size="md"
             onClick={handleStartAnalysis}
             disabled={isAnalyzing}
             style={{
-              padding: "0.55rem 1.6rem",
-              borderRadius: "9999px",
-              border: "none",
               backgroundColor: isAnalyzing ? "#334155" : "#2563eb",
               color: "#fff",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              cursor: isAnalyzing ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
               boxShadow: "0 4px 14px rgba(37, 99, 235, 0.3)",
             }}
           >
             {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
             <span>{isAnalyzing ? "正在分析比例..." : "开始标签比例探查"}</span>
-          </button>
+          </Button>
         </div>
       </div>
 

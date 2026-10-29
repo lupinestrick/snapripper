@@ -6,6 +6,8 @@ import { useConfigStore } from "@/store/useConfigStore";
 import { computeSnapshotDiff } from "@/services/diffEngine";
 import { PanelDiffResult, SideberySnapshot } from "@/types/sidebery";
 import { DiffHopupModal } from "./DiffHopupModal";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Trash2, FolderPlus, Bot, ArrowRight, Play, AlertCircle } from "lucide-react";
 
 export function ProcessPage() {
@@ -103,46 +105,46 @@ export function ProcessPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
-                width: "40px",
-                height: "40px",
+                width: "44px",
+                height: "44px",
                 borderRadius: "9999px",
-                backgroundColor: enableDedup ? "rgba(56, 189, 248, 0.15)" : "#0f172a",
+                backgroundColor: "rgba(56, 189, 248, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: enableDedup ? "#38bdf8" : "#64748b",
+                color: "#38bdf8",
               }}
             >
               <Trash2 size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>智能 URL 去重</div>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>URL 智能去重</div>
               <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
-                自动识别跨面板或同面板完全相同的网址，保留首个实例并清理冗余项
+                移除不同面板中重复打开的同一网址（保留最早出现的标签，安全豁免置顶与系统页）
               </div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <span style={{ fontSize: "0.8rem", color: "#f87171", fontWeight: 600 }}>
-              检测到 {duplicateUrls.size} 项重复
-            </span>
+            <Badge variant="subtle" size="sm" style={{ color: "#38bdf8" }}>
+              发现 {duplicateUrls.size} 个重复项
+            </Badge>
             <input
               type="checkbox"
               checked={enableDedup}
               onChange={() => {}}
-              style={{ width: "18px", height: "18px", accentColor: "#38bdf8", cursor: "pointer" }}
+              style={{ width: "18px", height: "18px", accentColor: "#2563eb", cursor: "pointer" }}
             />
           </div>
         </div>
 
-        {/* Card 2: Rule Clustering */}
+        {/* Card 2: Rule-based Grouping */}
         <div
           onClick={() => setEnableRules(!enableRules)}
           style={{
             padding: "1.25rem",
             borderRadius: "1rem",
             backgroundColor: "#1e293b",
-            border: enableRules ? "1px solid #10b981" : "1px solid #334155",
+            border: enableRules ? "1px solid #38bdf8" : "1px solid #334155",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -153,34 +155,34 @@ export function ProcessPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
-                width: "40px",
-                height: "40px",
+                width: "44px",
+                height: "44px",
                 borderRadius: "9999px",
-                backgroundColor: enableRules ? "rgba(16, 185, 129, 0.15)" : "#0f172a",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: enableRules ? "#10b981" : "#64748b",
+                color: "#34d399",
               }}
             >
               <FolderPlus size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>自定义规则自动建组</div>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>基于规则自动归类成组</div>
               <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
-                按照设定的域名与标题关键词将同类标签折叠为 Sidebery Group，保持原有 Group 为整体
+                匹配域名与标题关键词，自动创建 Group 组折叠收纳（支持阈值与原子组保持）
               </div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <span style={{ fontSize: "0.8rem", color: "#34d399", fontWeight: 600 }}>
+            <Badge variant="subtle" size="sm" style={{ color: "#34d399" }}>
               {enabledRulesCount} 条规则已启用
-            </span>
+            </Badge>
             <input
               type="checkbox"
               checked={enableRules}
               onChange={() => {}}
-              style={{ width: "18px", height: "18px", accentColor: "#10b981", cursor: "pointer" }}
+              style={{ width: "18px", height: "18px", accentColor: "#2563eb", cursor: "pointer" }}
             />
           </div>
         </div>
@@ -192,7 +194,7 @@ export function ProcessPage() {
             padding: "1.25rem",
             borderRadius: "1rem",
             backgroundColor: "#1e293b",
-            border: enableAI ? "1px solid #a855f7" : "1px solid #334155",
+            border: enableAI ? "1px solid #38bdf8" : "1px solid #334155",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -203,20 +205,20 @@ export function ProcessPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
-                width: "40px",
-                height: "40px",
+                width: "44px",
+                height: "44px",
                 borderRadius: "9999px",
-                backgroundColor: enableAI ? "rgba(168, 85, 247, 0.15)" : "#0f172a",
+                backgroundColor: "rgba(56, 189, 248, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: enableAI ? "#a855f7" : "#64748b",
+                color: "#38bdf8",
               }}
             >
               <Bot size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>AI 生成式比例分类</div>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>AI 智能比例重组</div>
               <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
                 根据大模型探索出的标签比例报告执行全局语义分类（需先在 AI 页面生成比例看板）
               </div>
@@ -227,7 +229,7 @@ export function ProcessPage() {
               type="checkbox"
               checked={enableAI}
               onChange={() => {}}
-              style={{ width: "18px", height: "18px", accentColor: "#a855f7", cursor: "pointer" }}
+              style={{ width: "18px", height: "18px", accentColor: "#2563eb", cursor: "pointer" }}
             />
           </div>
         </div>
@@ -235,27 +237,21 @@ export function ProcessPage() {
 
       {/* Start Button */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
+        <Button
+          variant="solid"
+          size="lg"
           onClick={handleStartProcess}
           disabled={!enableDedup && !enableRules && !enableAI}
           style={{
-            padding: "0.75rem 2rem",
-            borderRadius: "9999px", // Circular pill style
-            border: "none",
             backgroundColor: !enableDedup && !enableRules && !enableAI ? "#334155" : "#2563eb",
             color: "#ffffff",
-            fontSize: "0.95rem",
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: "0.6rem",
-            cursor: !enableDedup && !enableRules && !enableAI ? "not-allowed" : "pointer",
+            padding: "0.75rem 2rem",
             boxShadow: "0 10px 15px -3px rgba(37, 99, 235, 0.3)",
           }}
         >
           <Play size={16} fill="currentColor" />
           <span>开始处理并预览 Diff 对比</span>
-        </button>
+        </Button>
       </div>
 
       {/* Hop-up Modal for Diff */}
