@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { sendAIChatRequest } from "@/services/aiService";
 import { CategorizationRule } from "@/types/sidebery";
+import { Button } from "@/components/ui/button";
 import {
   X,
   Sparkles,
@@ -187,19 +188,16 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
               AI 智能生成规则助手
             </h3>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
+            pill
             onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#94a3b8",
-              cursor: "pointer",
-              padding: "4px",
-              borderRadius: "9999px",
-            }}
+            style={{ color: "#94a3b8", padding: "4px" }}
+            title="关闭"
           >
             <X size={18} />
-          </button>
+          </Button>
         </div>
 
         {/* Chat Messages Body */}
@@ -293,26 +291,29 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
                                 </span>
                               </div>
 
-                              <button
+                              <Button
                                 onClick={() => handleAddRule(rule, ruleKey)}
                                 disabled={isAdded}
-                                style={{
-                                  padding: "0.25rem 0.75rem",
-                                  borderRadius: "9999px",
-                                  border: isAdded ? "1px solid #059669" : "none",
-                                  backgroundColor: isAdded ? "rgba(16, 185, 129, 0.15)" : "#2563eb",
-                                  color: isAdded ? "#34d399" : "#fff",
-                                  fontSize: "0.75rem",
-                                  fontWeight: 500,
-                                  cursor: isAdded ? "default" : "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "0.3rem",
-                                }}
+                                variant={isAdded ? "outline" : "solid"}
+                                size="xs"
+                                pill
+                                style={
+                                  isAdded
+                                    ? {
+                                        borderColor: "#059669",
+                                        backgroundColor: "rgba(16, 185, 129, 0.15)",
+                                        color: "#34d399",
+                                      }
+                                    : {
+                                        backgroundColor: "#2563eb",
+                                        borderColor: "#3b82f6",
+                                        color: "#ffffff",
+                                      }
+                                }
                               >
                                 {isAdded ? <Check size={13} /> : <Plus size={13} />}
                                 <span>{isAdded ? "已添加" : "添加此规则"}</span>
-                              </button>
+                              </Button>
                             </div>
 
                             <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
@@ -368,24 +369,18 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
           }}
         >
           {QUICK_PROMPTS.map((promptText) => (
-            <button
+            <Button
               key={promptText}
               type="button"
+              variant="outline"
+              size="xs"
+              pill
               onClick={() => handleSendMessage(promptText)}
               disabled={isGenerating}
-              style={{
-                whiteSpace: "nowrap",
-                padding: "0.25rem 0.65rem",
-                borderRadius: "9999px",
-                border: "1px solid #334155",
-                backgroundColor: "#1e293b",
-                color: "#94a3b8",
-                fontSize: "0.72rem",
-                cursor: isGenerating ? "not-allowed" : "pointer",
-              }}
+              style={{ whiteSpace: "nowrap" }}
             >
               {promptText}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -414,36 +409,31 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
             disabled={isGenerating}
             style={{
               flex: 1,
-              padding: "0.55rem 0.85rem",
+              padding: "0.45rem 0.85rem",
               borderRadius: "0.5rem",
               backgroundColor: "#1e293b",
               border: "1px solid #334155",
               color: "#fff",
-              fontSize: "0.85rem",
+              fontSize: "0.8rem",
               outline: "none",
             }}
           />
 
-          <button
+          <Button
             onClick={() => handleSendMessage()}
             disabled={!inputPrompt.trim() || isGenerating}
+            variant="solid"
+            size="xs"
+            pill
             style={{
-              padding: "0.55rem 1.1rem",
-              borderRadius: "9999px",
-              border: "none",
               backgroundColor: !inputPrompt.trim() || isGenerating ? "#334155" : "#2563eb",
+              borderColor: !inputPrompt.trim() || isGenerating ? "#334155" : "#3b82f6",
               color: "#fff",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              cursor: !inputPrompt.trim() || isGenerating ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
             }}
           >
-            {isGenerating ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             <span>发送</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

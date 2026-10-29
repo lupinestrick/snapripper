@@ -289,32 +289,32 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
             <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
               <Button
                 variant="outline"
-                size="sm"
+                size="xs"
+                pill
                 onClick={() => fileInputRef.current?.click()}
                 style={{
                   borderColor: "#334155",
                   backgroundColor: "#1e293b",
                   color: "#f8fafc",
-                  padding: "0.45rem 1rem",
                 }}
               >
-                <Upload size={14} />
+                <Upload size={13} />
                 <span>从本地上传 JSON</span>
               </Button>
 
               <Button
                 variant="subtle"
-                size="sm"
+                size="xs"
+                pill
                 onClick={handleLoadUserSnapshot}
                 disabled={loadingUserSnapshot}
                 style={{
                   backgroundColor: "rgba(2, 132, 199, 0.15)",
                   color: "#38bdf8",
                   borderColor: "#0284c7",
-                  padding: "0.45rem 1rem",
                 }}
               >
-                {loadingUserSnapshot ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
+                {loadingUserSnapshot ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />}
                 <span>载入项目样本 (1,174 标签)</span>
               </Button>
             </div>
@@ -349,15 +349,16 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
 
                   <Button
                     variant="solid"
-                    size="sm"
+                    size="xs"
+                    pill
                     onClick={handleExportJSON}
                     style={{
                       backgroundColor: "#2563eb",
+                      borderColor: "#3b82f6",
                       color: "#fff",
-                      padding: "0.4rem 1.1rem",
                     }}
                   >
-                    <Download size={14} />
+                    <Download size={13} />
                     <span>下载文件</span>
                   </Button>
                 </div>

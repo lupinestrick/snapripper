@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { FolderArchive, Undo2 } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { SnapshotFileHopupModal, formatBytes } from "./SnapshotFileHopupModal";
+import { Button } from "@/components/ui/button";
 
 interface TopNavProps {
   onOpenExport?: () => void;
@@ -65,50 +66,33 @@ export function TopNav({ onOpenExport }: TopNavProps) {
         </div>
 
         {/* Action Controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
           {hasData && (
-            <button
+            <Button
               onClick={undo}
               disabled={undoStack.length === 0}
               style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "9999px",
-                border: "1px solid #334155",
-                backgroundColor: "#1e293b",
+                width: "30px",
+                height: "30px",
+                padding: 0,
                 color: undoStack.length > 0 ? "#94a3b8" : "#475569",
-                cursor: undoStack.length > 0 ? "pointer" : "not-allowed",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 0.15s ease",
               }}
               title="撤销 (Undo)"
             >
-              <Undo2 size={15} />
-            </button>
+              <Undo2 size={14} />
+            </Button>
           )}
 
           {/* Single File Icon Button Opening the File Management Hop-up */}
-          <button
+          <Button
             onClick={() => setFileHopupOpen(true)}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.45rem",
-              padding: "0.4rem 0.95rem",
-              borderRadius: "9999px",
-              border: hasData ? "1px solid #334155" : "1px solid #0284c7",
-              backgroundColor: hasData ? "#1e293b" : "rgba(2, 132, 199, 0.2)",
               color: hasData ? "#f8fafc" : "#38bdf8",
-              fontSize: "0.8rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
+              borderColor: hasData ? "#334155" : "#0284c7",
             }}
             title="快照文件与导入导出管理"
           >
-            <FolderArchive size={15} color="#38bdf8" />
+            <FolderArchive size={14} color="#38bdf8" />
             <span>
               {hasData
                 ? rawFileSize > 0
@@ -116,7 +100,7 @@ export function TopNav({ onOpenExport }: TopNavProps) {
                   : "快照管理"
                 : "导入文件"}
             </span>
-          </button>
+          </Button>
         </div>
       </header>
 

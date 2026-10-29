@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useConfigStore, AppPage } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { OverviewHopup } from "./OverviewHopup";
+import { Button } from "@/components/ui/button";
 import {
   Layers,
   Sparkles,
@@ -13,12 +14,11 @@ import {
   BarChart2,
   ChevronLeft,
   ChevronRight,
-  Upload,
 } from "lucide-react";
 
 export function AppSidebar() {
   const { activePage, setActivePage } = useConfigStore();
-  const { rawSnapshot, loadSnapshot } = useSnapshotStore();
+  const { rawSnapshot } = useSnapshotStore();
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -50,11 +50,11 @@ export function AppSidebar() {
   const panelCount = rawSnapshot?.panels ? Object.keys(rawSnapshot.panels).length : 0;
 
   const navItems: { page: AppPage; label: string; icon: React.ReactNode }[] = [
-    { page: "workbench", label: "工作台", icon: <Layers size={18} /> },
-    { page: "process", label: "处理比对", icon: <Sparkles size={18} /> },
-    { page: "rules", label: "规则管理", icon: <SlidersHorizontal size={18} /> },
-    { page: "ai", label: "AI 比例分析", icon: <Bot size={18} /> },
-    { page: "settings", label: "系统设置", icon: <Settings size={18} /> },
+    { page: "workbench", label: "工作台", icon: <Layers size={17} /> },
+    { page: "process", label: "处理中心", icon: <Sparkles size={17} /> },
+    { page: "rules", label: "规则管理", icon: <SlidersHorizontal size={17} /> },
+    { page: "ai", label: "AI 比例", icon: <Bot size={17} /> },
+    { page: "settings", label: "系统设置", icon: <Settings size={17} /> },
   ];
 
   // Mobile Bottom Bar Navigation
@@ -67,9 +67,9 @@ export function AppSidebar() {
             bottom: 0,
             left: 0,
             right: 0,
-            height: "60px",
+            height: "56px",
             backgroundColor: "#111827",
-            borderTop: "1px solid #1f2937",
+            borderTop: "1px solid #1e293b",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-around",
@@ -80,47 +80,38 @@ export function AppSidebar() {
           {navItems.map((item) => {
             const isActive = activePage === item.page;
             return (
-              <button
+              <Button
                 key={item.page}
+                variant={isActive ? "solid" : "ghost"}
+                size="xs"
                 onClick={() => setActivePage(item.page)}
                 style={{
-                  display: "flex",
                   flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
                   gap: "2px",
-                  padding: "6px 12px",
-                  borderRadius: "9999px",
-                  backgroundColor: isActive ? "#1e293b" : "transparent",
-                  color: isActive ? "#38bdf8" : "#9ca3af",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "0.7rem",
+                  padding: "4px 8px",
+                  fontSize: "0.68rem",
+                  backgroundColor: isActive ? "#2563eb" : "transparent",
+                  color: isActive ? "#ffffff" : "#94a3b8",
                 }}
               >
                 {item.icon}
                 <span>{item.label}</span>
-              </button>
+              </Button>
             );
           })}
-          <button
+          <Button
+            size="xs"
             onClick={() => setOverviewOpen(true)}
             style={{
-              padding: "6px 10px",
-              borderRadius: "9999px",
-              backgroundColor: "#2563eb",
-              color: "#fff",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "0.7rem",
-              display: "flex",
-              alignItems: "center",
+              padding: "4px 8px",
               gap: "4px",
+              fontSize: "0.68rem",
+              color: "#38bdf8",
             }}
           >
-            <BarChart2 size={14} />
+            <BarChart2 size={13} />
             <span>{totalTabs}</span>
-          </button>
+          </Button>
         </div>
         <OverviewHopup isOpen={overviewOpen} onClose={() => setOverviewOpen(false)} />
       </>
@@ -132,7 +123,7 @@ export function AppSidebar() {
     <>
       <aside
         style={{
-          width: isCompact ? "68px" : "220px",
+          width: isCompact ? "64px" : "210px",
           transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
           backgroundColor: "#0f172a",
           borderRight: "1px solid #1e293b",
@@ -159,8 +150,8 @@ export function AppSidebar() {
             <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
               <div
                 style={{
-                  width: "28px",
-                  height: "28px",
+                  width: "26px",
+                  height: "26px",
                   borderRadius: "9999px",
                   backgroundColor: "#2563eb",
                   display: "flex",
@@ -168,20 +159,20 @@ export function AppSidebar() {
                   justifyContent: "center",
                   color: "#fff",
                   fontWeight: 700,
-                  fontSize: "0.85rem",
+                  fontSize: "0.8rem",
                 }}
               >
                 S
               </div>
-              <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.02em" }}>
+              <span style={{ fontSize: "0.925rem", fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.02em" }}>
                 SnapRipper
               </span>
             </div>
           ) : (
             <div
               style={{
-                width: "28px",
-                height: "28px",
+                width: "26px",
+                height: "26px",
                 borderRadius: "9999px",
                 backgroundColor: "#2563eb",
                 display: "flex",
@@ -189,7 +180,7 @@ export function AppSidebar() {
                 justifyContent: "center",
                 color: "#fff",
                 fontWeight: 700,
-                fontSize: "0.85rem",
+                fontSize: "0.8rem",
               }}
             >
               S
@@ -198,48 +189,40 @@ export function AppSidebar() {
 
           {/* Compact Toggle Button */}
           {!isCompact && (
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => setIsCompact(true)}
               style={{
                 width: "24px",
                 height: "24px",
-                borderRadius: "9999px",
-                border: "none",
-                backgroundColor: "#1e293b",
+                padding: 0,
                 color: "#94a3b8",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
               }}
               title="折叠侧边栏"
             >
               <ChevronLeft size={14} />
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Compact expand toggle button if isCompact */}
         {isCompact && (
           <div style={{ display: "flex", justifyContent: "center", padding: "0.5rem 0" }}>
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => setIsCompact(false)}
               style={{
                 width: "28px",
                 height: "28px",
-                borderRadius: "9999px",
-                border: "none",
-                backgroundColor: "#1e293b",
+                padding: 0,
                 color: "#94a3b8",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
               }}
               title="展开侧边栏"
             >
               <ChevronRight size={14} />
-            </button>
+            </Button>
           </div>
         )}
 
@@ -248,32 +231,30 @@ export function AppSidebar() {
           {navItems.map((item) => {
             const isActive = activePage === item.page;
             return (
-              <button
+              <Button
                 key={item.page}
+                variant={isActive ? "solid" : "ghost"}
                 onClick={() => setActivePage(item.page)}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: isCompact ? "center" : "flex-start",
-                  gap: "0.75rem",
-                  padding: isCompact ? "0.6rem 0" : "0.6rem 0.75rem",
-                  borderRadius: "9999px",
-                  border: "none",
+                  gap: "0.65rem",
+                  padding: isCompact ? "0.55rem 0" : "0.5rem 0.75rem",
                   backgroundColor: isActive ? "#1e293b" : "transparent",
+                  borderColor: isActive ? "#334155" : "transparent",
                   color: isActive ? "#38bdf8" : "#94a3b8",
                   fontWeight: isActive ? 600 : 500,
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
+                  fontSize: "0.825rem",
                   width: "100%",
                 }}
                 title={isCompact ? item.label : undefined}
               >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "20px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "18px" }}>
                   {item.icon}
                 </div>
                 {!isCompact && <span>{item.label}</span>}
-              </button>
+              </Button>
             );
           })}
         </nav>
@@ -282,50 +263,43 @@ export function AppSidebar() {
         {rawSnapshot && (
           <div style={{ padding: "0.75rem" }}>
             {!isCompact ? (
-              <div
-                onClick={() => setOverviewOpen(true)}
-                style={{
-                  padding: "0.75rem",
-                  borderRadius: "0.75rem",
-                  backgroundColor: "#1e293b",
-                  border: "1px solid #334155",
-                  cursor: "pointer",
-                  transition: "border-color 0.15s ease",
-                }}
-                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "#38bdf8")}
-                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.borderColor = "#334155")}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                  <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600 }}>快照概览</span>
-                  <BarChart2 size={13} color="#38bdf8" />
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem" }}>
-                  <span style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f8fafc" }}>{totalTabs}</span>
-                  <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>标签 / {panelCount} 面板</span>
-                </div>
-                <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.25rem" }}>点击查看完整统计</div>
-              </div>
-            ) : (
-              <button
+              <Button
                 onClick={() => setOverviewOpen(true)}
                 style={{
                   width: "100%",
-                  padding: "0.6rem 0",
-                  borderRadius: "9999px",
-                  backgroundColor: "#1e293b",
-                  border: "1px solid #334155",
-                  color: "#38bdf8",
+                  padding: "0.6rem 0.75rem",
+                  borderRadius: "0.75rem",
                   display: "flex",
                   flexDirection: "column",
-                  alignItems: "center",
-                  gap: "2px",
-                  cursor: "pointer",
+                  alignItems: "stretch",
+                  gap: "0.25rem",
+                  textAlign: "left",
                 }}
                 title="查看概览数据"
               >
-                <BarChart2 size={16} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600 }}>快照概览</span>
+                  <BarChart2 size={13} color="#38bdf8" />
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem" }}>
+                  <span style={{ fontSize: "1.15rem", fontWeight: 700, color: "#f8fafc" }}>{totalTabs}</span>
+                  <span style={{ fontSize: "0.7rem", color: "#94a3b8" }}>标签 / {panelCount} 面板</span>
+                </div>
+              </Button>
+            ) : (
+              <Button
+                onClick={() => setOverviewOpen(true)}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem 0",
+                  flexDirection: "column",
+                  gap: "2px",
+                }}
+                title="查看概览数据"
+              >
+                <BarChart2 size={15} color="#38bdf8" />
                 <span style={{ fontSize: "0.65rem", fontWeight: 700 }}>{totalTabs}</span>
-              </button>
+              </Button>
             )}
           </div>
         )}

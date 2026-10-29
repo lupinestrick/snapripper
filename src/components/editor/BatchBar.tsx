@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Trash2, Pin, PinOff, FolderInput, X } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { Button } from "@/components/ui/button";
 
 export function BatchBar() {
   const {
@@ -27,106 +28,66 @@ export function BatchBar() {
         left: "50%",
         transform: "translateX(-50%)",
         backgroundColor: "#111827",
-        border: "1px solid #38bdf8",
-        borderRadius: "9999px", // Oval pill floating bar
-        padding: "0.5rem 1.25rem",
+        border: "1px solid #334155",
+        borderRadius: "9999px",
+        padding: "0.4rem 1rem",
         display: "flex",
         alignItems: "center",
-        gap: "0.85rem",
-        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.7)",
+        gap: "0.5rem",
         zIndex: 50,
       }}
     >
-      <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#38bdf8" }}>
+      <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#38bdf8", padding: "0 0.3rem" }}>
         已选择 {selectedIds.size} 项
       </div>
 
       <div style={{ height: "1.2rem", width: "1px", backgroundColor: "#334155" }} />
 
-      {/* Delete button (pill style) */}
-      <button
+      {/* Delete button */}
+      <Button
         onClick={deleteSelected}
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.3rem",
-          padding: "0.35rem 0.85rem",
-          borderRadius: "9999px",
           backgroundColor: "rgba(239, 68, 68, 0.15)",
           color: "#f87171",
-          border: "1px solid rgba(239, 68, 68, 0.3)",
-          fontSize: "0.8rem",
-          fontWeight: 500,
-          cursor: "pointer",
+          borderColor: "rgba(239, 68, 68, 0.3)",
         }}
       >
         <Trash2 size={13} />
         <span>批量删除</span>
-      </button>
+      </Button>
 
-      {/* Pin toggle (pill style) */}
-      <button
+      {/* Pin toggle */}
+      <Button
         onClick={() => markSelectedPinned(true)}
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.3rem",
-          padding: "0.35rem 0.85rem",
-          borderRadius: "9999px",
           backgroundColor: "rgba(245, 158, 11, 0.15)",
           color: "#fbbf24",
-          border: "1px solid rgba(245, 158, 11, 0.3)",
-          fontSize: "0.8rem",
-          fontWeight: 500,
-          cursor: "pointer",
+          borderColor: "rgba(245, 158, 11, 0.3)",
         }}
       >
         <Pin size={13} />
         <span>标记固定</span>
-      </button>
+      </Button>
 
-      <button
+      <Button
         onClick={() => markSelectedPinned(false)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.3rem",
-          padding: "0.35rem 0.85rem",
-          borderRadius: "9999px",
-          backgroundColor: "#1e293b",
-          color: "#94a3b8",
-          border: "1px solid #334155",
-          fontSize: "0.8rem",
-          fontWeight: 500,
-          cursor: "pointer",
-        }}
       >
         <PinOff size={13} />
         <span>取消固定</span>
-      </button>
+      </Button>
 
       {/* Move to Panel */}
       {panels.length > 0 && (
         <div style={{ position: "relative" }}>
-          <button
+          <Button
             onClick={() => setPanelSelectOpen(!panelSelectOpen)}
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.3rem",
-              padding: "0.35rem 0.85rem",
-              borderRadius: "9999px",
-              backgroundColor: "#1e293b",
               color: "#38bdf8",
-              border: "1px solid #334155",
-              fontSize: "0.8rem",
-              fontWeight: 500,
-              cursor: "pointer",
             }}
           >
             <FolderInput size={13} />
             <span>移至面板...</span>
-          </button>
+          </Button>
 
           {panelSelectOpen && (
             <div
@@ -137,61 +98,51 @@ export function BatchBar() {
                 backgroundColor: "#111827",
                 border: "1px solid #334155",
                 borderRadius: "0.75rem",
-                padding: "0.4rem",
+                padding: "0.35rem",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.25rem",
                 minWidth: "160px",
-                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.7)",
               }}
             >
               {panels.map((p) => (
-                <button
+                <Button
                   key={p.id}
+                  variant="ghost"
+                  pill={false}
                   onClick={() => {
                     moveSelectedToPanel(p.id);
                     setPanelSelectOpen(false);
                   }}
                   style={{
-                    padding: "0.35rem 0.75rem",
-                    borderRadius: "0.375rem",
-                    border: "none",
-                    backgroundColor: "transparent",
+                    justifyContent: "flex-start",
                     color: "#f8fafc",
-                    fontSize: "0.8rem",
-                    textAlign: "left",
-                    cursor: "pointer",
+                    fontSize: "0.75rem",
+                    padding: "0.35rem 0.6rem",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1e293b")}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 >
                   {p.name || p.id}
-                </button>
+                </Button>
               ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Clear selection (round button) */}
-      <button
+      {/* Clear selection */}
+      <Button
+        variant="ghost"
         onClick={clearSelection}
         style={{
           width: "26px",
           height: "26px",
-          borderRadius: "9999px",
-          border: "none",
-          backgroundColor: "#1e293b",
+          padding: 0,
           color: "#64748b",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
         }}
         title="清除选择"
       >
         <X size={14} />
-      </button>
+      </Button>
     </div>
   );
 }

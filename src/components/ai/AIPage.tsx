@@ -225,15 +225,17 @@ export function AIPage() {
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: "1.5rem", borderTop: "1px solid #334155", paddingTop: "1rem" }}>
           <Button
             variant="solid"
-            size="md"
+            size="xs"
+            pill
             onClick={handleStartAnalysis}
             disabled={isAnalyzing}
             style={{
               backgroundColor: isAnalyzing ? "#334155" : "#2563eb",
+              borderColor: isAnalyzing ? "#334155" : "#3b82f6",
               color: "#fff",
             }}
           >
-            {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            {isAnalyzing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
             <span>{isAnalyzing ? "正在分析比例..." : "开始标签比例探查"}</span>
           </Button>
         </div>

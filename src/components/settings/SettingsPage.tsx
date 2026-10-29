@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { testAIConnection } from "@/services/aiService";
 import { AI_PROVIDERS, AIProviderKey } from "@/types/ai";
+import { Button } from "@/components/ui/button";
 import {
   Bot,
   Sliders,
@@ -126,24 +127,21 @@ export function SettingsPage() {
               const preset = AI_PROVIDERS[key];
               const isSelected = aiConfig.provider === key;
               return (
-                <button
+                <Button
                   key={key}
                   type="button"
+                  variant={isSelected ? "solid" : "outline"}
+                  size="xs"
+                  pill
                   onClick={() => handleSelectProvider(key)}
                   style={{
-                    padding: "0.45rem 1.1rem",
-                    borderRadius: "9999px",
-                    border: isSelected ? "1.5px solid #3b82f6" : "1px solid #334155",
-                    backgroundColor: isSelected ? "#2563eb" : "#0f172a",
+                    backgroundColor: isSelected ? "#2563eb" : "#1e293b",
+                    borderColor: isSelected ? "#3b82f6" : "#334155",
                     color: isSelected ? "#ffffff" : "#94a3b8",
-                    fontWeight: isSelected ? 600 : 400,
-                    fontSize: "0.825rem",
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
                   }}
                 >
                   {preset.name}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -182,23 +180,23 @@ export function SettingsPage() {
                   {currentPreset.models.map((m) => {
                     const isModelActive = aiConfig.model === m;
                     return (
-                      <button
+                      <Button
                         key={m}
                         type="button"
+                        variant={isModelActive ? "solid" : "outline"}
+                        size="xs"
+                        pill
                         onClick={() => setAIConfig({ model: m })}
                         style={{
                           padding: "0.15rem 0.5rem",
-                          borderRadius: "9999px",
-                          border: isModelActive ? "1px solid #3b82f6" : "1px solid #334155",
-                          backgroundColor: isModelActive ? "rgba(37, 99, 235, 0.25)" : "transparent",
-                          color: isModelActive ? "#60a5fa" : "#64748b",
                           fontSize: "0.7rem",
-                          cursor: "pointer",
-                          transition: "all 0.15s ease",
+                          backgroundColor: isModelActive ? "rgba(37, 99, 235, 0.25)" : "#1e293b",
+                          borderColor: isModelActive ? "#3b82f6" : "#334155",
+                          color: isModelActive ? "#60a5fa" : "#64748b",
                         }}
                       >
                         {m}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -247,25 +245,16 @@ export function SettingsPage() {
 
         {/* Test Connection Button */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "1.25rem" }}>
-          <button
+          <Button
             onClick={handleTestConnection}
             disabled={isTesting}
-            style={{
-              padding: "0.45rem 1.1rem",
-              borderRadius: "9999px",
-              border: "1px solid #475569",
-              backgroundColor: "transparent",
-              color: "#94a3b8",
-              fontSize: "0.8rem",
-              cursor: isTesting ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-            }}
+            variant="outline"
+            size="xs"
+            pill
           >
-            {isTesting ? <Loader2 size={14} className="animate-spin" /> : null}
+            {isTesting ? <Loader2 size={13} className="animate-spin" /> : null}
             <span>测试连接</span>
-          </button>
+          </Button>
 
           {testResult && (
             <span
@@ -467,43 +456,44 @@ export function SettingsPage() {
           <div style={{ display: "flex", gap: "0.6rem" }}>
             <label
               style={{
-                padding: "0.45rem 1.1rem",
+                padding: "0.3rem 0.75rem",
                 borderRadius: "9999px",
                 border: "1px solid #334155",
-                backgroundColor: "#0f172a",
+                backgroundColor: "#1e293b",
                 color: "#94a3b8",
-                fontSize: "0.8rem",
+                fontSize: "0.75rem",
                 fontWeight: 500,
                 cursor: "pointer",
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "0.4rem",
+                gap: "0.35rem",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#334155";
+                e.currentTarget.style.borderColor = "#475569";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#1e293b";
+                e.currentTarget.style.borderColor = "#334155";
+                e.currentTarget.style.color = "#94a3b8";
               }}
             >
-              <Upload size={14} />
+              <Upload size={13} />
               <span>导入配置</span>
               <input type="file" accept=".json" onChange={handleImportAll} style={{ display: "none" }} />
             </label>
 
-            <button
+            <Button
               onClick={handleExportAll}
-              style={{
-                padding: "0.45rem 1.1rem",
-                borderRadius: "9999px",
-                border: "1px solid #334155",
-                backgroundColor: "#0f172a",
-                color: "#94a3b8",
-                fontSize: "0.8rem",
-                fontWeight: 500,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-              }}
+              variant="outline"
+              size="xs"
+              pill
             >
-              <Download size={14} />
+              <Download size={13} />
               <span>导出配置</span>
-            </button>
+            </Button>
           </div>
         </div>
       </div>

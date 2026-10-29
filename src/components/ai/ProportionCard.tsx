@@ -254,19 +254,17 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
           ) : (
             <Button
               variant="outline"
-              size="sm"
-              pill={false}
+              size="xs"
+              pill
               onClick={() => setIsAdding(true)}
               style={{
-                padding: "0.75rem",
-                borderRadius: "0.75rem",
                 border: "1px dashed #334155",
                 color: "#94a3b8",
                 backgroundColor: "transparent",
                 justifyContent: "center",
               }}
             >
-              <Plus size={15} />
+              <Plus size={13} />
               <span>添加自定义分类</span>
             </Button>
           )}
@@ -280,17 +278,18 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
 
         <Button
           variant="solid"
-          size="md"
+          size="xs"
           pill
           onClick={onStartClassification}
           style={{
-            backgroundColor: "#22c55e",
+            backgroundColor: "#2563eb",
+            borderColor: "#3b82f6",
             color: "#ffffff",
           }}
         >
-          <Sparkles size={16} />
+          <Sparkles size={13} />
           <span>确认分类标准并执行批量归类</span>
-          <ArrowRight size={16} />
+          <ArrowRight size={13} />
         </Button>
       </Card.Footer>
     </Card.Root>
