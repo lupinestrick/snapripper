@@ -169,16 +169,18 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
               </div>
             </div>
 
-            <Button
-              variant="ghost"
-              size="xs"
-              pill
-              onClick={onClose}
-              style={{ color: "#94a3b8", padding: "4px" }}
-              title="关闭"
-            >
-              <X size={18} />
-            </Button>
+            <Dialog.CloseTrigger asChild>
+              <Button
+                variant="ghost"
+                size="xs"
+                pill
+                onClick={onClose}
+                style={{ color: "#94a3b8", padding: "4px" }}
+                title="关闭"
+              >
+                <X size={18} />
+              </Button>
+            </Dialog.CloseTrigger>
           </div>
 
           {/* Snapshot Info Card */}

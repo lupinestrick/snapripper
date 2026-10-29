@@ -4,7 +4,6 @@ import React from "react";
 import { Pin, Copy, GitFork, ListFilter, ShieldCheck } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { flattenTabTree } from "@/services/snapshotParser";
-import { Button } from "@/components/ui/button";
 
 export function StatsHeader() {
   const { rootNodes, duplicateUrls, onlyDuplicates, setOnlyDuplicates } = useSnapshotStore();
@@ -49,21 +48,26 @@ export function StatsHeader() {
       </div>
 
       {duplicateCount > 0 && (
-        <Button
-          variant="subtle"
-          size="xs"
+        <button
           onClick={() => setOnlyDuplicates(!onlyDuplicates)}
           style={{
-            borderColor: onlyDuplicates ? "#ef4444" : "#334155",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.35rem",
+            padding: "0.2rem 0.65rem",
+            borderRadius: "9999px",
+            border: onlyDuplicates ? "1px solid #ef4444" : "1px solid #334155",
             backgroundColor: onlyDuplicates ? "rgba(239, 68, 68, 0.15)" : "transparent",
             color: onlyDuplicates ? "#f87171" : "#94a3b8",
+            cursor: "pointer",
+            fontSize: "0.75rem",
           }}
         >
           <Copy size={12} />
           <span>重复 URL:</span>
           <strong>{duplicateCount}</strong>
           <span style={{ fontSize: "0.65rem", opacity: 0.8 }}>({onlyDuplicates ? "显示全部" : "仅看重复"})</span>
-        </Button>
+        </button>
       )}
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "#64748b" }}>

@@ -12,7 +12,12 @@ export interface DialogProps {
 
 export const Dialog = {
   Root: ({ open, onOpenChange, children }: DialogProps) => (
-    <ArkDialog.Root open={open} onOpenChange={(details) => onOpenChange?.(details.open)}>
+    <ArkDialog.Root
+      open={open}
+      onOpenChange={(details) => onOpenChange?.(details.open)}
+      lazyMount
+      unmountOnExit
+    >
       {children}
     </ArkDialog.Root>
   ),
@@ -52,6 +57,7 @@ export const Dialog = {
             justifyContent: "center",
             zIndex: 101,
             padding: "1rem",
+            pointerEvents: "none",
             ...style,
           }}
           {...props}
@@ -68,11 +74,12 @@ export const Dialog = {
           className={`${classes.content} ${className}`}
           style={{
             backgroundColor: "#111827",
-            border: "1px solid #1f2937",
+            border: "1px solid #334155",
             borderRadius: "1rem",
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+            boxShadow: "none",
             overflow: "hidden",
             color: "#f8fafc",
+            pointerEvents: "auto",
             ...style,
           }}
           {...props}

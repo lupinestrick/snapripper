@@ -4,8 +4,6 @@ import React from "react";
 import { Search, X } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 
 export function SearchFilter() {
   const {
@@ -72,23 +70,30 @@ export function SearchFilter() {
             }}
           />
           {searchQuery && (
-            <Button
-              variant="ghost"
-              size="xs"
-              pill
+            <button
               onClick={() => setSearchQuery("")}
-              style={{ color: "#64748b", padding: "0.1rem" }}
+              style={{ background: "transparent", border: "none", cursor: "pointer", color: "#64748b" }}
             >
               <X size={13} />
-            </Button>
+            </button>
           )}
         </div>
 
         {/* Panel filter (pill style) */}
         {panels.length > 0 && (
-          <Select
+          <select
             value={panelFilter || ""}
             onChange={(e) => setPanelFilter(e.target.value ? e.target.value : null)}
+            style={{
+              padding: "0.35rem 0.85rem",
+              borderRadius: "9999px",
+              backgroundColor: "#1e293b",
+              border: "1px solid #334155",
+              color: "#f8fafc",
+              fontSize: "0.8rem",
+              cursor: "pointer",
+              outline: "none",
+            }}
           >
             <option value="">所有面板</option>
             {panels.map((p) => (
@@ -96,14 +101,24 @@ export function SearchFilter() {
                 面板: {p.name || p.id}
               </option>
             ))}
-          </Select>
+          </select>
         )}
 
         {/* Container filter (pill style) */}
         {containers.length > 0 && (
-          <Select
+          <select
             value={containerFilter || ""}
             onChange={(e) => setContainerFilter(e.target.value ? e.target.value : null)}
+            style={{
+              padding: "0.35rem 0.85rem",
+              borderRadius: "9999px",
+              backgroundColor: "#1e293b",
+              border: "1px solid #334155",
+              color: "#f8fafc",
+              fontSize: "0.8rem",
+              cursor: "pointer",
+              outline: "none",
+            }}
           >
             <option value="">所有容器</option>
             {containers.map((c) => (
@@ -111,7 +126,7 @@ export function SearchFilter() {
                 容器: {c.name}
               </option>
             ))}
-          </Select>
+          </select>
         )}
       </div>
 
@@ -144,32 +159,66 @@ export function SearchFilter() {
           <span>包含子标签</span>
         </label>
 
-        <Button variant="outline" size="xs" pill onClick={expandAll}>
+        <button
+          onClick={expandAll}
+          style={{
+            padding: "0.3rem 0.75rem",
+            borderRadius: "9999px",
+            border: "1px solid #334155",
+            backgroundColor: "#1e293b",
+            color: "#94a3b8",
+            fontSize: "0.75rem",
+            cursor: "pointer",
+          }}
+        >
           全部展开
-        </Button>
+        </button>
 
-        <Button variant="outline" size="xs" pill onClick={collapseAll}>
+        <button
+          onClick={collapseAll}
+          style={{
+            padding: "0.3rem 0.75rem",
+            borderRadius: "9999px",
+            border: "1px solid #334155",
+            backgroundColor: "#1e293b",
+            color: "#94a3b8",
+            fontSize: "0.75rem",
+            cursor: "pointer",
+          }}
+        >
           全部折叠
-        </Button>
+        </button>
 
         {selectedIds.size > 0 ? (
-          <Button
-            variant="subtle"
-            size="xs"
-            pill
+          <button
             onClick={clearSelection}
             style={{
+              padding: "0.3rem 0.75rem",
+              borderRadius: "9999px",
+              border: "1px solid #334155",
               backgroundColor: "rgba(239, 68, 68, 0.15)",
               color: "#f87171",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
+              fontSize: "0.75rem",
+              cursor: "pointer",
             }}
           >
             取消选中 ({selectedIds.size})
-          </Button>
+          </button>
         ) : (
-          <Button variant="outline" size="xs" pill onClick={selectAll}>
+          <button
+            onClick={selectAll}
+            style={{
+              padding: "0.3rem 0.75rem",
+              borderRadius: "9999px",
+              border: "1px solid #334155",
+              backgroundColor: "#1e293b",
+              color: "#94a3b8",
+              fontSize: "0.75rem",
+              cursor: "pointer",
+            }}
+          >
             全选当前
-          </Button>
+          </button>
         )}
       </div>
     </div>

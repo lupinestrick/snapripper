@@ -43,7 +43,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
         margin: "1rem 1.5rem",
         backgroundColor: "#1e293b",
         border: "1px solid #38bdf8",
-        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
       }}
     >
       <Card.Header style={{ marginBottom: "1rem" }}>
@@ -94,7 +93,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               borderRadius: "9999px",
               overflow: "hidden",
               backgroundColor: "#0f172a",
-              boxShadow: "inset 0 2px 4px rgba(0, 0, 0, 0.3)",
             }}
           >
             {categories.map((cat) => (
@@ -288,7 +286,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
           style={{
             backgroundColor: "#22c55e",
             color: "#ffffff",
-            boxShadow: "0 2px 4px rgba(34, 197, 94, 0.25)",
           }}
         >
           <Sparkles size={16} />

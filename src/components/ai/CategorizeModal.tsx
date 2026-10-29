@@ -30,7 +30,7 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
   const [restructureMode, setRestructureMode] = useState<"tree" | "panel">("tree");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  if (!proportionReport) return null;
+  if (!isOpen || !proportionReport) return null;
 
   const handleExecute = async () => {
     setErrorMsg(null);

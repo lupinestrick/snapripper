@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import { useConfigStore, AppPage } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { OverviewHopup } from "./OverviewHopup";
-import { Button } from "@/components/ui/button";
 import {
   Layers,
   Sparkles,
@@ -14,11 +13,12 @@ import {
   BarChart2,
   ChevronLeft,
   ChevronRight,
+  Upload,
 } from "lucide-react";
 
 export function AppSidebar() {
   const { activePage, setActivePage } = useConfigStore();
-  const { rawSnapshot } = useSnapshotStore();
+  const { rawSnapshot, loadSnapshot } = useSnapshotStore();
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -80,42 +80,47 @@ export function AppSidebar() {
           {navItems.map((item) => {
             const isActive = activePage === item.page;
             return (
-              <Button
+              <button
                 key={item.page}
-                variant={isActive ? "solid" : "ghost"}
-                size="xs"
-                pill
                 onClick={() => setActivePage(item.page)}
                 style={{
+                  display: "flex",
                   flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
                   gap: "2px",
                   padding: "6px 12px",
+                  borderRadius: "9999px",
                   backgroundColor: isActive ? "#1e293b" : "transparent",
                   color: isActive ? "#38bdf8" : "#9ca3af",
+                  border: "none",
+                  cursor: "pointer",
                   fontSize: "0.7rem",
                 }}
               >
                 {item.icon}
                 <span>{item.label}</span>
-              </Button>
+              </button>
             );
           })}
-          <Button
-            variant="solid"
-            size="xs"
-            pill
+          <button
             onClick={() => setOverviewOpen(true)}
             style={{
               padding: "6px 10px",
+              borderRadius: "9999px",
               backgroundColor: "#2563eb",
               color: "#fff",
+              border: "none",
+              cursor: "pointer",
               fontSize: "0.7rem",
+              display: "flex",
+              alignItems: "center",
               gap: "4px",
             }}
           >
             <BarChart2 size={14} />
             <span>{totalTabs}</span>
-          </Button>
+          </button>
         </div>
         <OverviewHopup isOpen={overviewOpen} onClose={() => setOverviewOpen(false)} />
       </>
@@ -193,44 +198,48 @@ export function AppSidebar() {
 
           {/* Compact Toggle Button */}
           {!isCompact && (
-            <Button
-              variant="ghost"
-              size="xs"
-              pill
+            <button
               onClick={() => setIsCompact(true)}
               style={{
                 width: "24px",
                 height: "24px",
-                padding: 0,
+                borderRadius: "9999px",
+                border: "none",
                 backgroundColor: "#1e293b",
                 color: "#94a3b8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
               }}
               title="折叠侧边栏"
             >
               <ChevronLeft size={14} />
-            </Button>
+            </button>
           )}
         </div>
 
         {/* Compact expand toggle button if isCompact */}
         {isCompact && (
           <div style={{ display: "flex", justifyContent: "center", padding: "0.5rem 0" }}>
-            <Button
-              variant="ghost"
-              size="xs"
-              pill
+            <button
               onClick={() => setIsCompact(false)}
               style={{
                 width: "28px",
                 height: "28px",
-                padding: 0,
+                borderRadius: "9999px",
+                border: "none",
                 backgroundColor: "#1e293b",
                 color: "#94a3b8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
               }}
               title="展开侧边栏"
             >
               <ChevronRight size={14} />
-            </Button>
+            </button>
           </div>
         )}
 
@@ -239,10 +248,8 @@ export function AppSidebar() {
           {navItems.map((item) => {
             const isActive = activePage === item.page;
             return (
-              <Button
+              <button
                 key={item.page}
-                variant={isActive ? "solid" : "ghost"}
-                pill
                 onClick={() => setActivePage(item.page)}
                 style={{
                   display: "flex",
@@ -250,10 +257,14 @@ export function AppSidebar() {
                   justifyContent: isCompact ? "center" : "flex-start",
                   gap: "0.75rem",
                   padding: isCompact ? "0.6rem 0" : "0.6rem 0.75rem",
+                  borderRadius: "9999px",
+                  border: "none",
                   backgroundColor: isActive ? "#1e293b" : "transparent",
                   color: isActive ? "#38bdf8" : "#94a3b8",
                   fontWeight: isActive ? 600 : 500,
                   fontSize: "0.85rem",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
                   width: "100%",
                 }}
                 title={isCompact ? item.label : undefined}
@@ -262,7 +273,7 @@ export function AppSidebar() {
                   {item.icon}
                 </div>
                 {!isCompact && <span>{item.label}</span>}
-              </Button>
+              </button>
             );
           })}
         </nav>
@@ -295,24 +306,26 @@ export function AppSidebar() {
                 <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.25rem" }}>点击查看完整统计</div>
               </div>
             ) : (
-              <Button
-                variant="outline"
-                pill
+              <button
                 onClick={() => setOverviewOpen(true)}
                 style={{
                   width: "100%",
                   padding: "0.6rem 0",
+                  borderRadius: "9999px",
                   backgroundColor: "#1e293b",
-                  borderColor: "#334155",
+                  border: "1px solid #334155",
                   color: "#38bdf8",
+                  display: "flex",
                   flexDirection: "column",
+                  alignItems: "center",
                   gap: "2px",
+                  cursor: "pointer",
                 }}
                 title="查看概览数据"
               >
                 <BarChart2 size={16} />
                 <span style={{ fontSize: "0.65rem", fontWeight: 700 }}>{totalTabs}</span>
-              </Button>
+              </button>
             )}
           </div>
         )}

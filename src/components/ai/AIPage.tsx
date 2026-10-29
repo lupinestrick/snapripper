@@ -231,7 +231,6 @@ export function AIPage() {
             style={{
               backgroundColor: isAnalyzing ? "#334155" : "#2563eb",
               color: "#fff",
-              boxShadow: "0 4px 14px rgba(37, 99, 235, 0.3)",
             }}
           >
             {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}

@@ -16,6 +16,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={`${classes} ${className}`}
         style={{
           borderRadius: pill ? "9999px" : "0.5rem",
+          boxShadow: "none",
           cursor: props.disabled ? "not-allowed" : "pointer",
           display: "inline-flex",
           alignItems: "center",

@@ -1,21 +1,23 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { CategorizationRule, RuleScope } from "@/types/sidebery";
 import { AIRulesChatModal } from "./AIRulesChatModal";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Download, Upload, Sparkles } from "lucide-react";
+import { Plus, Trash2, Download, Upload, Sparkles, Edit3, X, Check } from "lucide-react";
 
 export function RulesPage() {
   const {
     rulesSettings,
     setRulesSettings,
     addRule,
+    updateRule,
     deleteRule,
     toggleRule,
     importRulesJSON,
@@ -24,9 +26,13 @@ export function RulesPage() {
 
   const { rawSnapshot } = useSnapshotStore();
   const panels = rawSnapshot?.panels || {};
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isAIChatOpen, setIsAIChatOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<CategorizationRule | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
   const [newRule, setNewRule] = useState<Omit<CategorizationRule, "id">>({
     name: "",
     enabled: true,
@@ -63,6 +69,7 @@ export function RulesPage() {
       }
     };
     reader.readAsText(file);
+    e.target.value = "";
   };
 
   const handleCreateRule = () => {
@@ -88,77 +95,100 @@ export function RulesPage() {
     setIsAddOpen(false);
   };
 
+  const handleOpenEdit = (rule: CategorizationRule) => {
+    setEditingRule({ ...rule });
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingRule) return;
+    if (!editingRule.name.trim()) {
+      alert("请输入 Group 目标名称");
+      return;
+    }
+    if (!editingRule.matchDomain?.trim() && !editingRule.matchKeyword?.trim()) {
+      alert("请至少填写域名或标题关键词中的一项");
+      return;
+    }
+    updateRule(editingRule.id, editingRule);
+    setIsEditOpen(false);
+    setEditingRule(null);
+  };
+
   return (
     <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "#f8fafc" }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>规则与成组设置</h1>
           <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-            匹配域名与关键词自动归类到目标 Group 分组中，支持自定义作用范围与聚合阈值。
+            匹配域名与关键词自动归类到目标 Group 分组中
           </p>
         </div>
 
-        {/* Action Controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        {/* Action Controls - Compact Oblong Pill Buttons */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
           <Button
             variant="subtle"
-            size="sm"
+            size="xs"
+            pill
             onClick={() => setIsAIChatOpen(true)}
             style={{
               backgroundColor: "rgba(56, 189, 248, 0.1)",
               borderColor: "#38bdf8",
               color: "#38bdf8",
+              padding: "0.25rem 0.75rem",
             }}
           >
-            <Sparkles size={15} />
-            <span>AI 生成规则</span>
+            <Sparkles size={13} />
+            <span>AI 生成</span>
           </Button>
-
-          <label
-            style={{
-              padding: "0.45rem 1rem",
-              borderRadius: "9999px",
-              border: "1px solid #334155",
-              backgroundColor: "#1e293b",
-              color: "#94a3b8",
-              fontSize: "0.8rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-            }}
-          >
-            <Upload size={14} />
-            <span>导入设置</span>
-            <input type="file" accept=".json" onChange={handleImport} style={{ display: "none" }} />
-          </label>
 
           <Button
             variant="outline"
-            size="sm"
+            size="xs"
+            pill
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              borderColor: "#334155",
+              backgroundColor: "#1e293b",
+              color: "#94a3b8",
+              padding: "0.25rem 0.75rem",
+            }}
+          >
+            <Upload size={13} />
+            <span>导入</span>
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: "none" }} />
+
+          <Button
+            variant="outline"
+            size="xs"
+            pill
             onClick={handleExport}
             style={{
               borderColor: "#334155",
               backgroundColor: "#1e293b",
               color: "#94a3b8",
+              padding: "0.25rem 0.75rem",
             }}
           >
-            <Download size={14} />
-            <span>导出设置</span>
+            <Download size={13} />
+            <span>导出</span>
           </Button>
 
           <Button
             variant="solid"
-            size="sm"
+            size="xs"
+            pill
             onClick={() => setIsAddOpen(true)}
             style={{
               backgroundColor: "#2563eb",
               color: "#fff",
+              padding: "0.25rem 0.85rem",
             }}
           >
-            <Plus size={15} />
+            <Plus size={13} />
             <span>添加规则</span>
           </Button>
         </div>
@@ -181,7 +211,7 @@ export function RulesPage() {
           <div>
             <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>已有 Group 视为不可分割整体</div>
             <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
-              快照中已由用户建立的 Group（带子级标签的折叠项）保持为一个单元，不打散其子节点
+              快照中已建立的 Group 保持为整体，不拆散其子节点
             </div>
           </div>
           <input
@@ -196,7 +226,7 @@ export function RulesPage() {
           <div>
             <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>默认最小成组阈值</div>
             <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
-              同类标签达到该数量时才创建新 Group 折叠项（少于该阈值则保持原状，防止产生过多单标签组）
+              同类标签达到该数量时才创建新 Group 折叠项
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -245,7 +275,7 @@ export function RulesPage() {
 
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
-                应用范围 (Scope)
+                应用范围
               </label>
               <Select
                 value={newRule.scope}
@@ -253,7 +283,7 @@ export function RulesPage() {
                 pill={false}
               >
                 <option value="all">全局所有面板</option>
-                <option value="panel">指定特定面板 (Panel)</option>
+                <option value="panel">指定特定面板</option>
               </Select>
             </div>
 
@@ -303,7 +333,7 @@ export function RulesPage() {
 
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
-                成组阈值 (达到多少个才建组)
+                成组阈值
               </label>
               <Input
                 type="number"
@@ -318,7 +348,8 @@ export function RulesPage() {
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
             <Button
               variant="outline"
-              size="sm"
+              size="xs"
+              pill
               onClick={() => setIsAddOpen(false)}
               style={{ borderColor: "#475569", color: "#94a3b8" }}
             >
@@ -326,7 +357,8 @@ export function RulesPage() {
             </Button>
             <Button
               variant="solid"
-              size="sm"
+              size="xs"
+              pill
               onClick={handleCreateRule}
               style={{ backgroundColor: "#2563eb", color: "#fff" }}
             >
@@ -344,7 +376,7 @@ export function RulesPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {rulesSettings.rules.map((rule, idx) => (
+          {rulesSettings.rules.map((rule) => (
             <div
               key={rule.id}
               style={{
@@ -401,23 +433,163 @@ export function RulesPage() {
                 </div>
               </div>
 
-              <Button
-                variant="ghost"
-                size="xs"
-                pill
-                onClick={() => deleteRule(rule.id)}
-                style={{
-                  color: "#94a3b8",
-                  padding: "0.4rem",
-                }}
-                title="删除规则"
-              >
-                <Trash2 size={16} />
-              </Button>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  pill
+                  onClick={() => handleOpenEdit(rule)}
+                  style={{
+                    color: "#94a3b8",
+                    padding: "0.4rem",
+                  }}
+                  title="编辑规则"
+                >
+                  <Edit3 size={15} />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  pill
+                  onClick={() => deleteRule(rule.id)}
+                  style={{
+                    color: "#94a3b8",
+                    padding: "0.4rem",
+                  }}
+                  title="删除规则"
+                >
+                  <Trash2 size={15} />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Edit Rule Hop-up Modal */}
+      {editingRule && (
+        <Dialog.Root open={isEditOpen} onOpenChange={(open) => !open && setIsEditOpen(false)}>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content style={{ maxWidth: "560px", padding: "1.5rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+                <Dialog.Title>编辑分类规则</Dialog.Title>
+                <Dialog.CloseTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    pill
+                    onClick={() => setIsEditOpen(false)}
+                    style={{ color: "#94a3b8", padding: "4px" }}
+                    title="关闭"
+                  >
+                    <X size={18} />
+                  </Button>
+                </Dialog.CloseTrigger>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                    Group 名称
+                  </label>
+                  <Input
+                    type="text"
+                    value={editingRule.name}
+                    onChange={(e) => setEditingRule({ ...editingRule, name: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                      应用范围
+                    </label>
+                    <Select
+                      value={editingRule.scope}
+                      onChange={(e) => setEditingRule({ ...editingRule, scope: e.target.value as RuleScope })}
+                      pill={false}
+                    >
+                      <option value="all">全局所有面板</option>
+                      <option value="panel">指定特定面板</option>
+                    </Select>
+                  </div>
+
+                  {editingRule.scope === "panel" && (
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                        目标面板
+                      </label>
+                      <Select
+                        value={editingRule.targetScopeId || ""}
+                        onChange={(e) => setEditingRule({ ...editingRule, targetScopeId: e.target.value })}
+                        pill={false}
+                      >
+                        <option value="">请选择面板...</option>
+                        {Object.entries(panels).map(([id, p]: [string, any]) => (
+                          <option key={id} value={id}>
+                            {p.name || id}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                    匹配域名 (逗号分隔)
+                  </label>
+                  <Input
+                    type="text"
+                    value={editingRule.matchDomain || ""}
+                    onChange={(e) => setEditingRule({ ...editingRule, matchDomain: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                    标题关键词 (逗号分隔)
+                  </label>
+                  <Input
+                    type="text"
+                    value={editingRule.matchKeyword || ""}
+                    onChange={(e) => setEditingRule({ ...editingRule, matchKeyword: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                    成组阈值
+                  </label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={editingRule.minThreshold}
+                    onChange={(e) => setEditingRule({ ...editingRule, minThreshold: parseInt(e.target.value) || 1 })}
+                    style={{ width: "90px" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem", marginTop: "1.5rem" }}>
+                <Button
+                  variant="solid"
+                  size="sm"
+                  pill
+                  onClick={handleSaveEdit}
+                  style={{ backgroundColor: "#2563eb", color: "#fff" }}
+                >
+                  <Check size={14} />
+                  <span>保存修改</span>
+                </Button>
+              </div>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Dialog.Root>
+      )}
 
       {/* AI Rule Generator Chat Hop-up Modal */}
       <AIRulesChatModal isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
