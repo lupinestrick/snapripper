@@ -219,9 +219,9 @@ export function AIPage() {
           style={{
             padding: "0.875rem 1.25rem",
             borderRadius: "0.75rem",
-            backgroundColor: "rgba(56, 189, 248, 0.1)",
-            border: "1px solid #38bdf8",
-            color: "#38bdf8",
+            backgroundColor: "var(--accent-subtle)",
+            border: "1px solid var(--accent-border)",
+            color: "var(--accent-text)",
             display: "flex",
             alignItems: "center",
             gap: "0.6rem",

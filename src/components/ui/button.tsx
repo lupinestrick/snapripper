@@ -25,29 +25,28 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const [isHovered, setIsHovered] = useState(false);
 
-    // Exact "全部展开" baseline style from Workbench:
-    // padding: "0.3rem 0.75rem", borderRadius: "9999px", border: "1px solid #334155", backgroundColor: "#1e293b", color: "#94a3b8", fontSize: "0.75rem"
-    let bg = "#1e293b";
-    let border = "1px solid #334155";
-    let color = "#94a3b8";
+    // Theme-driven Park-UI button styles:
+    let bg = "var(--btn-outline-bg)";
+    let border = "1px solid var(--btn-outline-border)";
+    let color = "var(--text-muted)";
 
     if (variant === "solid") {
-      bg = isHovered && !props.disabled ? "#1d4ed8" : "#2563eb";
-      border = "1px solid #3b82f6";
-      color = "#ffffff";
+      bg = isHovered && !props.disabled ? "var(--accent-hover)" : "var(--accent-solid)";
+      border = "1px solid var(--accent-solid)";
+      color = "var(--accent-fg, #ffffff)";
     } else if (variant === "subtle") {
-      bg = isHovered && !props.disabled ? "rgba(56, 189, 248, 0.2)" : "rgba(56, 189, 248, 0.12)";
-      border = "1px solid rgba(56, 189, 248, 0.3)";
-      color = "#38bdf8";
+      bg = isHovered && !props.disabled ? "var(--accent-subtle-hover)" : "var(--accent-subtle)";
+      border = "1px solid var(--accent-border)";
+      color = "var(--accent-text)";
     } else if (variant === "ghost") {
-      bg = isHovered && !props.disabled ? "rgba(255, 255, 255, 0.08)" : "transparent";
+      bg = isHovered && !props.disabled ? "var(--btn-ghost-hover)" : "transparent";
       border = "1px solid transparent";
-      color = isHovered && !props.disabled ? "#f8fafc" : "#94a3b8";
+      color = isHovered && !props.disabled ? "var(--text-main)" : "var(--text-muted)";
     } else {
-      // "outline" - standard "全部展开" style
-      bg = isHovered && !props.disabled ? "#334155" : "#1e293b";
-      border = isHovered && !props.disabled ? "1px solid #475569" : "1px solid #334155";
-      color = isHovered && !props.disabled ? "#f8fafc" : "#94a3b8";
+      // "outline" - standard Park-UI / Workbench button style
+      bg = isHovered && !props.disabled ? "var(--btn-outline-hover-bg)" : "var(--btn-outline-bg)";
+      border = isHovered && !props.disabled ? "1px solid var(--btn-outline-hover-border)" : "1px solid var(--btn-outline-border)";
+      color = isHovered && !props.disabled ? "var(--text-main)" : "var(--text-muted)";
     }
 
     const padding =

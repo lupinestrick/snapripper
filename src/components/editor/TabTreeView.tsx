@@ -163,15 +163,15 @@ function TreeNodeRow({
           padding: "0.4rem 0.5rem",
           paddingLeft: `${depth * 1.5 + 0.5}rem`,
           borderRadius: "0.375rem",
-          backgroundColor: isSelected ? "rgba(56, 189, 248, 0.15)" : "transparent",
-          border: isSelected ? "1px solid rgba(56, 189, 248, 0.4)" : "1px solid transparent",
+          backgroundColor: isSelected ? "var(--accent-subtle)" : "transparent",
+          border: isSelected ? "1px solid var(--accent-border)" : "1px solid transparent",
           cursor: "pointer",
           transition: "background 0.1s ease",
           fontSize: "0.85rem",
           userSelect: "none",
         }}
         onMouseEnter={(e) => {
-          if (!isSelected) e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
+          if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-hover)";
         }}
         onMouseLeave={(e) => {
           if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
@@ -214,7 +214,7 @@ function TreeNodeRow({
 
         <div style={{ display: "flex", alignItems: "center", width: "1rem", flexShrink: 0 }}>
           {node.isCategoryHeader ? (
-            <Folder size={16} color="#38bdf8" />
+            <Folder size={16} style={{ color: "var(--accent)" }} />
           ) : favicon ? (
             <img
               src={favicon}
@@ -282,7 +282,7 @@ function TreeNodeRow({
                 fontSize: "0.68rem",
                 padding: "0.1rem 0.4rem",
                 borderRadius: "0.25rem",
-                backgroundColor: "rgba(255, 255, 255, 0.08)",
+                backgroundColor: "var(--bg-subtle)",
                 color: "var(--text-muted)",
                 borderLeft: `2px solid ${container.color || "var(--accent)"}`,
               }}

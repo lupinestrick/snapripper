@@ -61,8 +61,8 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
                 style={{
                   padding: "0.4rem",
                   borderRadius: "9999px",
-                  backgroundColor: "rgba(56, 189, 248, 0.15)",
-                  color: "#38bdf8",
+                  backgroundColor: "var(--accent-subtle)",
+                  color: "var(--accent)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -83,7 +83,7 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
                 size="xs"
                 pill
                 onClick={onClose}
-                style={{ color: "#94a3b8", padding: "4px" }}
+                style={{ color: "var(--text-muted)", padding: "4px" }}
                 title="关闭"
               >
                 <X size={18} />

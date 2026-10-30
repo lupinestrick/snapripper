@@ -105,9 +105,9 @@ export default function WorkbenchPage() {
           style={{
             position: "fixed",
             inset: 0,
-            backgroundColor: "rgba(56, 189, 248, 0.15)",
+            backgroundColor: "var(--accent-subtle)",
             backdropFilter: "blur(4px)",
-            border: "3px dashed #38bdf8",
+            border: "3px dashed var(--accent-solid)",
             zIndex: 999,
             display: "flex",
             alignItems: "center",
@@ -118,10 +118,10 @@ export default function WorkbenchPage() {
           <div
             style={{
               padding: "1.25rem 2.5rem",
-              backgroundColor: "#1e293b",
+              backgroundColor: "var(--bg-card)",
               borderRadius: "9999px",
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.6)",
-              color: "#38bdf8",
+              color: "var(--accent-text)",
               fontWeight: 700,
               fontSize: "1.1rem",
             }}
