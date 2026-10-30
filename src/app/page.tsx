@@ -18,10 +18,23 @@ import { Loader2 } from "lucide-react";
 
 export default function WorkbenchPage() {
   const { rawSnapshot, loadSnapshot } = useSnapshotStore();
-  const { activePage } = useConfigStore();
+  const { activePage, theme } = useConfigStore();
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Sync theme with HTML document element
+  useEffect(() => {
+    const activeTheme = theme || "midnight";
+    document.documentElement.setAttribute("data-theme", activeTheme);
+    if (activeTheme === "park-light") {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+      document.documentElement.classList.add("dark");
+    }
+  }, [theme]);
 
   // Auto load project snapshot on first load if none is present
   useEffect(() => {
@@ -77,8 +90,8 @@ export default function WorkbenchPage() {
         height: "100vh",
         width: "100vw",
         overflow: "hidden",
-        backgroundColor: "#0b1120",
-        color: "#f8fafc",
+        backgroundColor: "var(--bg-canvas)",
+        color: "var(--text-main)",
         position: "relative",
       }}
     >

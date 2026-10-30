@@ -68,8 +68,8 @@ export function AppSidebar() {
             left: 0,
             right: 0,
             height: "56px",
-            backgroundColor: "#111827",
-            borderTop: "1px solid #1e293b",
+            backgroundColor: "var(--bg-surface)",
+            borderTop: "1px solid var(--border-subtle)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-around",
@@ -90,8 +90,6 @@ export function AppSidebar() {
                   gap: "2px",
                   padding: "4px 8px",
                   fontSize: "0.68rem",
-                  backgroundColor: isActive ? "#2563eb" : "transparent",
-                  color: isActive ? "#ffffff" : "#94a3b8",
                 }}
               >
                 {item.icon}
@@ -106,7 +104,7 @@ export function AppSidebar() {
               padding: "4px 8px",
               gap: "4px",
               fontSize: "0.68rem",
-              color: "#38bdf8",
+              color: "var(--accent-text)",
             }}
           >
             <BarChart2 size={13} />
@@ -125,8 +123,8 @@ export function AppSidebar() {
         style={{
           width: isCompact ? "64px" : "210px",
           transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-          backgroundColor: "#0f172a",
-          borderRight: "1px solid #1e293b",
+          backgroundColor: "var(--bg-primary)",
+          borderRight: "1px solid var(--border-base)",
           display: "flex",
           flexDirection: "column",
           flexShrink: 0,
@@ -143,7 +141,7 @@ export function AppSidebar() {
             display: "flex",
             alignItems: "center",
             justifyContent: isCompact ? "center" : "space-between",
-            borderBottom: "1px solid #1e293b",
+            borderBottom: "1px solid var(--border-base)",
           }}
         >
           {!isCompact ? (
@@ -152,8 +150,8 @@ export function AppSidebar() {
                 style={{
                   width: "26px",
                   height: "26px",
-                  borderRadius: "9999px",
-                  backgroundColor: "#2563eb",
+                  borderRadius: "var(--radius-btn, 6px)",
+                  backgroundColor: "var(--accent-solid)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -164,7 +162,7 @@ export function AppSidebar() {
               >
                 S
               </div>
-              <span style={{ fontSize: "0.925rem", fontWeight: 700, color: "#f8fafc", letterSpacing: "-0.02em" }}>
+              <span style={{ fontSize: "0.925rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em" }}>
                 SnapRipper
               </span>
             </div>
@@ -173,8 +171,8 @@ export function AppSidebar() {
               style={{
                 width: "26px",
                 height: "26px",
-                borderRadius: "9999px",
-                backgroundColor: "#2563eb",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--accent-solid)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -241,9 +239,9 @@ export function AppSidebar() {
                   justifyContent: isCompact ? "center" : "flex-start",
                   gap: "0.65rem",
                   padding: isCompact ? "0.55rem 0" : "0.5rem 0.75rem",
-                  backgroundColor: isActive ? "#1e293b" : "transparent",
-                  borderColor: isActive ? "#334155" : "transparent",
-                  color: isActive ? "#38bdf8" : "#94a3b8",
+                  backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
+                  borderColor: isActive ? "var(--accent-border)" : "transparent",
+                  color: isActive ? "var(--accent-text)" : "var(--text-muted)",
                   fontWeight: isActive ? 600 : 500,
                   fontSize: "0.825rem",
                   width: "100%",
@@ -268,7 +266,7 @@ export function AppSidebar() {
                 style={{
                   width: "100%",
                   padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
+                  borderRadius: "var(--radius-btn, 8px)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "stretch",
@@ -278,12 +276,12 @@ export function AppSidebar() {
                 title="查看概览数据"
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600 }}>快照概览</span>
-                  <BarChart2 size={13} color="#38bdf8" />
+                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600 }}>快照概览</span>
+                  <BarChart2 size={13} style={{ color: "var(--accent)" }} />
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem" }}>
-                  <span style={{ fontSize: "1.15rem", fontWeight: 700, color: "#f8fafc" }}>{totalTabs}</span>
-                  <span style={{ fontSize: "0.7rem", color: "#94a3b8" }}>标签 / {panelCount} 面板</span>
+                  <span style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-main)" }}>{totalTabs}</span>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>标签 / {panelCount} 面板</span>
                 </div>
               </Button>
             ) : (
@@ -297,7 +295,7 @@ export function AppSidebar() {
                 }}
                 title="查看概览数据"
               >
-                <BarChart2 size={15} color="#38bdf8" />
+                <BarChart2 size={15} style={{ color: "var(--accent)" }} />
                 <span style={{ fontSize: "0.65rem", fontWeight: 700 }}>{totalTabs}</span>
               </Button>
             )}

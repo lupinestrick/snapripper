@@ -20,8 +20,6 @@ export function AIPage() {
     setAiThresholds,
     preserveSubtrees,
     setPreserveSubtrees,
-    cascadeSelectChildren,
-    setCascadeSelectChildren,
   } = useConfigStore();
 
   const {
@@ -58,12 +56,12 @@ export function AIPage() {
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "#f8fafc" }}>
+    <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "var(--text-main)" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "2rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>生成式 AI 比例分析</h1>
-          <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
             按域名与标题推导主题分布，并支持调整分类阈值后按比例重组。
           </p>
         </div>
@@ -73,29 +71,25 @@ export function AIPage() {
           <div
             style={{
               padding: "0.35rem 0.8rem",
-              borderRadius: "9999px",
-              backgroundColor: "#1e293b",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
               fontSize: "0.75rem",
-              color: "#94a3b8",
+              color: "var(--text-muted)",
               display: "flex",
               alignItems: "center",
               gap: "0.4rem",
             }}
           >
             <span>接口:</span>
-            <strong style={{ color: "#38bdf8" }}>{currentProviderDef.name}</strong>
-            <span style={{ color: "#64748b" }}>({aiConfig.model || currentProviderDef.model})</span>
+            <strong style={{ color: "var(--accent)" }}>{currentProviderDef.name}</strong>
+            <span style={{ color: "var(--text-muted)" }}>({aiConfig.model || currentProviderDef.model})</span>
           </div>
 
           <Button
             variant="outline"
             size="xs"
             onClick={() => setActivePage("settings")}
-            style={{
-              borderColor: "#475569",
-              color: "#cbd5e1",
-            }}
           >
             <Settings size={13} />
             <span>配置接口</span>
@@ -107,14 +101,14 @@ export function AIPage() {
       <div
         style={{
           padding: "1.5rem",
-          borderRadius: "1rem",
-          backgroundColor: "#1e293b",
-          border: "1px solid #334155",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
           marginBottom: "2rem",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <Sliders size={20} color="#38bdf8" />
+          <Sliders size={20} style={{ color: "var(--accent)" }} />
           <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>分类阈值与聚合控制</h2>
         </div>
 
@@ -123,20 +117,20 @@ export function AIPage() {
           <div
             style={{
               padding: "1rem",
-              borderRadius: "0.75rem",
-              backgroundColor: "#0f172a",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                 最小成组阈值
               </label>
-              <span style={{ fontSize: "0.85rem", color: "#38bdf8", fontWeight: 600 }}>
+              <span style={{ fontSize: "0.85rem", color: "var(--accent)", fontWeight: 600 }}>
                 {aiThresholds.minTabsPerGroup} 个标签
               </span>
             </div>
-            <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.75rem" }}>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
               同类标签数达到此阈值才形成独立分组，少于此数合并为其他类。
             </p>
             <input
@@ -145,7 +139,7 @@ export function AIPage() {
               max={10}
               value={aiThresholds.minTabsPerGroup}
               onChange={(e) => setAiThresholds({ minTabsPerGroup: parseInt(e.target.value) || 2 })}
-              style={{ width: "100%", accentColor: "#2563eb", cursor: "pointer" }}
+              style={{ width: "100%", accentColor: "var(--accent-solid)", cursor: "pointer" }}
             />
           </div>
 
@@ -153,20 +147,20 @@ export function AIPage() {
           <div
             style={{
               padding: "1rem",
-              borderRadius: "0.75rem",
-              backgroundColor: "#0f172a",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                 建议最大分类数
               </label>
-              <span style={{ fontSize: "0.85rem", color: "#38bdf8", fontWeight: 600 }}>
+              <span style={{ fontSize: "0.85rem", color: "var(--accent)", fontWeight: 600 }}>
                 {aiThresholds.maxCategories} 个类别
               </span>
             </div>
-            <p style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.75rem" }}>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>
               控制大模型归纳提炼的主题数量上限，避免分类过多导致零散。
             </p>
             <input
@@ -175,13 +169,13 @@ export function AIPage() {
               max={15}
               value={aiThresholds.maxCategories}
               onChange={(e) => setAiThresholds({ maxCategories: parseInt(e.target.value) || 6 })}
-              style={{ width: "100%", accentColor: "#2563eb", cursor: "pointer" }}
+              style={{ width: "100%", accentColor: "var(--accent-solid)", cursor: "pointer" }}
             />
           </div>
         </div>
 
-        {/* Interaction checkboxes */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", paddingTop: "0.5rem" }}>
+        {/* Interaction options */}
+        <div style={{ paddingTop: "0.5rem" }}>
           <label
             style={{
               display: "flex",
@@ -189,51 +183,26 @@ export function AIPage() {
               gap: "0.6rem",
               cursor: "pointer",
               fontSize: "0.825rem",
-              color: "#cbd5e1",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={cascadeSelectChildren}
-              onChange={(e) => setCascadeSelectChildren(e.target.checked)}
-              style={{ accentColor: "#2563eb", width: 16, height: 16, cursor: "pointer" }}
-            />
-            <span>勾选标签时默认级联勾选所有子标签</span>
-          </label>
-
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.6rem",
-              cursor: "pointer",
-              fontSize: "0.825rem",
-              color: "#cbd5e1",
+              color: "var(--text-main)",
             }}
           >
             <input
               type="checkbox"
               checked={preserveSubtrees}
               onChange={(e) => setPreserveSubtrees(e.target.checked)}
-              style={{ accentColor: "#2563eb", width: 16, height: 16, cursor: "pointer" }}
+              style={{ accentColor: "var(--accent-solid)", width: 16, height: 16, cursor: "pointer" }}
             />
             <span>保持子树完整性（子标签跟随父节点整体归类）</span>
           </label>
         </div>
 
         {/* Start button row */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: "1.5rem", borderTop: "1px solid #334155", paddingTop: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: "1.5rem", borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem" }}>
           <Button
             variant="solid"
-            size="xs"
-            pill
+            size="sm"
             onClick={handleStartAnalysis}
             disabled={isAnalyzing}
-            style={{
-              backgroundColor: isAnalyzing ? "#334155" : "#2563eb",
-              borderColor: isAnalyzing ? "#334155" : "#3b82f6",
-              color: "#fff",
-            }}
           >
             {isAnalyzing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
             <span>{isAnalyzing ? "正在分析比例..." : "开始标签比例探查"}</span>

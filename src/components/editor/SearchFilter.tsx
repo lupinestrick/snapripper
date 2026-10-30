@@ -36,26 +36,26 @@ export function SearchFilter() {
         flexWrap: "wrap",
         gap: "0.75rem",
         padding: "0.6rem 1.5rem",
-        backgroundColor: "#0f172a",
-        borderBottom: "1px solid #1e293b",
+        backgroundColor: "var(--bg-surface)",
+        borderBottom: "1px solid var(--border-subtle)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: "260px" }}>
-        {/* Search bar (pill style) */}
+        {/* Search bar */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: "0.4rem",
             padding: "0.35rem 0.85rem",
-            backgroundColor: "#1e293b",
-            borderRadius: "9999px",
-            border: "1px solid #334155",
+            backgroundColor: "var(--bg-card)",
+            borderRadius: "var(--radius-btn, 6px)",
+            border: "1px solid var(--border-subtle)",
             flex: 1,
             maxWidth: "340px",
           }}
         >
-          <Search size={14} color="#64748b" />
+          <Search size={14} style={{ color: "var(--text-muted)" }} />
           <input
             type="text"
             placeholder="按标题或域名搜索..."
@@ -65,7 +65,7 @@ export function SearchFilter() {
               background: "transparent",
               border: "none",
               outline: "none",
-              color: "#f8fafc",
+              color: "var(--text-main)",
               fontSize: "0.8rem",
               width: "100%",
             }}
@@ -74,26 +74,25 @@ export function SearchFilter() {
             <Button
               variant="ghost"
               size="xs"
-              pill
               onClick={() => setSearchQuery("")}
-              style={{ color: "#64748b", padding: "0.1rem", width: "20px", height: "20px" }}
+              style={{ color: "var(--text-muted)", padding: "0.1rem", width: "20px", height: "20px" }}
             >
               <X size={13} />
             </Button>
           )}
         </div>
 
-        {/* Panel filter (pill style) */}
+        {/* Panel filter */}
         {panels.length > 0 && (
           <select
             value={panelFilter || ""}
             onChange={(e) => setPanelFilter(e.target.value ? e.target.value : null)}
             style={{
               padding: "0.3rem 0.75rem",
-              borderRadius: "9999px",
-              backgroundColor: "#1e293b",
-              border: "1px solid #334155",
-              color: "#94a3b8",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-main)",
               fontSize: "0.75rem",
               cursor: "pointer",
               outline: "none",
@@ -108,17 +107,17 @@ export function SearchFilter() {
           </select>
         )}
 
-        {/* Container filter (pill style) */}
+        {/* Container filter */}
         {containers.length > 0 && (
           <select
             value={containerFilter || ""}
             onChange={(e) => setContainerFilter(e.target.value ? e.target.value : null)}
             style={{
               padding: "0.3rem 0.75rem",
-              borderRadius: "9999px",
-              backgroundColor: "#1e293b",
-              border: "1px solid #334155",
-              color: "#94a3b8",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-main)",
               fontSize: "0.75rem",
               cursor: "pointer",
               outline: "none",
@@ -134,7 +133,7 @@ export function SearchFilter() {
         )}
       </div>
 
-      {/* Action buttons (pill style) */}
+      {/* Action buttons */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
         {/* Cascade select children toggle */}
         <label
@@ -142,11 +141,11 @@ export function SearchFilter() {
             display: "flex",
             alignItems: "center",
             gap: "0.35rem",
-            padding: "0.3rem 0.75rem",
-            borderRadius: "9999px",
-            border: cascadeSelectChildren ? "1px solid #3b82f6" : "1px solid #334155",
-            backgroundColor: cascadeSelectChildren ? "rgba(37, 99, 235, 0.15)" : "#1e293b",
-            color: cascadeSelectChildren ? "#60a5fa" : "#94a3b8",
+            padding: "0.28rem 0.7rem",
+            borderRadius: "var(--radius-btn, 6px)",
+            border: cascadeSelectChildren ? "1px solid var(--accent-border)" : "1px solid var(--btn-outline-border)",
+            backgroundColor: cascadeSelectChildren ? "var(--accent-subtle)" : "var(--btn-outline-bg)",
+            color: cascadeSelectChildren ? "var(--accent-text)" : "var(--text-muted)",
             fontSize: "0.75rem",
             cursor: "pointer",
             userSelect: "none",
@@ -158,7 +157,7 @@ export function SearchFilter() {
             type="checkbox"
             checked={cascadeSelectChildren}
             onChange={(e) => setCascadeSelectChildren(e.target.checked)}
-            style={{ accentColor: "#2563eb", cursor: "pointer", width: 14, height: 14 }}
+            style={{ accentColor: "var(--accent-solid)", cursor: "pointer", width: 14, height: 14 }}
           />
           <span>包含子标签</span>
         </label>
@@ -175,9 +174,9 @@ export function SearchFilter() {
           <Button
             onClick={clearSelection}
             style={{
-              backgroundColor: "rgba(239, 68, 68, 0.15)",
-              borderColor: "rgba(239, 68, 68, 0.3)",
-              color: "#f87171",
+              backgroundColor: "rgba(229, 72, 77, 0.15)",
+              borderColor: "rgba(229, 72, 77, 0.35)",
+              color: "var(--danger)",
             }}
           >
             取消选中 ({selectedIds.size})

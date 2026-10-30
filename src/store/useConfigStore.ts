@@ -7,6 +7,8 @@ import { DomainMergeConfig, DEFAULT_DOMAIN_MERGE_CONFIG } from "@/services/domai
 
 export type AppPage = "workbench" | "process" | "rules" | "ai" | "settings";
 
+export type AppTheme = "midnight" | "park-dark" | "park-light";
+
 export type ProcessScope = "current" | "all" | "selected";
 
 export interface AIThresholds {
@@ -16,6 +18,7 @@ export interface AIThresholds {
 
 interface ConfigState {
   activePage: AppPage;
+  theme: AppTheme;
   aiConfig: AIConfig;
   rulesSettings: RulesSettings;
   exemptPinned: boolean;
@@ -30,6 +33,7 @@ interface ConfigState {
   domainMergeConfig: DomainMergeConfig;
 
   setActivePage: (page: AppPage) => void;
+  setTheme: (theme: AppTheme) => void;
   setAIConfig: (config: Partial<AIConfig>) => void;
   setRulesSettings: (settings: Partial<RulesSettings>) => void;
   addRule: (rule: Omit<CategorizationRule, "id">) => void;
@@ -54,6 +58,7 @@ export const useConfigStore = create<ConfigState>()(
   persist(
     (set, get) => ({
       activePage: "workbench",
+      theme: "midnight",
       aiConfig: {
         provider: "deepseek",
         baseURL: AI_PROVIDERS.deepseek.baseUrl,
@@ -76,6 +81,7 @@ export const useConfigStore = create<ConfigState>()(
       domainMergeConfig: DEFAULT_DOMAIN_MERGE_CONFIG,
 
       setActivePage: (page) => set({ activePage: page }),
+      setTheme: (theme) => set({ theme }),
 
       setAIConfig: (config) =>
         set((state) => ({
@@ -165,7 +171,7 @@ export const useConfigStore = create<ConfigState>()(
         })),
     }),
     {
-      name: "snapripper_config_storage_v4",
+      name: "snapripper_config_storage_v5",
     }
   )
 );

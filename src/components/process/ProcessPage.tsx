@@ -132,11 +132,11 @@ export function ProcessPage() {
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "900px", margin: "0 auto", color: "#f8fafc" }}>
+    <div style={{ padding: "2rem", maxWidth: "900px", margin: "0 auto", color: "var(--text-main)" }}>
       {/* Title */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>快照处理中心</h1>
-        <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+        <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
           点击下方功能面板即可直接进入 Diff 对比确认
         </p>
       </div>
@@ -155,43 +155,43 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#1e293b",
-            border: "1px solid #3b82f6",
+            borderRadius: "var(--radius-btn, 8px)",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--accent-solid)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(30, 41, 59, 0.9)")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1e293b")}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--accent-subtle)")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "9999px",
-                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--accent-subtle)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#60a5fa",
+                color: "var(--accent)",
               }}
             >
               <Sparkles size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>
                 一键全量优化 (去重 + 同域名合并 + 规则建组)
               </div>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
                 同时执行 URL 智能去重、同域名折叠与关键词规则自动建组
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
             <ChevronLeft size={18} />
           </div>
         </div>
@@ -208,24 +208,30 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#1e293b",
-            border: "1px solid #334155",
+            borderRadius: "var(--radius-btn, 8px)",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#38bdf8")}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#334155")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-focus)";
+            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-card)";
+            e.currentTarget.style.backgroundColor = "var(--bg-card)";
+          }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "9999px",
+                borderRadius: "var(--radius-btn, 6px)",
                 backgroundColor: "rgba(56, 189, 248, 0.15)",
                 display: "flex",
                 alignItems: "center",
@@ -236,13 +242,13 @@ export function ProcessPage() {
               <Trash2 size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>URL 智能去重</div>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>URL 智能去重</div>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
                 移除跨面板或同面板重复打开的相同网页，保留首个实例
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
             <ChevronLeft size={18} />
           </div>
         </div>
@@ -259,24 +265,30 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#1e293b",
-            border: "1px solid #334155",
+            borderRadius: "var(--radius-btn, 8px)",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#06b6d4")}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#334155")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-focus)";
+            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-card)";
+            e.currentTarget.style.backgroundColor = "var(--bg-card)";
+          }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "9999px",
+                borderRadius: "var(--radius-btn, 6px)",
                 backgroundColor: "rgba(6, 182, 212, 0.15)",
                 display: "flex",
                 alignItems: "center",
@@ -287,13 +299,13 @@ export function ProcessPage() {
               <Globe size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>同域名标签合并</div>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>同域名标签合并</div>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
                 将同域名的标签页自动归类折叠为分组
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
             <ChevronLeft size={18} />
           </div>
         </div>
@@ -310,41 +322,47 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#1e293b",
-            border: "1px solid #334155",
+            borderRadius: "var(--radius-btn, 8px)",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#34d399")}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#334155")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-focus)";
+            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-card)";
+            e.currentTarget.style.backgroundColor = "var(--bg-card)";
+          }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "9999px",
-                backgroundColor: "rgba(168, 85, 247, 0.15)",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#34d399",
+                color: "#10b981",
               }}
             >
               <FolderPlus size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>基于规则自动归类成组</div>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>基于规则自动归类成组</div>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
                 匹配域名与关键词，自动折叠为 Group 分组
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
             <ChevronLeft size={18} />
           </div>
         </div>
@@ -361,24 +379,30 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "#1e293b",
-            border: "1px solid #334155",
+            borderRadius: "var(--radius-btn, 8px)",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#a855f7")}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#334155")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-focus)";
+            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-card)";
+            e.currentTarget.style.backgroundColor = "var(--bg-card)";
+          }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "9999px",
+                borderRadius: "var(--radius-btn, 6px)",
                 backgroundColor: "rgba(168, 85, 247, 0.15)",
                 display: "flex",
                 alignItems: "center",
@@ -389,13 +413,13 @@ export function ProcessPage() {
               <Bot size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "1rem", color: "#f8fafc" }}>AI 智能比例重组</div>
-              <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+              <div style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>AI 智能比例重组</div>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
                 按大模型探查的主题比例执行语义归类
               </div>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", color: "#64748b" }}>
+          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
             <ChevronLeft size={18} />
           </div>
         </div>

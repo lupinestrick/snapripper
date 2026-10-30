@@ -24,28 +24,28 @@ export function StatsHeader() {
         flexWrap: "wrap",
         gap: "1.25rem",
         padding: "0.5rem 1.5rem",
-        backgroundColor: "rgba(15, 23, 42, 0.7)",
-        borderBottom: "1px solid #1e293b",
+        backgroundColor: "var(--bg-surface)",
+        borderBottom: "1px solid var(--border-subtle)",
         fontSize: "0.8rem",
-        color: "#94a3b8",
+        color: "var(--text-muted)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-        <ListFilter size={14} color="#38bdf8" />
+        <ListFilter size={14} style={{ color: "var(--accent)" }} />
         <span>总标签:</span>
-        <strong style={{ color: "#f8fafc" }}>{totalTabs}</strong>
+        <strong style={{ color: "var(--text-main)" }}>{totalTabs}</strong>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
         <GitFork size={14} color="#10b981" />
         <span>顶级/子树:</span>
-        <strong style={{ color: "#f8fafc" }}>{rootNodes.length}</strong>
+        <strong style={{ color: "var(--text-main)" }}>{rootNodes.length}</strong>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
         <Pin size={14} color="#f59e0b" />
         <span>置顶固定:</span>
-        <strong style={{ color: "#f8fafc" }}>{pinnedTabs}</strong>
+        <strong style={{ color: "var(--text-main)" }}>{pinnedTabs}</strong>
       </div>
 
       {duplicateCount > 0 && (
@@ -53,9 +53,9 @@ export function StatsHeader() {
           onClick={() => setOnlyDuplicates(!onlyDuplicates)}
           style={{
             padding: "0.2rem 0.65rem",
-            borderColor: onlyDuplicates ? "#ef4444" : "#334155",
-            backgroundColor: onlyDuplicates ? "rgba(239, 68, 68, 0.15)" : "#1e293b",
-            color: onlyDuplicates ? "#f87171" : "#94a3b8",
+            borderColor: onlyDuplicates ? "var(--danger)" : "var(--btn-outline-border)",
+            backgroundColor: onlyDuplicates ? "rgba(229, 72, 77, 0.15)" : "var(--btn-outline-bg)",
+            color: onlyDuplicates ? "var(--danger)" : "var(--text-muted)",
           }}
         >
           <Copy size={12} />
@@ -65,7 +65,7 @@ export function StatsHeader() {
         </Button>
       )}
 
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "#64748b" }}>
+      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
         <ShieldCheck size={13} color="#10b981" />
         <span>本地纯前端沙盒运算</span>
       </div>

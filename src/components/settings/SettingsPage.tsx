@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useConfigStore } from "@/store/useConfigStore";
+import { useConfigStore, AppTheme } from "@/store/useConfigStore";
 import { testAIConnection } from "@/services/aiService";
 import { AI_PROVIDERS, AIProviderKey } from "@/types/ai";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,16 @@ import {
   Layers,
   ShieldCheck,
   FolderTree,
+  Palette,
+  Sun,
+  Moon,
+  Sparkles,
 } from "lucide-react";
 
 export function SettingsPage() {
   const {
+    theme,
+    setTheme,
     aiConfig,
     setAIConfig,
     exemptPinned,
@@ -92,34 +98,158 @@ export function SettingsPage() {
     reader.readAsText(file);
   };
 
+  const THEME_CONFIGS: {
+    id: AppTheme;
+    name: string;
+    tag: string;
+    desc: string;
+    colors: string[];
+  }[] = [
+    {
+      id: "midnight",
+      name: "经典暗蓝 (Midnight)",
+      tag: "经典默认",
+      desc: "沉稳暗夜深蓝底色与科技蓝 Accent，专注夜间整理与护眼。",
+      colors: ["#0b0f19", "#1e293b", "#2563eb", "#38bdf8"],
+    },
+    {
+      id: "park-dark",
+      name: "Park UI 深色 (Crimson Dark)",
+      tag: "Park-UI 官方深色",
+      desc: "Neutral 深黑灰底色，搭配 Park-UI 经典绯红 Crimson 强调色。",
+      colors: ["#111111", "#202020", "#e93d82", "#ff92ad"],
+    },
+    {
+      id: "park-light",
+      name: "Park UI 浅色 (Crimson Light)",
+      tag: "Park-UI 官方浅色",
+      desc: "Neutral 极净亮白底色，搭配 Park-UI 经典绯红 Crimson 强调色。",
+      colors: ["#fcfcfc", "#ffffff", "#e93d82", "#cb1d63"],
+    },
+  ];
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "#f8fafc" }}>
+    <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "var(--text-main)" }}>
       {/* Header */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>系统设置</h1>
-        <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-          配置生成式大模型服务接口与标签页整理交互偏好。
+        <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+          个性化主题外观、配置生成式大模型服务接口与标签页整理交互偏好。
         </p>
+      </div>
+
+      {/* Theme Section */}
+      <div
+        style={{
+          padding: "1.5rem",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
+          marginBottom: "2rem",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
+          <Palette size={20} style={{ color: "var(--accent)" }} />
+          <div>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>界面主题与配色方案</h2>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+              支持原版经典暗蓝、以及 Park-UI 官方 Neutral 中性灰与 Crimson 绯红色主题。
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
+          {THEME_CONFIGS.map((t) => {
+            const isSelected = (theme || "midnight") === t.id;
+            return (
+              <div
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                style={{
+                  padding: "1rem",
+                  borderRadius: "var(--radius-btn, 6px)",
+                  border: "2px solid",
+                  borderColor: isSelected ? "var(--accent-solid)" : "var(--border-subtle)",
+                  backgroundColor: isSelected ? "var(--accent-subtle)" : "var(--bg-subtle)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "0.75rem",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                    <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>
+                      {t.name}
+                    </span>
+                    {isSelected && (
+                      <span
+                        style={{
+                          fontSize: "0.7rem",
+                          fontWeight: 600,
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                          backgroundColor: "var(--accent-solid)",
+                          color: "#ffffff",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "3px",
+                        }}
+                      >
+                        <Check size={11} /> 当前使用
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
+                    {t.desc}
+                  </p>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>色板预览:</span>
+                  <div style={{ display: "flex", gap: "5px" }}>
+                    {t.colors.map((c, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          width: "18px",
+                          height: "18px",
+                          borderRadius: "4px",
+                          backgroundColor: c,
+                          border: "1px solid rgba(128,128,128,0.25)",
+                          display: "inline-block",
+                        }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Section 1: AI Model Services */}
       <div
         style={{
           padding: "1.5rem",
-          borderRadius: "1rem",
-          backgroundColor: "#1e293b",
-          border: "1px solid #334155",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
           marginBottom: "2rem",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <Bot size={20} color="#38bdf8" />
+          <Bot size={20} style={{ color: "var(--accent)" }} />
           <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>模型服务配置</h2>
         </div>
 
         {/* Provider Pills */}
         <div style={{ marginBottom: "1.25rem" }}>
-          <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.5rem" }}>
+          <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
             接口提供方
           </label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -132,13 +262,7 @@ export function SettingsPage() {
                   type="button"
                   variant={isSelected ? "solid" : "outline"}
                   size="xs"
-                  pill
                   onClick={() => handleSelectProvider(key)}
-                  style={{
-                    backgroundColor: isSelected ? "#2563eb" : "#1e293b",
-                    borderColor: isSelected ? "#3b82f6" : "#334155",
-                    color: isSelected ? "#ffffff" : "#94a3b8",
-                  }}
                 >
                   {preset.name}
                 </Button>
@@ -150,7 +274,7 @@ export function SettingsPage() {
         {/* Form Inputs */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
+            <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
               API Base URL
             </label>
             <input
@@ -160,10 +284,10 @@ export function SettingsPage() {
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
-                borderRadius: "0.5rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #374151",
-                color: "#fff",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
                 fontSize: "0.85rem",
                 outline: "none",
               }}
@@ -172,7 +296,7 @@ export function SettingsPage() {
 
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-              <label style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+              <label style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
                 模型名称
               </label>
               {currentPreset.models.length > 0 && (
@@ -185,14 +309,10 @@ export function SettingsPage() {
                         type="button"
                         variant={isModelActive ? "solid" : "outline"}
                         size="xs"
-                        pill
                         onClick={() => setAIConfig({ model: m })}
                         style={{
                           padding: "0.15rem 0.5rem",
                           fontSize: "0.7rem",
-                          backgroundColor: isModelActive ? "rgba(37, 99, 235, 0.25)" : "#1e293b",
-                          borderColor: isModelActive ? "#3b82f6" : "#334155",
-                          color: isModelActive ? "#60a5fa" : "#64748b",
                         }}
                       >
                         {m}
@@ -210,10 +330,10 @@ export function SettingsPage() {
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
-                borderRadius: "0.5rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #374151",
-                color: "#fff",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
                 fontSize: "0.85rem",
                 outline: "none",
               }}
@@ -221,7 +341,7 @@ export function SettingsPage() {
           </div>
 
           <div style={{ gridColumn: "span 2" }}>
-            <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.35rem" }}>
+            <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
               API Key {aiConfig.provider === "custom" ? "(根据自定义服务选填)" : ""}
             </label>
             <input
@@ -232,10 +352,10 @@ export function SettingsPage() {
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
-                borderRadius: "0.5rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #374151",
-                color: "#fff",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
                 fontSize: "0.85rem",
                 outline: "none",
               }}
@@ -277,14 +397,14 @@ export function SettingsPage() {
       <div
         style={{
           padding: "1.5rem",
-          borderRadius: "1rem",
-          backgroundColor: "#1e293b",
-          border: "1px solid #334155",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
           marginBottom: "2rem",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <Sliders size={20} color="#38bdf8" />
+          <Sliders size={20} style={{ color: "var(--accent)" }} />
           <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>全局整理偏好</h2>
         </div>
 
@@ -297,22 +417,22 @@ export function SettingsPage() {
               gap: "0.75rem",
               cursor: "pointer",
               padding: "0.75rem",
-              borderRadius: "0.5rem",
-              backgroundColor: "#0f172a",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
             }}
           >
             <input
               type="checkbox"
               checked={cascadeSelectChildren}
               onChange={(e) => setCascadeSelectChildren(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "#2563eb", width: "16px", height: "16px", cursor: "pointer" }}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
             />
             <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                 勾选标签时默认级联勾选所有子标签（包含子标签）
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                 在工作台树状图中勾选父标签或组节点时，自动同时勾选其下层的所有子标签页；取消勾选时同理。
               </div>
             </div>
@@ -326,22 +446,22 @@ export function SettingsPage() {
               gap: "0.75rem",
               cursor: "pointer",
               padding: "0.75rem",
-              borderRadius: "0.5rem",
-              backgroundColor: "#0f172a",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
             }}
           >
             <input
               type="checkbox"
               checked={preserveSubtrees}
               onChange={(e) => setPreserveSubtrees(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "#2563eb", width: "16px", height: "16px", cursor: "pointer" }}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
             />
             <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                 保持子树完整性
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                 分类与重组时将整个子树作为整体跟随父节点归入新类别，不拆散既有层级结构。
               </div>
             </div>
@@ -355,22 +475,22 @@ export function SettingsPage() {
               gap: "0.75rem",
               cursor: "pointer",
               padding: "0.75rem",
-              borderRadius: "0.5rem",
-              backgroundColor: "#0f172a",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
             }}
           >
             <input
               type="checkbox"
               checked={rulesSettings.treatExistingGroupsAsUnit}
               onChange={(e) => setRulesSettings({ treatExistingGroupsAsUnit: e.target.checked })}
-              style={{ marginTop: "0.2rem", accentColor: "#2563eb", width: "16px", height: "16px", cursor: "pointer" }}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
             />
             <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                 既有 Group 组当成独立整体
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                 快照中原本就是 Sidebery Group 的组标签作为一个原子单元参与规则匹配，不拆分内部标签。
               </div>
             </div>
@@ -384,22 +504,22 @@ export function SettingsPage() {
               gap: "0.75rem",
               cursor: "pointer",
               padding: "0.75rem",
-              borderRadius: "0.5rem",
-              backgroundColor: "#0f172a",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
             }}
           >
             <input
               type="checkbox"
               checked={exemptPinned}
               onChange={(e) => setExemptPinned(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "#2563eb", width: "16px", height: "16px", cursor: "pointer" }}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
             />
             <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                 豁免已固定标签 (Pinned Tabs)
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                 固定标签默认作为常驻项，不参与批量去重或重组。
               </div>
             </div>
@@ -413,22 +533,22 @@ export function SettingsPage() {
               gap: "0.75rem",
               cursor: "pointer",
               padding: "0.75rem",
-              borderRadius: "0.5rem",
-              backgroundColor: "#0f172a",
-              border: "1px solid #334155",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
             }}
           >
             <input
               type="checkbox"
               checked={exemptInternalPages}
               onChange={(e) => setExemptInternalPages(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "#2563eb", width: "16px", height: "16px", cursor: "pointer" }}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
             />
             <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                 豁免浏览器内部页面
               </div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                 忽略 about:, chrome:, moz-extension: 等本地系统页面。
               </div>
             </div>
@@ -440,15 +560,15 @@ export function SettingsPage() {
       <div
         style={{
           padding: "1.5rem",
-          borderRadius: "1rem",
-          backgroundColor: "#1e293b",
-          border: "1px solid #334155",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>配置备份与恢复</h2>
-            <p style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
               导出或导入规则列表与全局偏好配置 JSON。
             </p>
           </div>
@@ -456,11 +576,11 @@ export function SettingsPage() {
           <div style={{ display: "flex", gap: "0.6rem" }}>
             <label
               style={{
-                padding: "0.3rem 0.75rem",
-                borderRadius: "9999px",
-                border: "1px solid #334155",
-                backgroundColor: "#1e293b",
-                color: "#94a3b8",
+                padding: "0.28rem 0.7rem",
+                borderRadius: "var(--radius-btn, 6px)",
+                border: "1px solid var(--btn-outline-border)",
+                backgroundColor: "var(--btn-outline-bg)",
+                color: "var(--text-muted)",
                 fontSize: "0.75rem",
                 fontWeight: 500,
                 cursor: "pointer",
@@ -470,14 +590,14 @@ export function SettingsPage() {
                 transition: "all 0.15s ease",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#334155";
-                e.currentTarget.style.borderColor = "#475569";
-                e.currentTarget.style.color = "#f8fafc";
+                e.currentTarget.style.backgroundColor = "var(--btn-outline-hover-bg)";
+                e.currentTarget.style.borderColor = "var(--btn-outline-hover-border)";
+                e.currentTarget.style.color = "var(--text-main)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#1e293b";
-                e.currentTarget.style.borderColor = "#334155";
-                e.currentTarget.style.color = "#94a3b8";
+                e.currentTarget.style.backgroundColor = "var(--btn-outline-bg)";
+                e.currentTarget.style.borderColor = "var(--btn-outline-border)";
+                e.currentTarget.style.color = "var(--text-muted)";
               }}
             >
               <Upload size={13} />
@@ -489,7 +609,6 @@ export function SettingsPage() {
               onClick={handleExportAll}
               variant="outline"
               size="xs"
-              pill
             >
               <Download size={13} />
               <span>导出配置</span>

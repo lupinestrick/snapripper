@@ -1,20 +1,157 @@
 @layer reset, base, tokens, recipes, utilities;
 
-:root {
+:root,
+[data-theme="midnight"] {
+  color-scheme: dark;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Backgrounds */
+  --bg-canvas: #0b0f19;
   --bg-primary: #0f172a;
-  --bg-surface: #1e293b;
+  --bg-surface: #111827;
+  --bg-card: #1e293b;
   --bg-subtle: #334155;
+  --bg-hover: #26334d;
+
+  /* Borders */
+  --border-base: #1e293b;
   --border-subtle: #334155;
+  --border-card: #334155;
   --border-focus: #38bdf8;
+
+  /* Texts */
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
+
+  /* Accents (Midnight Blue/Cyan) */
   --accent: #38bdf8;
-  --accent-hover: #0ea5e9;
+  --accent-solid: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-subtle: rgba(56, 189, 248, 0.15);
+  --accent-subtle-hover: rgba(56, 189, 248, 0.25);
+  --accent-border: rgba(56, 189, 248, 0.35);
+  --accent-text: #38bdf8;
+  --accent-fg: #ffffff;
+
+  /* System Feedback */
   --danger: #ef4444;
   --danger-hover: #dc2626;
   --success: #22c55e;
   --warning: #f59e0b;
+
+  /* Buttons */
+  --radius-btn: 6px;
+  --btn-outline-bg: #1e293b;
+  --btn-outline-hover-bg: #334155;
+  --btn-outline-border: #334155;
+  --btn-outline-hover-border: #475569;
+  --btn-ghost-hover: rgba(255, 255, 255, 0.08);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #334155;
+  --scrollbar-hover: #475569;
+}
+
+[data-theme="park-dark"] {
+  color-scheme: dark;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Backgrounds (Neutral Dark) */
+  --bg-canvas: #0c0c0c;
+  --bg-primary: #111111;
+  --bg-surface: #181818;
+  --bg-card: #202020;
+  --bg-subtle: #2a2a2a;
+  --bg-hover: #262626;
+
+  /* Borders */
+  --border-base: #222222;
+  --border-subtle: #2e2e2e;
+  --border-card: #383838;
+  --border-focus: #e93d82;
+
+  /* Texts */
+  --text-main: #eeeeee;
+  --text-muted: #9e9e9e;
+
+  /* Accents (Park UI Crimson) */
+  --accent: #e93d82;
+  --accent-solid: #e93d82;
+  --accent-hover: #ee518a;
+  --accent-subtle: rgba(233, 61, 130, 0.15);
+  --accent-subtle-hover: rgba(233, 61, 130, 0.25);
+  --accent-border: rgba(233, 61, 130, 0.4);
+  --accent-text: #ff92ad;
+  --accent-fg: #ffffff;
+
+  /* System Feedback */
+  --danger: #e5484d;
+  --danger-hover: #f2555a;
+  --success: #30a46c;
+  --warning: #f1a10d;
+
+  /* Buttons */
+  --radius-btn: 6px;
+  --btn-outline-bg: #191919;
+  --btn-outline-hover-bg: #262626;
+  --btn-outline-border: #333333;
+  --btn-outline-hover-border: #484848;
+  --btn-ghost-hover: rgba(255, 255, 255, 0.08);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #2a2a2a;
+  --scrollbar-hover: #383838;
+}
+
+[data-theme="park-light"] {
+  color-scheme: light;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* Backgrounds (Neutral Light) */
+  --bg-canvas: #f4f4f5;
+  --bg-primary: #fcfcfc;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-subtle: #f0f0f0;
+  --bg-hover: #eaeaea;
+
+  /* Borders */
+  --border-base: #e8e8e8;
+  --border-subtle: #e0e0e0;
+  --border-card: #d4d4d4;
+  --border-focus: #e93d82;
+
+  /* Texts */
+  --text-main: #202020;
+  --text-muted: #646464;
+
+  /* Accents (Park UI Crimson Light) */
+  --accent: #e93d82;
+  --accent-solid: #e93d82;
+  --accent-hover: #df3478;
+  --accent-subtle: #ffe9f0;
+  --accent-subtle-hover: #fedce7;
+  --accent-border: #eaacc3;
+  --accent-text: #cb1d63;
+  --accent-fg: #ffffff;
+
+  /* System Feedback */
+  --danger: #e5484d;
+  --danger-hover: #dc3e42;
+  --success: #30a46c;
+  --warning: #f1a10d;
+
+  /* Buttons */
+  --radius-btn: 6px;
+  --btn-outline-bg: #ffffff;
+  --btn-outline-hover-bg: #f5f5f5;
+  --btn-outline-border: #d9d9d9;
+  --btn-outline-hover-border: #bbbbbb;
+  --btn-ghost-hover: rgba(0, 0, 0, 0.05);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #d9d9d9;
+  --scrollbar-hover: #bbbbbb;
 }
 
 * {
@@ -25,7 +162,7 @@
 
 body {
   font-family: var(--font-sans);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-canvas);
   color: var(--text-main);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
@@ -41,14 +178,14 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-subtle);
+  background: var(--scrollbar-thumb);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--scrollbar-hover);
 }
 
-input, button, select {
+input, button, select, textarea {
   font-family: inherit;
 }
