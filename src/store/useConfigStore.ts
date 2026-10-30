@@ -178,7 +178,7 @@ export const useConfigStore = create<ConfigState>()(
         })),
     }),
     {
-      name: "snapripper_config_storage_v6",
+      name: "snapripper_config_storage_v9",
     }
   )
 );

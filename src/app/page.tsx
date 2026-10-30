@@ -27,6 +27,7 @@ export default function WorkbenchPage() {
   useEffect(() => {
     const activeTheme = theme || "park-light";
     document.documentElement.setAttribute("data-theme", activeTheme);
+    document.body.setAttribute("data-theme", activeTheme);
     const isLight =
       activeTheme === "park-light" ||
       activeTheme === "nord-snow-storm" ||
@@ -120,7 +121,7 @@ export default function WorkbenchPage() {
               padding: "1.25rem 2.5rem",
               backgroundColor: "var(--bg-card)",
               borderRadius: "9999px",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.6)",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.2)",
               color: "var(--accent-text)",
               fontWeight: 700,
               fontSize: "1.1rem",

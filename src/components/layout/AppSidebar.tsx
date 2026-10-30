@@ -242,7 +242,7 @@ export function AppSidebar() {
                   padding: isCompact ? "0.55rem 0" : "0.5rem 0.75rem",
                   fontSize: "0.825rem",
                   width: "100%",
-                  color: isActive ? "#ffffff" : "var(--text-muted)",
+                  color: isActive ? "var(--accent-fg, #ffffff)" : "var(--text-muted)",
                 }}
                 title={isCompact ? item.label : undefined}
               >

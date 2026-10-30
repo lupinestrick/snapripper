@@ -101,57 +101,41 @@ export function SettingsPage() {
   const THEME_CONFIGS: {
     id: AppTheme;
     name: string;
-    tag: string;
-    desc: string;
     colors: string[];
   }[] = [
     {
       id: "park-light",
       name: "Park UI 浅色 (Crimson Light)",
-      tag: "默认主题",
-      desc: "Neutral 极净亮白底色，搭配 Park-UI 经典绯红 Crimson 强调色。",
-      colors: ["#fcfcfc", "#ffffff", "#e93d82", "#cb1d63"],
+      colors: ["#fcfcfc", "#f0f0f0", "#e93d82", "#cb1d63"],
     },
     {
       id: "park-dark",
       name: "Park UI 深色 (Crimson Dark)",
-      tag: "Park-UI 官方深色",
-      desc: "Neutral 深黑灰底色，搭配 Park-UI 经典绯红 Crimson 强调色。",
       colors: ["#111111", "#202020", "#e93d82", "#ff92ad"],
     },
     {
       id: "midnight",
       name: "经典暗蓝 (Midnight)",
-      tag: "经典默认",
-      desc: "沉稳暗夜深蓝底色与科技蓝 Accent，专注夜间整理与护眼。",
       colors: ["#0b0f19", "#1e293b", "#2563eb", "#38bdf8"],
     },
     {
       id: "nord-snow-storm",
       name: "Nord Snow Storm",
-      tag: "北欧极简浅色",
-      desc: "极简北欧冰雪纯净白底色，柔和深灰与淡雅冰蓝冷调。",
       colors: ["#eceff4", "#e5e9f0", "#88c0d0", "#2e3440"],
     },
     {
       id: "rose-pine-dawn",
       name: "Rosé Pine Dawn",
-      tag: "温暖柔和浅色",
-      desc: "温暖纸张柔白暖底色，搭配典雅玫瑰粉与松针绿调。",
       colors: ["#faf4ed", "#fffaf3", "#d7827e", "#575279"],
     },
     {
       id: "nord-dark",
       name: "Nord Dark",
-      tag: "北欧极地暗色",
-      desc: "极地夜空暗灰蓝底色，融合标志性北欧极光冰蓝高亮。",
       colors: ["#2e3440", "#3b4252", "#88c0d0", "#81a1c1"],
     },
     {
       id: "catppuccin-mocha",
       name: "Catppuccin Mocha",
-      tag: "柔和马卡龙深色",
-      desc: "柔和温暖的深灰底色，搭配典雅马卡龙粉与薰衣草蓝点缀。",
       colors: ["#1e1e2e", "#313244", "#f5c2e7", "#cba6f7"],
     },
   ];
@@ -186,7 +170,7 @@ export function SettingsPage() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem" }}>
           {THEME_CONFIGS.map((t) => {
             const isSelected = (theme || "park-light") === t.id;
             return (
@@ -194,60 +178,45 @@ export function SettingsPage() {
                 key={t.id}
                 onClick={() => setTheme(t.id)}
                 style={{
-                  padding: "1rem",
+                  padding: "0.85rem 1rem",
                   borderRadius: "var(--radius-btn, 6px)",
-                  border: "2px solid",
+                  border: "1.5px solid",
                   borderColor: isSelected ? "var(--accent-solid)" : "var(--border-subtle)",
                   backgroundColor: isSelected ? "var(--accent-subtle)" : "var(--bg-subtle)",
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                   display: "flex",
                   flexDirection: "column",
-                  justifyContent: "space-between",
-                  gap: "0.75rem",
+                  gap: "0.65rem",
                 }}
               >
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.4rem" }}>
-                    <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>
-                      {t.name}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.68rem",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        backgroundColor: "var(--bg-card)",
-                        border: "1px solid var(--border-subtle)",
-                        color: "var(--text-muted)",
-                      }}
-                    >
-                      {t.tag}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
-                    {t.desc}
-                  </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-main)" }}>
+                    {t.name}
+                  </span>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>色板预览:</span>
-                  <div style={{ display: "flex", gap: "5px" }}>
-                    {t.colors.map((c, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          width: "18px",
-                          height: "18px",
-                          borderRadius: "4px",
-                          backgroundColor: c,
-                          border: "1px solid rgba(128,128,128,0.25)",
-                          display: "inline-block",
-                        }}
-                        title={c}
-                      />
-                    ))}
-                  </div>
+                <div
+                  style={{
+                    display: "flex",
+                    height: "14px",
+                    width: "100%",
+                    borderRadius: "4px",
+                    overflow: "hidden",
+                    border: "1px solid var(--border-subtle)",
+                  }}
+                >
+                  {t.colors.map((c, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1,
+                        height: "100%",
+                        backgroundColor: c,
+                      }}
+                      title={c}
+                    />
+                  ))}
                 </div>
               </div>
             );

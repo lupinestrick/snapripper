@@ -25,7 +25,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const [isHovered, setIsHovered] = useState(false);
 
-    // Theme-driven Park-UI button styles:
+    // Theme-driven button styles:
     let bg = "var(--btn-outline-bg)";
     let border = "1px solid var(--btn-outline-border)";
     let color = "var(--text-muted)";
@@ -72,7 +72,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={className}
         style={{
-          borderRadius: pill ? "9999px" : "0.5rem",
+          borderRadius: pill ? "9999px" : "var(--radius-btn, 6px)",
           padding,
           fontSize,
           fontWeight: 500,
@@ -87,9 +87,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           alignItems: "center",
           justifyContent: "center",
           gap: "0.35rem",
-          transition: "all 0.15s ease",
-          userSelect: "none",
-          whiteSpace: "nowrap",
+          transition: "all 0.12s ease",
           ...style,
         }}
         onMouseEnter={(e) => {
@@ -107,4 +105,5 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     );
   }
 );
+
 Button.displayName = "Button";
