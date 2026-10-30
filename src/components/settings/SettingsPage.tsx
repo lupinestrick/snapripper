@@ -199,11 +199,10 @@ export function SettingsPage() {
                 <div
                   style={{
                     display: "flex",
-                    height: "14px",
+                    height: "6px",
                     width: "100%",
-                    borderRadius: "4px",
+                    borderRadius: "9999px",
                     overflow: "hidden",
-                    border: "1px solid var(--border-subtle)",
                   }}
                 >
                   {t.colors.map((c, i) => (

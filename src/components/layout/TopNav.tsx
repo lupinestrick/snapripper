@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { FolderArchive, Undo2, Palette, Check, Moon, Sun, Sparkles } from "lucide-react";
+import { FolderArchive, Undo2, Palette, Check } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore, AppTheme } from "@/store/useConfigStore";
 import { SnapshotFileHopupModal, formatBytes } from "./SnapshotFileHopupModal";
@@ -11,54 +11,40 @@ interface TopNavProps {
   onOpenExport?: () => void;
 }
 
-const THEME_OPTIONS: { id: AppTheme; name: string; subtitle: string; icon: React.ReactNode; previewDot: string }[] = [
+const THEME_OPTIONS: { id: AppTheme; name: string; previewDot: string }[] = [
   {
     id: "park-light",
     name: "Park UI 浅色",
-    subtitle: "Crimson & Neutral Light",
-    icon: <Sun size={13} />,
     previewDot: "#e93d82",
   },
   {
     id: "park-dark",
     name: "Park UI 深色",
-    subtitle: "Crimson & Neutral Dark",
-    icon: <Sparkles size={13} />,
     previewDot: "#e93d82",
   },
   {
     id: "midnight",
     name: "经典暗蓝",
-    subtitle: "Dark Slate & Blue",
-    icon: <Moon size={13} />,
     previewDot: "#2563eb",
   },
   {
     id: "nord-snow-storm",
     name: "Nord Snow Storm",
-    subtitle: "Polar White & Frost",
-    icon: <Sun size={13} />,
     previewDot: "#88c0d0",
   },
   {
     id: "rose-pine-dawn",
     name: "Rosé Pine Dawn",
-    subtitle: "Warm Rosé & Pine",
-    icon: <Sun size={13} />,
     previewDot: "#d7827e",
   },
   {
     id: "nord-dark",
     name: "Nord Dark",
-    subtitle: "Nordic Frost & Night",
-    icon: <Moon size={13} />,
     previewDot: "#88c0d0",
   },
   {
     id: "catppuccin-mocha",
     name: "Catppuccin Mocha",
-    subtitle: "Mocha & Pastel",
-    icon: <Moon size={13} />,
     previewDot: "#f5c2e7",
   },
 ];
@@ -163,16 +149,16 @@ export function TopNav({ onOpenExport }: TopNavProps) {
                   position: "absolute",
                   top: "calc(100% + 6px)",
                   right: 0,
-                  width: "210px",
+                  width: "170px",
                   backgroundColor: "var(--bg-surface)",
                   border: "1px solid var(--border-subtle)",
                   borderRadius: "var(--radius-btn, 6px)",
-                  padding: "0.4rem",
+                  padding: "0.35rem",
                   boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
                   zIndex: 50,
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.25rem",
+                  gap: "0.15rem",
                 }}
               >
                 <div
@@ -180,12 +166,12 @@ export function TopNav({ onOpenExport }: TopNavProps) {
                     fontSize: "0.68rem",
                     fontWeight: 600,
                     color: "var(--text-muted)",
-                    padding: "0.25rem 0.5rem",
+                    padding: "0.2rem 0.45rem",
                     borderBottom: "1px solid var(--border-subtle)",
-                    marginBottom: "0.2rem",
+                    marginBottom: "0.15rem",
                   }}
                 >
-                  外观与主题 (Themes)
+                  外观与主题
                 </div>
 
                 {THEME_OPTIONS.map((item) => {
@@ -201,7 +187,7 @@ export function TopNav({ onOpenExport }: TopNavProps) {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        padding: "0.45rem 0.6rem",
+                        padding: "0.35rem 0.5rem",
                         borderRadius: "var(--radius-btn, 6px)",
                         border: "1px solid",
                         borderColor: isActive ? "var(--accent-border)" : "transparent",
@@ -227,18 +213,17 @@ export function TopNav({ onOpenExport }: TopNavProps) {
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <span
                           style={{
-                            width: "9px",
-                            height: "9px",
+                            width: "8px",
+                            height: "8px",
                             borderRadius: "50%",
                             backgroundColor: item.previewDot,
                             display: "inline-block",
                             flexShrink: 0,
                           }}
                         />
-                        <div>
-                          <div style={{ fontSize: "0.78rem", fontWeight: 600 }}>{item.name}</div>
-                          <div style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>{item.subtitle}</div>
-                        </div>
+                        <span style={{ fontSize: "0.78rem", fontWeight: isActive ? 600 : 500 }}>
+                          {item.name}
+                        </span>
                       </div>
                       {isActive && <Check size={13} style={{ color: "var(--accent)" }} />}
                     </button>
