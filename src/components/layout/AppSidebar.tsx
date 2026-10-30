@@ -165,88 +165,128 @@ export function AppSidebar() {
           })}
         </nav>
 
-        {/* Sidebar Summary Card (Clickable to open Hop-up) */}
-        {rawSnapshot && (
-          <div style={{ padding: "0.75rem" }}>
-            {!isCompact ? (
+        {/* Sidebar Footer: Collapse Toggle & Summary Card */}
+        {!isCompact ? (
+          <div
+            style={{
+              padding: "0.5rem 0.6rem 0.75rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.45rem",
+            }}
+          >
+            {/* Circular Collapse Button (on the left of Snapshot Overview) */}
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setIsCompact(true)}
+              style={{
+                width: "32px",
+                height: "32px",
+                minWidth: "32px",
+                padding: 0,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--text-muted)",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-subtle)",
+                flexShrink: 0,
+              }}
+              title="折叠侧边栏"
+            >
+              <ChevronLeft size={15} />
+            </Button>
+
+            {/* Snapshot Overview Button (slightly shrunk to fit beside the circle button) */}
+            {rawSnapshot && (
               <Button
                 variant="outline"
                 onClick={() => setOverviewOpen(true)}
                 style={{
-                  width: "100%",
-                  padding: "0.6rem 0.75rem",
-                  borderRadius: "0.75rem",
+                  flex: 1,
+                  padding: "0.4rem 0.55rem",
+                  borderRadius: "0.65rem",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "stretch",
-                  gap: "0.25rem",
+                  gap: "0.2rem",
                   textAlign: "left",
                   backgroundColor: "var(--bg-subtle)",
                   borderColor: "var(--border-subtle)",
+                  minWidth: 0,
                 }}
                 title="查看概览数据"
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600 }}>快照概览</span>
-                  <BarChart2 size={13} style={{ color: "var(--accent)" }} />
+                  <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>快照概览</span>
+                  <BarChart2 size={12} style={{ color: "var(--accent)" }} />
                 </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem" }}>
-                  <span style={{ fontSize: "1.15rem", fontWeight: 700, color: "var(--text-main)" }}>{totalTabs}</span>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>标签 / {panelCount} 面板</span>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", overflow: "hidden" }}>
+                  <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)", lineHeight: 1.1 }}>
+                    {totalTabs}
+                  </span>
+                  <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                    标签 / {panelCount} 面板
+                  </span>
                 </div>
               </Button>
-            ) : (
+            )}
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: "0.5rem 0.4rem 0.75rem",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "0.45rem",
+            }}
+          >
+            {rawSnapshot && (
               <Button
                 variant="outline"
                 onClick={() => setOverviewOpen(true)}
                 style={{
                   width: "100%",
-                  padding: "0.5rem 0",
+                  padding: "0.45rem 0",
                   flexDirection: "column",
                   gap: "2px",
                   backgroundColor: "var(--bg-subtle)",
                   borderColor: "var(--border-subtle)",
+                  borderRadius: "0.5rem",
                 }}
                 title="查看概览数据"
               >
-                <BarChart2 size={15} style={{ color: "var(--accent)" }} />
+                <BarChart2 size={14} style={{ color: "var(--accent)" }} />
                 <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-main)" }}>{totalTabs}</span>
               </Button>
             )}
+
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setIsCompact(false)}
+              style={{
+                width: "32px",
+                height: "32px",
+                minWidth: "32px",
+                padding: 0,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--text-muted)",
+                border: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-subtle)",
+              }}
+              title="展开侧边栏"
+            >
+              <ChevronRight size={15} />
+            </Button>
           </div>
         )}
-
-        {/* Bottom Left Collapse / Expand Toggle Circle */}
-        <div
-          style={{
-            padding: "0.4rem 0.75rem 0.75rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: isCompact ? "center" : "flex-start",
-          }}
-        >
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setIsCompact(!isCompact)}
-            style={{
-              width: "32px",
-              height: "32px",
-              minWidth: "32px",
-              padding: 0,
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "var(--text-muted)",
-              border: "1px solid var(--border-subtle)",
-              backgroundColor: "var(--bg-subtle)",
-            }}
-            title={isCompact ? "展开侧边栏" : "折叠侧边栏"}
-          >
-            {isCompact ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
-          </Button>
-        </div>
       </aside>
 
       <OverviewHopup isOpen={overviewOpen} onClose={() => setOverviewOpen(false)} />
