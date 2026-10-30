@@ -134,32 +134,6 @@ export function AppSidebar() {
           zIndex: 40,
         }}
       >
-        {/* Sidebar Header / Collapse Toggle */}
-        <div
-          style={{
-            height: "56px",
-            padding: isCompact ? "0" : "0 0.75rem",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: isCompact ? "center" : "flex-end",
-            borderBottom: "1px solid var(--border-subtle)",
-          }}
-        >
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => setIsCompact(!isCompact)}
-            style={{
-              width: "28px",
-              height: "28px",
-              padding: 0,
-              color: "var(--text-muted)",
-            }}
-            title={isCompact ? "展开侧边栏" : "折叠侧边栏"}
-          >
-            {isCompact ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-          </Button>
-        </div>
 
         {/* Nav Items */}
         <nav style={{ padding: "0.75rem 0.5rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
@@ -241,6 +215,38 @@ export function AppSidebar() {
             )}
           </div>
         )}
+
+        {/* Bottom Left Collapse / Expand Toggle Circle */}
+        <div
+          style={{
+            padding: "0.4rem 0.75rem 0.75rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: isCompact ? "center" : "flex-start",
+          }}
+        >
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => setIsCompact(!isCompact)}
+            style={{
+              width: "32px",
+              height: "32px",
+              minWidth: "32px",
+              padding: 0,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--bg-subtle)",
+            }}
+            title={isCompact ? "展开侧边栏" : "折叠侧边栏"}
+          >
+            {isCompact ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+          </Button>
+        </div>
       </aside>
 
       <OverviewHopup isOpen={overviewOpen} onClose={() => setOverviewOpen(false)} />
