@@ -134,96 +134,32 @@ export function AppSidebar() {
           zIndex: 40,
         }}
       >
-        {/* Brand / Logo */}
+        {/* Sidebar Header / Collapse Toggle */}
         <div
           style={{
             height: "56px",
-            padding: isCompact ? "0" : "0 1rem",
+            padding: isCompact ? "0" : "0 0.75rem",
             display: "flex",
             alignItems: "center",
-            justifyContent: isCompact ? "center" : "space-between",
+            justifyContent: isCompact ? "center" : "flex-end",
             borderBottom: "1px solid var(--border-subtle)",
           }}
         >
-          {!isCompact ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-              <div
-                style={{
-                  width: "26px",
-                  height: "26px",
-                  borderRadius: "9999px",
-                  backgroundColor: "var(--accent-solid)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  fontWeight: 700,
-                  fontSize: "0.8rem",
-                }}
-              >
-                S
-              </div>
-              <span style={{ fontSize: "0.925rem", fontWeight: 700, color: "var(--text-main)", letterSpacing: "-0.02em" }}>
-                SnapRipper
-              </span>
-            </div>
-          ) : (
-            <div
-              style={{
-                width: "26px",
-                height: "26px",
-                borderRadius: "9999px",
-                backgroundColor: "var(--accent-solid)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: "0.8rem",
-              }}
-            >
-              S
-            </div>
-          )}
-
-          {/* Compact Toggle Button */}
-          {!isCompact && (
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => setIsCompact(true)}
-              style={{
-                width: "24px",
-                height: "24px",
-                padding: 0,
-                color: "var(--text-muted)",
-              }}
-              title="折叠侧边栏"
-            >
-              <ChevronLeft size={14} />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => setIsCompact(!isCompact)}
+            style={{
+              width: "28px",
+              height: "28px",
+              padding: 0,
+              color: "var(--text-muted)",
+            }}
+            title={isCompact ? "展开侧边栏" : "折叠侧边栏"}
+          >
+            {isCompact ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          </Button>
         </div>
-
-        {/* Compact expand toggle button if isCompact */}
-        {isCompact && (
-          <div style={{ display: "flex", justifyContent: "center", padding: "0.5rem 0" }}>
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => setIsCompact(false)}
-              style={{
-                width: "28px",
-                height: "28px",
-                padding: 0,
-                color: "var(--text-muted)",
-              }}
-              title="展开侧边栏"
-            >
-              <ChevronRight size={14} />
-            </Button>
-          </div>
-        )}
 
         {/* Nav Items */}
         <nav style={{ padding: "0.75rem 0.5rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
