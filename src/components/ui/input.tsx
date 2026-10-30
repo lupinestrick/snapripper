@@ -17,11 +17,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           border: "1px solid var(--border-subtle)",
           borderRadius: "var(--radius-btn, 6px)",
           color: "var(--text-main)",
-          padding: "0.45rem 0.75rem",
+          padding: "0.5rem 0.75rem",
           outline: "none",
           width: "100%",
           fontSize: "0.85rem",
-          transition: "border-color 0.15s ease",
           ...style,
         }}
         {...props}

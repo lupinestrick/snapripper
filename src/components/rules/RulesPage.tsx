@@ -126,7 +126,7 @@ export function RulesPage() {
           </p>
         </div>
 
-        {/* Action Controls - Park UI Make It Yours Button Style */}
+        {/* Action Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
           <Button
             variant="subtle"
@@ -227,11 +227,11 @@ export function RulesPage() {
             padding: "1.5rem",
             borderRadius: "var(--radius-btn, 8px)",
             backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-focus)",
+            border: "1px solid var(--accent-solid)",
             marginBottom: "2rem",
           }}
         >
-          <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "1rem" }}>新建分类规则</h3>
+          <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem", color: "var(--text-main)" }}>新建分类规则</h3>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
             <div>
@@ -352,7 +352,7 @@ export function RulesPage() {
                 padding: "1rem 1.25rem",
                 borderRadius: "var(--radius-btn, 6px)",
                 backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border-subtle)",
+                border: "1px solid var(--border-card)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -408,7 +408,6 @@ export function RulesPage() {
                   size="xs"
                   onClick={() => handleOpenEdit(rule)}
                   style={{
-                    color: "var(--text-muted)",
                     padding: "0.4rem",
                   }}
                   title="编辑规则"
@@ -421,7 +420,6 @@ export function RulesPage() {
                   size="xs"
                   onClick={() => deleteRule(rule.id)}
                   style={{
-                    color: "var(--text-muted)",
                     padding: "0.4rem",
                   }}
                   title="删除规则"
@@ -446,9 +444,8 @@ export function RulesPage() {
                   <Button
                     variant="ghost"
                     size="xs"
-                    pill
                     onClick={() => setIsEditOpen(false)}
-                    style={{ color: "var(--text-muted)", padding: "4px" }}
+                    style={{ padding: "4px" }}
                     title="关闭"
                   >
                     <X size={18} />
@@ -545,7 +542,6 @@ export function RulesPage() {
                 <Button
                   variant="solid"
                   size="sm"
-                  pill
                   onClick={handleSaveEdit}
                 >
                   <Check size={14} />

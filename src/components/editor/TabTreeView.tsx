@@ -163,15 +163,15 @@ function TreeNodeRow({
           padding: "0.4rem 0.5rem",
           paddingLeft: `${depth * 1.5 + 0.5}rem`,
           borderRadius: "0.375rem",
-          backgroundColor: isSelected ? "var(--accent-subtle)" : "transparent",
-          border: isSelected ? "1px solid var(--accent-border)" : "1px solid transparent",
+          backgroundColor: isSelected ? "rgba(56, 189, 248, 0.15)" : "transparent",
+          border: isSelected ? "1px solid rgba(56, 189, 248, 0.4)" : "1px solid transparent",
           cursor: "pointer",
           transition: "background 0.1s ease",
           fontSize: "0.85rem",
           userSelect: "none",
         }}
         onMouseEnter={(e) => {
-          if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-hover)";
+          if (!isSelected) e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)";
         }}
         onMouseLeave={(e) => {
           if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";

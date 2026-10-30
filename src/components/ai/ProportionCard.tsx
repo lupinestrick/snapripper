@@ -41,8 +41,8 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
     <Card.Root
       style={{
         margin: "1rem 1.5rem",
-        backgroundColor: "#1e293b",
-        border: "1px solid #38bdf8",
+        backgroundColor: "var(--bg-card)",
+        border: "1px solid var(--accent-solid)",
       }}
     >
       <Card.Header style={{ marginBottom: "1rem" }}>
@@ -52,8 +52,8 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               style={{
                 padding: "0.45rem",
                 borderRadius: "9999px",
-                backgroundColor: "rgba(56, 189, 248, 0.15)",
-                color: "#38bdf8",
+                backgroundColor: "var(--accent-subtle)",
+                color: "var(--accent)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -62,7 +62,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               <PieChart size={20} />
             </div>
             <div>
-              <Card.Title style={{ fontSize: "1.05rem" }}>AI 标签主题比例分析看板</Card.Title>
+              <Card.Title style={{ fontSize: "1.05rem", color: "var(--text-main)" }}>AI 标签主题比例分析看板</Card.Title>
               <Card.Description>
                 分析了 {totalAnalyzed} 个有效标签页，豁免保护 {excludedCount} 个置顶与内建页面
                 {suggestedAction && ` · 建议: ${suggestedAction}`}
@@ -75,7 +75,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
             size="xs"
             pill
             onClick={onClose}
-            style={{ color: "#94a3b8" }}
+            style={{ color: "var(--text-muted)" }}
             title="关闭看板"
           >
             <X size={18} />
@@ -92,7 +92,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               height: "1.25rem",
               borderRadius: "9999px",
               overflow: "hidden",
-              backgroundColor: "#0f172a",
+              backgroundColor: "var(--bg-subtle)",
             }}
           >
             {categories.map((cat) => (
@@ -120,8 +120,8 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
             {categories.map((cat) => (
               <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: cat.color }} />
-                <span style={{ color: "#f8fafc", fontWeight: 500 }}>{cat.name}</span>
-                <span style={{ color: "#94a3b8" }}>{cat.ratio}%</span>
+                <span style={{ color: "var(--text-main)", fontWeight: 500 }}>{cat.name}</span>
+                <span style={{ color: "var(--text-muted)" }}>{cat.ratio}%</span>
               </div>
             ))}
             {totalRatio !== 100 && (
@@ -147,8 +147,8 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               style={{
                 padding: "0.75rem",
                 borderRadius: "0.75rem",
-                backgroundColor: "#0f172a",
-                border: "1px solid #334155",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--border-subtle)",
                 display: "flex",
                 flexDirection: "column",
                 gap: "0.4rem",
@@ -166,8 +166,8 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
                     style={{
                       backgroundColor: "transparent",
                       border: "none",
-                      borderBottom: "1px dashed #475569",
-                      color: "#f8fafc",
+                      borderBottom: "1px dashed var(--border-subtle)",
+                      color: "var(--text-main)",
                       fontWeight: 600,
                       fontSize: "0.85rem",
                       width: "100%",
@@ -178,7 +178,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                  <Badge variant="subtle" size="sm" style={{ color: "#38bdf8" }}>
+                  <Badge variant="subtle" size="sm" style={{ color: "var(--accent-text)" }}>
                     {cat.ratio}%
                   </Badge>
                   <Button
@@ -187,7 +187,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
                     pill
                     onClick={() => removeCategory(cat.id)}
                     title="删除此分类"
-                    style={{ color: "#94a3b8", padding: "0.2rem" }}
+                    style={{ color: "var(--text-muted)", padding: "0.2rem" }}
                   >
                     <Trash2 size={13} />
                   </Button>
@@ -195,7 +195,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               </div>
 
               {cat.description && (
-                <p style={{ fontSize: "0.72rem", color: "#94a3b8", lineHeight: 1.3 }}>{cat.description}</p>
+                <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", lineHeight: 1.3 }}>{cat.description}</p>
               )}
 
               {cat.keywords && cat.keywords.length > 0 && (
@@ -215,8 +215,8 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               style={{
                 padding: "0.75rem",
                 borderRadius: "0.75rem",
-                backgroundColor: "#0f172a",
-                border: "1px dashed #38bdf8",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px dashed var(--accent-solid)",
                 display: "flex",
                 alignItems: "center",
                 gap: "0.5rem",
@@ -237,7 +237,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
                 size="xs"
                 pill
                 onClick={handleAdd}
-                style={{ backgroundColor: "#38bdf8", color: "#0f172a" }}
               >
                 确定
               </Button>
@@ -246,7 +245,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
                 size="xs"
                 pill
                 onClick={() => setIsAdding(false)}
-                style={{ color: "#94a3b8" }}
+                style={{ color: "var(--text-muted)" }}
               >
                 <X size={16} />
               </Button>
@@ -258,8 +257,8 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               pill
               onClick={() => setIsAdding(true)}
               style={{
-                border: "1px dashed #334155",
-                color: "#94a3b8",
+                border: "1px dashed var(--border-subtle)",
+                color: "var(--text-muted)",
                 backgroundColor: "transparent",
                 justifyContent: "center",
               }}
@@ -272,7 +271,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
       </Card.Body>
 
       <Card.Footer style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
           💡 确认上述分类满意后，点击右侧按钮，AI 将根据该分类标准自动重新组织标签。
         </span>
 
@@ -281,11 +280,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
           size="xs"
           pill
           onClick={onStartClassification}
-          style={{
-            backgroundColor: "#2563eb",
-            borderColor: "#3b82f6",
-            color: "#ffffff",
-          }}
         >
           <Sparkles size={13} />
           <span>确认分类标准并执行批量归类</span>

@@ -155,7 +155,7 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "var(--radius-btn, 8px)",
+            borderRadius: "1rem",
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--accent-solid)",
             display: "flex",
@@ -164,7 +164,7 @@ export function ProcessPage() {
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--accent-subtle)")}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
@@ -172,7 +172,7 @@ export function ProcessPage() {
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "var(--radius-btn, 6px)",
+                borderRadius: "9999px",
                 backgroundColor: "var(--accent-subtle)",
                 display: "flex",
                 alignItems: "center",
@@ -208,7 +208,7 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "var(--radius-btn, 8px)",
+            borderRadius: "1rem",
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-card)",
             display: "flex",
@@ -217,26 +217,20 @@ export function ProcessPage() {
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-focus)";
-            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-card)";
-            e.currentTarget.style.backgroundColor = "var(--bg-card)";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "rgba(56, 189, 248, 0.15)",
+                borderRadius: "9999px",
+                backgroundColor: "var(--accent-subtle)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#38bdf8",
+                color: "var(--accent)",
               }}
             >
               <Trash2 size={20} />
@@ -265,7 +259,7 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "var(--radius-btn, 8px)",
+            borderRadius: "1rem",
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-card)",
             display: "flex",
@@ -274,26 +268,20 @@ export function ProcessPage() {
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-focus)";
-            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-card)";
-            e.currentTarget.style.backgroundColor = "var(--bg-card)";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "rgba(6, 182, 212, 0.15)",
+                borderRadius: "9999px",
+                backgroundColor: "var(--accent-subtle)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#06b6d4",
+                color: "var(--accent)",
               }}
             >
               <Globe size={20} />
@@ -322,7 +310,7 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "var(--radius-btn, 8px)",
+            borderRadius: "1rem",
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-card)",
             display: "flex",
@@ -331,26 +319,20 @@ export function ProcessPage() {
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-focus)";
-            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-card)";
-            e.currentTarget.style.backgroundColor = "var(--bg-card)";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                borderRadius: "9999px",
+                backgroundColor: "var(--accent-subtle)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#10b981",
+                color: "var(--accent)",
               }}
             >
               <FolderPlus size={20} />
@@ -379,7 +361,7 @@ export function ProcessPage() {
           }
           style={{
             padding: "1.25rem",
-            borderRadius: "var(--radius-btn, 8px)",
+            borderRadius: "1rem",
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-card)",
             display: "flex",
@@ -388,26 +370,20 @@ export function ProcessPage() {
             cursor: "pointer",
             transition: "all 0.15s ease",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-focus)";
-            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = "var(--border-card)";
-            e.currentTarget.style.backgroundColor = "var(--bg-card)";
-          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div
               style={{
                 width: "44px",
                 height: "44px",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "rgba(168, 85, 247, 0.15)",
+                borderRadius: "9999px",
+                backgroundColor: "var(--accent-subtle)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#a855f7",
+                color: "var(--accent)",
               }}
             >
               <Bot size={20} />

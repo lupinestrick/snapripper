@@ -158,7 +158,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "var(--accent-default)",
+                  color: "var(--accent)",
                 }}
               >
                 <FolderArchive size={18} />
@@ -195,12 +195,12 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <FileText size={16} color="var(--accent-default)" />
+                <FileText size={16} style={{ color: "var(--accent)" }} />
                 <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>
                   {fileName || "暂未载入快照文件"}
                 </span>
               </div>
-              <Badge variant={rawSnapshot ? "subtle" : "outline"} style={{ color: rawSnapshot ? "var(--accent-default)" : "var(--text-muted)" }}>
+              <Badge variant={rawSnapshot ? "subtle" : "outline"} style={{ color: rawSnapshot ? "var(--accent-text)" : "var(--text-muted)" }}>
                 {rawSnapshot ? "已就绪" : "未加载"}
               </Badge>
             </div>
@@ -212,17 +212,17 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
                   backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
+                  border: "1px solid var(--border-card)",
                 }}
               >
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
                   配置文件数据大小
                 </div>
-                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-default)" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--accent)" }}>
                   {rawFileSize > 0 ? formatBytes(rawFileSize) : "0 B"}
                 </div>
                 {rawFileSize > 0 && (
-                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", opacity: 0.8, marginTop: "0.15rem" }}>
                     {rawFileSize.toLocaleString()} 字节
                   </div>
                 )}
@@ -233,7 +233,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
                   backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
+                  border: "1px solid var(--border-card)",
                 }}
               >
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
@@ -242,7 +242,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)" }}>
                   {totalTabs.toLocaleString()} 个
                 </div>
-                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", opacity: 0.8, marginTop: "0.15rem" }}>
                   {rootNodes.length} 个顶层根节点
                 </div>
               </div>
@@ -252,7 +252,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
                   backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
+                  border: "1px solid var(--border-card)",
                 }}
               >
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
@@ -268,7 +268,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
                   backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
+                  border: "1px solid var(--border-card)",
                 }}
               >
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
@@ -371,21 +371,27 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   <div style={{ display: "flex", gap: "0.4rem" }}>
                     <Button
                       variant="outline"
-                      size="xs"
-                      pill
+                      size="sm"
                       onClick={() => handleExportUrls("txt")}
+                      style={{
+                        fontSize: "0.75rem",
+                        padding: "0.3rem 0.75rem",
+                      }}
                     >
-                      {copiedType === "txt" ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+                      {copiedType === "txt" ? <Check size={13} style={{ color: "var(--accent)" }} /> : <Copy size={13} />}
                       <span>{copiedType === "txt" ? "已复制" : "复制网址"}</span>
                     </Button>
 
                     <Button
                       variant="outline"
-                      size="xs"
-                      pill
+                      size="sm"
                       onClick={() => handleExportUrls("md")}
+                      style={{
+                        fontSize: "0.75rem",
+                        padding: "0.3rem 0.75rem",
+                      }}
                     >
-                      {copiedType === "md" ? <Check size={13} color="#10b981" /> : <FileCode size={13} />}
+                      {copiedType === "md" ? <Check size={13} style={{ color: "var(--accent)" }} /> : <FileCode size={13} />}
                       <span>{copiedType === "md" ? "已复制" : "Markdown"}</span>
                     </Button>
                   </div>

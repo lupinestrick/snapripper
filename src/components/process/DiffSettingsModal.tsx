@@ -105,6 +105,7 @@ export function DiffSettingsModal({
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
           }}
         >
           {/* Header */}
@@ -119,7 +120,7 @@ export function DiffSettingsModal({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <SlidersHorizontal size={16} color="var(--accent-default)" />
+              <SlidersHorizontal size={16} style={{ color: "var(--accent)" }} />
               <Dialog.Title style={{ fontSize: "0.95rem", fontWeight: 600 }}>处理与整理设置</Dialog.Title>
             </div>
             <Dialog.CloseTrigger asChild>
@@ -210,7 +211,7 @@ export function DiffSettingsModal({
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => handleTogglePanelSelect(p.id)}
-                          style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
+                          style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                         />
                         <span>{p.name || p.id}</span>
                       </label>
@@ -240,7 +241,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localExemptPinned}
                     onChange={(e) => setLocalExemptPinned(e.target.checked)}
-                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                   />
                   <span>豁免固定标签</span>
                 </label>
@@ -259,7 +260,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localExemptInternal}
                     onChange={(e) => setLocalExemptInternal(e.target.checked)}
-                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                   />
                   <span>豁免关于与内建页</span>
                 </label>
@@ -278,7 +279,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localPreserveSubtrees}
                     onChange={(e) => setLocalPreserveSubtrees(e.target.checked)}
-                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                   />
                   <span>保持子树完整性</span>
                 </label>
@@ -297,7 +298,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localTreatGroupAsUnit}
                     onChange={(e) => setLocalTreatGroupAsUnit(e.target.checked)}
-                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                   />
                   <span>原有 Group 视为整体</span>
                 </label>
@@ -317,7 +318,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localCascade}
                     onChange={(e) => setLocalCascade(e.target.checked)}
-                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                   />
                   <span>勾选标签时默认级联包含子标签</span>
                 </label>
@@ -327,7 +328,7 @@ export function DiffSettingsModal({
             {/* 3. Domain Merge Scheme */}
             <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.5rem" }}>
-                <Globe size={14} color="var(--accent-default)" />
+                <Globe size={14} style={{ color: "var(--accent)" }} />
                 <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-main)" }}>
                   同域名合并方案
                 </label>

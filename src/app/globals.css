@@ -1,6 +1,18 @@
 @layer reset, base, tokens, recipes, utilities;
 
-/* Default Theme: Park UI Light (Crimson + Neutral) */
+/* 
+ * ==============================================================================
+ * THEME SPECIFICATIONS (7 THEMES)
+ * 1. park-light (Default): Park UI Crimson Light
+ * 2. park-dark: Park UI Crimson Dark
+ * 3. midnight: Classic Midnight Slate & Blue
+ * 4. nord-snow-storm: Nord Snow Storm (Arctic Light)
+ * 5. rose-pine-dawn: Rosé Pine Dawn (Warm Pastel Light)
+ * 6. nord-dark: Nord Frost Dark (Arctic Dark)
+ * 7. catppuccin-mocha: Catppuccin Mocha (Soothing Pastel Dark)
+ * ==============================================================================
+ */
+
 :root,
 [data-theme="park-light"] {
   color-scheme: light;
@@ -17,7 +29,7 @@
   /* Borders */
   --border-base: #e8e8e8;
   --border-subtle: #e0e0e0;
-  --border-card: #d4d4d4;
+  --border-card: #cecece;
   --border-focus: #e93d82;
 
   /* Texts */
@@ -75,7 +87,7 @@
   --text-main: #eeeeee;
   --text-muted: #9e9e9e;
 
-  /* Accents (Park UI Crimson) */
+  /* Accents (Park UI Crimson Dark) */
   --accent: #e93d82;
   --accent-solid: #e93d82;
   --accent-hover: #ee518a;
@@ -155,12 +167,11 @@
   --scrollbar-hover: #475569;
 }
 
-/* Nord Snow Storm Theme (Light) */
 [data-theme="nord-snow-storm"] {
   color-scheme: light;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Backgrounds */
+  /* Backgrounds (Nord Snow Storm Light) */
   --bg-canvas: #eceff4;
   --bg-primary: #e5e9f0;
   --bg-surface: #ffffff;
@@ -178,26 +189,26 @@
   --text-main: #2e3440;
   --text-muted: #4c566a;
 
-  /* Accents (Nord Frost Dark Blue) */
+  /* Accents (Nord Frost Blue) */
   --accent: #5e81ac;
   --accent-solid: #5e81ac;
-  --accent-hover: #4c6f98;
+  --accent-hover: #81a1c1;
   --accent-subtle: rgba(94, 129, 172, 0.14);
   --accent-subtle-hover: rgba(94, 129, 172, 0.22);
   --accent-border: rgba(94, 129, 172, 0.35);
-  --accent-text: #434c5e;
+  --accent-text: #5e81ac;
   --accent-fg: #ffffff;
 
   /* System Feedback */
   --danger: #bf616a;
-  --danger-hover: #a54b54;
+  --danger-hover: #ab5159;
   --success: #a3be8c;
   --warning: #ebcb8b;
 
   /* Buttons */
   --radius-btn: 6px;
   --btn-outline-bg: #ffffff;
-  --btn-outline-hover-bg: #eceff4;
+  --btn-outline-hover-bg: #e5e9f0;
   --btn-outline-border: #d8dee9;
   --btn-outline-hover-border: #81a1c1;
   --btn-ghost-hover: rgba(46, 52, 64, 0.06);
@@ -207,64 +218,62 @@
   --scrollbar-hover: #cbd5e1;
 }
 
-/* Rosé Pine Dawn Theme (Light) */
 [data-theme="rose-pine-dawn"] {
   color-scheme: light;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Backgrounds */
+  /* Backgrounds (Rosé Pine Dawn Warm Pastel Light) */
   --bg-canvas: #faf4ed;
-  --bg-primary: #f2e9e1;
+  --bg-primary: #fffaf3;
   --bg-surface: #fffaf3;
   --bg-card: #ffffff;
-  --bg-subtle: #f4ede8;
-  --bg-hover: #eae0d7;
+  --bg-subtle: #f2e9e1;
+  --bg-hover: #ebe1d7;
 
   /* Borders */
-  --border-base: #e4ded8;
-  --border-subtle: #dfdad5;
-  --border-card: #d5cfc9;
-  --border-focus: #b4637a;
+  --border-base: #dfdad9;
+  --border-subtle: #dfdad9;
+  --border-card: #d4cfce;
+  --border-focus: #d7827e;
 
   /* Texts */
   --text-main: #575279;
   --text-muted: #797593;
 
-  /* Accents (Rose Pine Rose) */
-  --accent: #b4637a;
-  --accent-solid: #b4637a;
-  --accent-hover: #9d4f66;
-  --accent-subtle: rgba(180, 99, 122, 0.14);
-  --accent-subtle-hover: rgba(180, 99, 122, 0.22);
-  --accent-border: rgba(180, 99, 122, 0.35);
+  /* Accents (Rosé Pine Rose) */
+  --accent: #d7827e;
+  --accent-solid: #d7827e;
+  --accent-hover: #b4637a;
+  --accent-subtle: rgba(215, 130, 126, 0.16);
+  --accent-subtle-hover: rgba(215, 130, 126, 0.26);
+  --accent-border: rgba(215, 130, 126, 0.38);
   --accent-text: #b4637a;
   --accent-fg: #ffffff;
 
   /* System Feedback */
   --danger: #b4637a;
-  --danger-hover: #9d4f66;
+  --danger-hover: #9c4f64;
   --success: #286983;
   --warning: #ea9d34;
 
   /* Buttons */
   --radius-btn: 6px;
-  --btn-outline-bg: #fffaf3;
+  --btn-outline-bg: #ffffff;
   --btn-outline-hover-bg: #f2e9e1;
-  --btn-outline-border: #dfdad5;
-  --btn-outline-hover-border: #b4637a;
+  --btn-outline-border: #dfdad9;
+  --btn-outline-hover-border: #d7827e;
   --btn-ghost-hover: rgba(87, 82, 121, 0.06);
 
   /* Scrollbar */
-  --scrollbar-thumb: #dfdad5;
-  --scrollbar-hover: #cecac5;
+  --scrollbar-thumb: #dfdad9;
+  --scrollbar-hover: #cecacd;
 }
 
-/* Nord Dark Theme */
 [data-theme="nord-dark"] {
   color-scheme: dark;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Backgrounds */
+  /* Backgrounds (Nord Dark Arctic Deep) */
   --bg-canvas: #242933;
   --bg-primary: #2e3440;
   --bg-surface: #3b4252;
@@ -273,7 +282,7 @@
   --bg-hover: #4c566a;
 
   /* Borders */
-  --border-base: #3b4252;
+  --border-base: #434c5e;
   --border-subtle: #434c5e;
   --border-card: #4c566a;
   --border-focus: #88c0d0;
@@ -311,23 +320,22 @@
   --scrollbar-hover: #4c566a;
 }
 
-/* Catppuccin Mocha Theme (Dark) */
 [data-theme="catppuccin-mocha"] {
   color-scheme: dark;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Backgrounds */
-  --bg-canvas: #1e1e2e;
+  /* Backgrounds (Catppuccin Mocha Crust / Mantle / Base) */
+  --bg-canvas: #11111b;
   --bg-primary: #181825;
-  --bg-surface: #181825;
-  --bg-card: #252538;
+  --bg-surface: #1e1e2e;
+  --bg-card: #1e1e2e;
   --bg-subtle: #313244;
   --bg-hover: #45475a;
 
   /* Borders */
   --border-base: #313244;
-  --border-subtle: #45475a;
-  --border-card: #585b70;
+  --border-subtle: #313244;
+  --border-card: #45475a;
   --border-focus: #cba6f7;
 
   /* Texts */
@@ -337,7 +345,7 @@
   /* Accents (Catppuccin Mauve) */
   --accent: #cba6f7;
   --accent-solid: #cba6f7;
-  --accent-hover: #b48ead;
+  --accent-hover: #b4befe;
   --accent-subtle: rgba(203, 166, 247, 0.18);
   --accent-subtle-hover: rgba(203, 166, 247, 0.28);
   --accent-border: rgba(203, 166, 247, 0.4);
@@ -352,7 +360,7 @@
 
   /* Buttons */
   --radius-btn: 6px;
-  --btn-outline-bg: #252538;
+  --btn-outline-bg: #1e1e2e;
   --btn-outline-hover-bg: #313244;
   --btn-outline-border: #45475a;
   --btn-outline-hover-border: #cba6f7;

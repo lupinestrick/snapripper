@@ -94,9 +94,9 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
           <div
             style={{
               padding: "0.75rem 1rem",
-              backgroundColor: "#0f172a",
+              backgroundColor: "var(--bg-subtle)",
               borderRadius: "0.5rem",
-              border: "1px solid #334155",
+              border: "1px solid var(--border-subtle)",
               marginBottom: "1rem",
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
@@ -105,21 +105,21 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
             }}
           >
             <div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>整理后标签</div>
-              <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#38bdf8" }}>{allTabs.length}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>整理后标签</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent)" }}>{allTabs.length}</div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>顶层分组/子树</div>
-              <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f8fafc" }}>{rootNodes.length}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>顶层分组/子树</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-main)" }}>{rootNodes.length}</div>
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>面板数量</div>
-              <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f8fafc" }}>{panels.length}</div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>面板数量</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--text-main)" }}>{panels.length}</div>
             </div>
           </div>
 
           <div style={{ marginBottom: "1rem" }}>
-            <label style={{ fontSize: "0.8rem", color: "#94a3b8", display: "block", marginBottom: "0.3rem" }}>
+            <label style={{ fontSize: "0.8rem", color: "var(--text-muted)", display: "block", marginBottom: "0.3rem" }}>
               保存文件名:
             </label>
             <Input
@@ -132,16 +132,16 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
           <div
             style={{
               padding: "0.75rem",
-              backgroundColor: "rgba(56, 189, 248, 0.08)",
+              backgroundColor: "var(--accent-subtle)",
               borderRadius: "0.375rem",
-              border: "1px solid rgba(56, 189, 248, 0.2)",
+              border: "1px solid var(--border-subtle)",
               marginBottom: "1.25rem",
               fontSize: "0.78rem",
-              color: "#94a3b8",
+              color: "var(--text-muted)",
               lineHeight: 1.5,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", color: "#38bdf8", fontWeight: 600, marginBottom: "0.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", color: "var(--accent)", fontWeight: 600, marginBottom: "0.25rem" }}>
               <Info size={14} />
               如何将快照导入 Firefox Sidebery:
             </div>
@@ -178,7 +178,6 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
               size="sm"
               pill
               onClick={onClose}
-              style={{ borderColor: "#334155", color: "#94a3b8" }}
             >
               关闭
             </Button>
@@ -187,10 +186,6 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
               size="sm"
               pill
               onClick={handleDownload}
-              style={{
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-              }}
             >
               <Download size={14} />
               <span>立即下载快照 JSON</span>

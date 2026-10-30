@@ -15,14 +15,14 @@ const THEME_OPTIONS: { id: AppTheme; name: string; subtitle: string; icon: React
   {
     id: "park-light",
     name: "Park UI 浅色",
-    subtitle: "Crimson + Neutral (默认)",
+    subtitle: "Crimson & Neutral Light",
     icon: <Sun size={13} />,
     previewDot: "#e93d82",
   },
   {
     id: "park-dark",
     name: "Park UI 深色",
-    subtitle: "Crimson + Neutral Dark",
+    subtitle: "Crimson & Neutral Dark",
     icon: <Sparkles size={13} />,
     previewDot: "#e93d82",
   },
@@ -36,30 +36,30 @@ const THEME_OPTIONS: { id: AppTheme; name: string; subtitle: string; icon: React
   {
     id: "nord-snow-storm",
     name: "Nord Snow Storm",
-    subtitle: "北欧雪暴 浅色",
+    subtitle: "Polar White & Frost",
     icon: <Sun size={13} />,
-    previewDot: "#5e81ac",
+    previewDot: "#88c0d0",
   },
   {
     id: "rose-pine-dawn",
     name: "Rosé Pine Dawn",
-    subtitle: "晨曦玫瑰 浅色",
+    subtitle: "Warm Rosé & Pine",
     icon: <Sun size={13} />,
-    previewDot: "#b4637a",
+    previewDot: "#d7827e",
   },
   {
     id: "nord-dark",
     name: "Nord Dark",
-    subtitle: "北极暗夜 深色",
+    subtitle: "Nordic Frost & Night",
     icon: <Moon size={13} />,
     previewDot: "#88c0d0",
   },
   {
     id: "catppuccin-mocha",
     name: "Catppuccin Mocha",
-    subtitle: "猫普契诺 摩卡深色",
-    icon: <Sparkles size={13} />,
-    previewDot: "#cba6f7",
+    subtitle: "Mocha & Pastel",
+    icon: <Moon size={13} />,
+    previewDot: "#f5c2e7",
   },
 ];
 
@@ -87,7 +87,7 @@ export function TopNav({ onOpenExport }: TopNavProps) {
     };
   }, [themeMenuOpen]);
 
-  const currentTheme = THEME_OPTIONS.find((t) => t.id === (theme || "park-light")) || THEME_OPTIONS[0];
+  const currentTheme = THEME_OPTIONS.find((t) => t.id === theme) || THEME_OPTIONS[0];
 
   return (
     <>
@@ -189,7 +189,7 @@ export function TopNav({ onOpenExport }: TopNavProps) {
                 </div>
 
                 {THEME_OPTIONS.map((item) => {
-                  const isActive = (theme || "midnight") === item.id;
+                  const isActive = (theme || "park-light") === item.id;
                   return (
                     <button
                       key={item.id}

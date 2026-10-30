@@ -99,6 +99,7 @@ export function AppSidebar() {
           })}
           <Button
             size="xs"
+            variant="ghost"
             onClick={() => setOverviewOpen(true)}
             style={{
               padding: "4px 8px",
@@ -123,8 +124,8 @@ export function AppSidebar() {
         style={{
           width: isCompact ? "64px" : "210px",
           transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-          backgroundColor: "var(--bg-primary)",
-          borderRight: "1px solid var(--border-base)",
+          backgroundColor: "var(--bg-surface)",
+          borderRight: "1px solid var(--border-subtle)",
           display: "flex",
           flexDirection: "column",
           flexShrink: 0,
@@ -141,7 +142,7 @@ export function AppSidebar() {
             display: "flex",
             alignItems: "center",
             justifyContent: isCompact ? "center" : "space-between",
-            borderBottom: "1px solid var(--border-base)",
+            borderBottom: "1px solid var(--border-subtle)",
           }}
         >
           {!isCompact ? (
@@ -150,7 +151,7 @@ export function AppSidebar() {
                 style={{
                   width: "26px",
                   height: "26px",
-                  borderRadius: "var(--radius-btn, 6px)",
+                  borderRadius: "9999px",
                   backgroundColor: "var(--accent-solid)",
                   display: "flex",
                   alignItems: "center",
@@ -171,7 +172,7 @@ export function AppSidebar() {
               style={{
                 width: "26px",
                 height: "26px",
-                borderRadius: "var(--radius-btn, 6px)",
+                borderRadius: "9999px",
                 backgroundColor: "var(--accent-solid)",
                 display: "flex",
                 alignItems: "center",
@@ -195,7 +196,7 @@ export function AppSidebar() {
                 width: "24px",
                 height: "24px",
                 padding: 0,
-                color: "#94a3b8",
+                color: "var(--text-muted)",
               }}
               title="折叠侧边栏"
             >
@@ -215,7 +216,7 @@ export function AppSidebar() {
                 width: "28px",
                 height: "28px",
                 padding: 0,
-                color: "#94a3b8",
+                color: "var(--text-muted)",
               }}
               title="展开侧边栏"
             >
@@ -239,12 +240,9 @@ export function AppSidebar() {
                   justifyContent: isCompact ? "center" : "flex-start",
                   gap: "0.65rem",
                   padding: isCompact ? "0.55rem 0" : "0.5rem 0.75rem",
-                  backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
-                  borderColor: isActive ? "var(--accent-border)" : "transparent",
-                  color: isActive ? "var(--accent-text)" : "var(--text-muted)",
-                  fontWeight: isActive ? 600 : 500,
                   fontSize: "0.825rem",
                   width: "100%",
+                  color: isActive ? "#ffffff" : "var(--text-muted)",
                 }}
                 title={isCompact ? item.label : undefined}
               >
@@ -262,16 +260,19 @@ export function AppSidebar() {
           <div style={{ padding: "0.75rem" }}>
             {!isCompact ? (
               <Button
+                variant="outline"
                 onClick={() => setOverviewOpen(true)}
                 style={{
                   width: "100%",
                   padding: "0.6rem 0.75rem",
-                  borderRadius: "var(--radius-btn, 8px)",
+                  borderRadius: "0.75rem",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "stretch",
                   gap: "0.25rem",
                   textAlign: "left",
+                  backgroundColor: "var(--bg-subtle)",
+                  borderColor: "var(--border-subtle)",
                 }}
                 title="查看概览数据"
               >
@@ -286,17 +287,20 @@ export function AppSidebar() {
               </Button>
             ) : (
               <Button
+                variant="outline"
                 onClick={() => setOverviewOpen(true)}
                 style={{
                   width: "100%",
                   padding: "0.5rem 0",
                   flexDirection: "column",
                   gap: "2px",
+                  backgroundColor: "var(--bg-subtle)",
+                  borderColor: "var(--border-subtle)",
                 }}
                 title="查看概览数据"
               >
                 <BarChart2 size={15} style={{ color: "var(--accent)" }} />
-                <span style={{ fontSize: "0.65rem", fontWeight: 700 }}>{totalTabs}</span>
+                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-main)" }}>{totalTabs}</span>
               </Button>
             )}
           </div>

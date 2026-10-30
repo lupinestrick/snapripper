@@ -14,7 +14,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         className={`${classes} ${className}`}
         style={{
           borderRadius: pill ? "9999px" : "var(--radius-btn, 6px)",
-          backgroundColor: "var(--bg-subtle)",
+          backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-subtle)",
           color: "var(--text-main)",
           padding: "0.35rem 0.85rem",

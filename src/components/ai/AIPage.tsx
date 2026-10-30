@@ -20,6 +20,8 @@ export function AIPage() {
     setAiThresholds,
     preserveSubtrees,
     setPreserveSubtrees,
+    cascadeSelectChildren,
+    setCascadeSelectChildren,
   } = useConfigStore();
 
   const {
@@ -71,8 +73,8 @@ export function AIPage() {
           <div
             style={{
               padding: "0.35rem 0.8rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-card)",
+              borderRadius: "9999px",
+              backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
               fontSize: "0.75rem",
               color: "var(--text-muted)",
@@ -83,7 +85,7 @@ export function AIPage() {
           >
             <span>接口:</span>
             <strong style={{ color: "var(--accent)" }}>{currentProviderDef.name}</strong>
-            <span style={{ color: "var(--text-muted)" }}>({aiConfig.model || currentProviderDef.model})</span>
+            <span style={{ color: "var(--text-muted)", opacity: 0.8 }}>({aiConfig.model || currentProviderDef.model})</span>
           </div>
 
           <Button
@@ -101,7 +103,7 @@ export function AIPage() {
       <div
         style={{
           padding: "1.5rem",
-          borderRadius: "var(--radius-btn, 8px)",
+          borderRadius: "1rem",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
           marginBottom: "2rem",
@@ -117,7 +119,7 @@ export function AIPage() {
           <div
             style={{
               padding: "1rem",
-              borderRadius: "var(--radius-btn, 6px)",
+              borderRadius: "0.75rem",
               backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
             }}
@@ -147,7 +149,7 @@ export function AIPage() {
           <div
             style={{
               padding: "1rem",
-              borderRadius: "var(--radius-btn, 6px)",
+              borderRadius: "0.75rem",
               backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
             }}
@@ -174,11 +176,11 @@ export function AIPage() {
           </div>
         </div>
 
-        {/* Interaction options */}
+        {/* Interaction checkboxes */}
         <div style={{ paddingTop: "0.5rem" }}>
           <label
             style={{
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
               gap: "0.6rem",
               cursor: "pointer",
@@ -200,7 +202,8 @@ export function AIPage() {
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginTop: "1.5rem", borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem" }}>
           <Button
             variant="solid"
-            size="sm"
+            size="xs"
+            pill
             onClick={handleStartAnalysis}
             disabled={isAnalyzing}
           >

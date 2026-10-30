@@ -90,12 +90,12 @@ export function DiffHopupModal({
               <Dialog.Title>Diff 变更确认</Dialog.Title>
               <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                 {totalDeduped > 0 && (
-                  <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(239, 68, 68, 0.15)", color: "#ef4444" }}>
+                  <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(239, 68, 68, 0.15)", color: "#f87171" }}>
                     去重 -{totalDeduped}
                   </Badge>
                 )}
                 {totalGroupsCreated > 0 && (
-                  <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
+                  <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#34d399" }}>
                     分组 +{totalGroupsCreated}
                   </Badge>
                 )}
@@ -217,7 +217,7 @@ export function DiffHopupModal({
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
-                backgroundColor: "var(--bg-card)",
+                backgroundColor: "var(--bg-canvas)",
               }}
             >
               <div
@@ -248,7 +248,7 @@ export function DiffHopupModal({
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
-                backgroundColor: "var(--bg-card)",
+                backgroundColor: "var(--bg-canvas)",
               }}
             >
               <div
@@ -261,7 +261,7 @@ export function DiffHopupModal({
                   alignItems: "center",
                   fontSize: "0.8rem",
                   fontWeight: 600,
-                  color: "var(--accent-default)",
+                  color: "var(--accent-text)",
                 }}
               >
                 <span>{viewMode === "git" ? "变更差分(+ / -)" : "处理后结构"}</span>
@@ -355,7 +355,7 @@ function DiffNodeItem({ node, isBefore }: { node: TabTreeNode; isBefore: boolean
         }}
       >
         {isGroup && (
-          <span style={{ padding: "1px 6px", borderRadius: "9999px", backgroundColor: "var(--bg-surface)", border: "1px solid var(--border-subtle)", fontSize: "0.65rem", color: "var(--text-muted)" }}>
+          <span style={{ padding: "1px 6px", borderRadius: "9999px", backgroundColor: "var(--bg-card)", border: "1px solid var(--border-subtle)", fontSize: "0.65rem", color: "var(--text-muted)" }}>
             Group
           </span>
         )}
@@ -394,7 +394,7 @@ function GitDiffView({
 
   if (!hasChanges) {
     return (
-      <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+      <div style={{ padding: "2rem", textAlign: "center", color: "#64748b", fontSize: "0.85rem" }}>
         该面板在此操作下无增删变更 (标签数保持: {afterTabsCount})
       </div>
     );
@@ -405,7 +405,7 @@ function GitDiffView({
       {/* Removed Tabs (Red -) */}
       {removedTabs.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#ef4444", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#f87171", display: "flex", alignItems: "center", gap: "0.3rem" }}>
             <span>- 移除 / 去重标签 ({removedTabs.length})</span>
           </div>
           {removedTabs.map((tab) => {
@@ -421,7 +421,7 @@ function GitDiffView({
                   borderRadius: "0.375rem",
                   backgroundColor: "rgba(239, 68, 68, 0.12)",
                   border: "1px solid rgba(239, 68, 68, 0.3)",
-                  color: "#ef4444",
+                  color: "#fca5a5",
                   fontSize: "0.78rem",
                 }}
               >
@@ -443,7 +443,7 @@ function GitDiffView({
       {/* Newly Created Groups (Green +) */}
       {newGroups.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", marginTop: removedTabs.length > 0 ? "0.6rem" : "0" }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#10b981", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#34d399", display: "flex", alignItems: "center", gap: "0.3rem" }}>
             <span>+ 新建分组及归类 ({newGroups.length} 个组)</span>
           </div>
           {newGroups.map((group) => (
@@ -463,7 +463,7 @@ function GitDiffView({
                   gap: "0.4rem",
                   padding: "0.35rem 0.6rem",
                   backgroundColor: "rgba(16, 185, 129, 0.15)",
-                  color: "#10b981",
+                  color: "#34d399",
                   fontSize: "0.8rem",
                   fontWeight: 600,
                 }}
@@ -484,10 +484,10 @@ function GitDiffView({
                         alignItems: "center",
                         gap: "0.4rem",
                         fontSize: "0.75rem",
-                        color: "var(--text-main)",
+                        color: "#cbd5e1",
                       }}
                     >
-                      <span style={{ color: "#10b981", fontSize: "0.7rem" }}>↳</span>
+                      <span style={{ color: "#34d399", fontSize: "0.7rem" }}>↳</span>
                       <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {child.tab.title || child.tab.url}
                       </span>

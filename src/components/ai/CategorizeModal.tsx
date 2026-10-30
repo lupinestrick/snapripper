@@ -90,11 +90,11 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
                   width: "36px",
                   height: "36px",
                   borderRadius: "9999px",
-                  backgroundColor: "rgba(56, 189, 248, 0.15)",
+                  backgroundColor: "var(--accent-subtle)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#38bdf8",
+                  color: "var(--accent)",
                 }}
               >
                 <Sparkles size={18} />
@@ -110,7 +110,7 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
               size="xs"
               pill
               onClick={onClose}
-              style={{ color: "#94a3b8", padding: "4px" }}
+              style={{ color: "var(--text-muted)", padding: "4px" }}
               title="关闭"
             >
               <X size={18} />
@@ -124,8 +124,8 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
               style={{
                 padding: "1rem",
                 borderRadius: "0.75rem",
-                border: restructureMode === "tree" ? "2px solid #38bdf8" : "1px solid #334155",
-                backgroundColor: restructureMode === "tree" ? "rgba(56, 189, 248, 0.08)" : "#0f172a",
+                border: restructureMode === "tree" ? "2px solid var(--accent-solid)" : "1px solid var(--border-subtle)",
+                backgroundColor: restructureMode === "tree" ? "var(--accent-subtle)" : "var(--bg-subtle)",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "flex-start",
@@ -133,12 +133,12 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
                 transition: "all 0.15s ease",
               }}
             >
-              <FolderTree size={20} color={restructureMode === "tree" ? "#38bdf8" : "#94a3b8"} style={{ marginTop: "2px" }} />
+              <FolderTree size={20} style={{ marginTop: "2px", color: restructureMode === "tree" ? "var(--accent-text)" : "var(--text-muted)" }} />
               <div>
-                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#f8fafc" }}>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-main)" }}>
                   生成树形目录（创建分类 Group 组）
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
                   在当前面板内创建对应类别的 Group 标签，并将同类标签移入作为子标签。保持子树整体。
                 </div>
               </div>
@@ -149,8 +149,8 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
               style={{
                 padding: "1rem",
                 borderRadius: "0.75rem",
-                border: restructureMode === "panel" ? "2px solid #38bdf8" : "1px solid #334155",
-                backgroundColor: restructureMode === "panel" ? "rgba(56, 189, 248, 0.08)" : "#0f172a",
+                border: restructureMode === "panel" ? "2px solid var(--accent-solid)" : "1px solid var(--border-subtle)",
+                backgroundColor: restructureMode === "panel" ? "var(--accent-subtle)" : "var(--bg-subtle)",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "flex-start",
@@ -158,12 +158,12 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
                 transition: "all 0.15s ease",
               }}
             >
-              <PanelsTopLeft size={20} color={restructureMode === "panel" ? "#38bdf8" : "#94a3b8"} style={{ marginTop: "2px" }} />
+              <PanelsTopLeft size={20} style={{ marginTop: "2px", color: restructureMode === "panel" ? "var(--accent-text)" : "var(--text-muted)" }} />
               <div>
-                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#f8fafc" }}>
+                <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-main)" }}>
                   分割为独立面板（创建侧边栏 Panels）
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
                   为每个主题分类新建一个独立的侧边栏面板，将同类标签移入对应面板中，适合按领域彻底隔离。
                 </div>
               </div>
@@ -173,14 +173,14 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
           {/* Progress bar */}
           {isClassifying && (
             <div style={{ marginBottom: "1.25rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "#38bdf8", marginBottom: "0.35rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--accent-text)", marginBottom: "0.35rem" }}>
                 <span>AI 正在逐批归类标签...</span>
                 <span>
                   {classificationProgress.current} / {classificationProgress.total} ({percent}%)
                 </span>
               </div>
-              <div style={{ width: "100%", height: "6px", backgroundColor: "#0f172a", borderRadius: "9999px", overflow: "hidden" }}>
-                <div style={{ width: `${percent}%`, height: "100%", backgroundColor: "#38bdf8", transition: "width 0.2s ease" }} />
+              <div style={{ width: "100%", height: "6px", backgroundColor: "var(--bg-subtle)", borderRadius: "9999px", overflow: "hidden" }}>
+                <div style={{ width: `${percent}%`, height: "100%", backgroundColor: "var(--accent-solid)", transition: "width 0.2s ease" }} />
               </div>
             </div>
           )}
@@ -198,7 +198,6 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
               size="sm"
               onClick={onClose}
               disabled={isClassifying}
-              style={{ borderColor: "#334155", color: "#94a3b8" }}
             >
               取消
             </Button>
@@ -207,7 +206,6 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
               size="sm"
               onClick={handleExecute}
               disabled={isClassifying}
-              style={{ backgroundColor: isClassifying ? "#334155" : "#2563eb", color: "#fff" }}
             >
               {isClassifying ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
               <span>{isClassifying ? "正在重组..." : "确认并执行重构"}</span>

@@ -37,13 +37,13 @@ export function StatsHeader() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-        <GitFork size={14} color="#10b981" />
+        <GitFork size={14} style={{ color: "var(--accent)" }} />
         <span>顶级/子树:</span>
         <strong style={{ color: "var(--text-main)" }}>{rootNodes.length}</strong>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-        <Pin size={14} color="#f59e0b" />
+        <Pin size={14} style={{ color: "var(--accent)" }} />
         <span>置顶固定:</span>
         <strong style={{ color: "var(--text-main)" }}>{pinnedTabs}</strong>
       </div>
@@ -53,9 +53,9 @@ export function StatsHeader() {
           onClick={() => setOnlyDuplicates(!onlyDuplicates)}
           style={{
             padding: "0.2rem 0.65rem",
-            borderColor: onlyDuplicates ? "var(--danger)" : "var(--btn-outline-border)",
-            backgroundColor: onlyDuplicates ? "rgba(229, 72, 77, 0.15)" : "var(--btn-outline-bg)",
-            color: onlyDuplicates ? "var(--danger)" : "var(--text-muted)",
+            borderColor: onlyDuplicates ? "rgba(239, 68, 68, 0.4)" : "var(--border-subtle)",
+            backgroundColor: onlyDuplicates ? "rgba(239, 68, 68, 0.15)" : "var(--bg-subtle)",
+            color: onlyDuplicates ? "#ef4444" : "var(--text-muted)",
           }}
         >
           <Copy size={12} />
@@ -66,7 +66,7 @@ export function StatsHeader() {
       )}
 
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-        <ShieldCheck size={13} color="#10b981" />
+        <ShieldCheck size={13} style={{ color: "var(--accent)" }} />
         <span>本地纯前端沙盒运算</span>
       </div>
     </div>

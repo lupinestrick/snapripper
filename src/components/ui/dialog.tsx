@@ -75,8 +75,8 @@ export const Dialog = {
           style={{
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-card)",
-            borderRadius: "var(--radius-btn, 12px)",
-            boxShadow: "0 20px 45px rgba(0, 0, 0, 0.3)",
+            borderRadius: "var(--radius-btn, 8px)",
+            boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.3)",
             overflow: "hidden",
             color: "var(--text-main)",
             pointerEvents: "auto",

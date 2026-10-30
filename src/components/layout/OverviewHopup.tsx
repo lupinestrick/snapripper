@@ -64,12 +64,14 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
                 pill
                 onClick={onClose}
                 style={{
+                  width: "32px",
+                  height: "32px",
+                  padding: 0,
                   color: "var(--text-muted)",
-                  padding: "6px",
                 }}
                 title="关闭"
               >
-                <X size={18} />
+                <X size={16} />
               </Button>
             </Dialog.CloseTrigger>
           </div>
@@ -78,26 +80,26 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
             <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
               <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>总标签</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent-default)", marginTop: "0.25rem" }}>{tabs.length}</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{tabs.length}</div>
             </div>
             <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
               <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>面板数</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#10b981", marginTop: "0.25rem" }}>{panelCounts.size}</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{panelCounts.size}</div>
             </div>
             <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
               <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>已有 Group</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#f59e0b", marginTop: "0.25rem" }}>{groupCount}</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{groupCount}</div>
             </div>
             <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
               <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>固定标签</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "#a855f7", marginTop: "0.25rem" }}>{pinnedCount}</div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{pinnedCount}</div>
             </div>
           </div>
 
           {/* Panels Breakdown */}
           <div style={{ marginBottom: "1.5rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-main)" }}>
-              <Layers size={16} color="var(--accent-default)" />
+              <Layers size={16} style={{ color: "var(--accent)" }} />
               <span>面板分布</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
@@ -117,7 +119,7 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
                         style={{
                           height: "100%",
                           width: `${pct}%`,
-                          backgroundColor: "var(--accent-default)",
+                          backgroundColor: "var(--accent-solid)",
                           borderRadius: "9999px",
                         }}
                       />
@@ -131,7 +133,7 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
           {/* Top Domains */}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-main)" }}>
-              <Globe size={16} color="#10b981" />
+              <Globe size={16} style={{ color: "var(--accent)" }} />
               <span>顶级域名分布 (Top 8)</span>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.5rem" }}>
@@ -168,9 +170,6 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
               size="sm"
               pill
               onClick={onClose}
-              style={{
-                padding: "0.5rem 1.5rem",
-              }}
             >
               完成
             </Button>

@@ -27,8 +27,9 @@ export function BatchBar() {
         bottom: "1.5rem",
         left: "50%",
         transform: "translateX(-50%)",
-        backgroundColor: "#111827",
-        border: "1px solid #334155",
+        backgroundColor: "var(--bg-surface)",
+        border: "1px solid var(--border-card)",
+        boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
         borderRadius: "9999px",
         padding: "0.4rem 1rem",
         display: "flex",
@@ -37,11 +38,11 @@ export function BatchBar() {
         zIndex: 50,
       }}
     >
-      <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#38bdf8", padding: "0 0.3rem" }}>
+      <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--accent)", padding: "0 0.3rem" }}>
         已选择 {selectedIds.size} 项
       </div>
 
-      <div style={{ height: "1.2rem", width: "1px", backgroundColor: "#334155" }} />
+      <div style={{ height: "1.2rem", width: "1px", backgroundColor: "var(--border-subtle)" }} />
 
       {/* Delete button */}
       <Button
@@ -82,7 +83,7 @@ export function BatchBar() {
           <Button
             onClick={() => setPanelSelectOpen(!panelSelectOpen)}
             style={{
-              color: "#38bdf8",
+              color: "var(--accent)",
             }}
           >
             <FolderInput size={13} />
@@ -95,8 +96,9 @@ export function BatchBar() {
                 position: "absolute",
                 bottom: "120%",
                 left: 0,
-                backgroundColor: "#111827",
-                border: "1px solid #334155",
+                backgroundColor: "var(--bg-surface)",
+                border: "1px solid var(--border-card)",
+                boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
                 borderRadius: "0.75rem",
                 padding: "0.35rem",
                 display: "flex",
@@ -116,7 +118,7 @@ export function BatchBar() {
                   }}
                   style={{
                     justifyContent: "flex-start",
-                    color: "#f8fafc",
+                    color: "var(--text-main)",
                     fontSize: "0.75rem",
                     padding: "0.35rem 0.6rem",
                   }}
@@ -137,7 +139,7 @@ export function BatchBar() {
           width: "26px",
           height: "26px",
           padding: 0,
-          color: "#64748b",
+          color: "var(--text-muted)",
         }}
         title="清除选择"
       >

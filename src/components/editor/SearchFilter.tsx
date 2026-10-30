@@ -36,20 +36,20 @@ export function SearchFilter() {
         flexWrap: "wrap",
         gap: "0.75rem",
         padding: "0.6rem 1.5rem",
-        backgroundColor: "var(--bg-surface)",
+        backgroundColor: "var(--bg-card)",
         borderBottom: "1px solid var(--border-subtle)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flex: 1, minWidth: "260px" }}>
-        {/* Search bar */}
+        {/* Search bar (pill style) */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: "0.4rem",
             padding: "0.35rem 0.85rem",
-            backgroundColor: "var(--bg-card)",
-            borderRadius: "var(--radius-btn, 6px)",
+            backgroundColor: "var(--bg-subtle)",
+            borderRadius: "9999px",
             border: "1px solid var(--border-subtle)",
             flex: 1,
             maxWidth: "340px",
@@ -74,6 +74,7 @@ export function SearchFilter() {
             <Button
               variant="ghost"
               size="xs"
+              pill
               onClick={() => setSearchQuery("")}
               style={{ color: "var(--text-muted)", padding: "0.1rem", width: "20px", height: "20px" }}
             >
@@ -82,15 +83,15 @@ export function SearchFilter() {
           )}
         </div>
 
-        {/* Panel filter */}
+        {/* Panel filter (pill style) */}
         {panels.length > 0 && (
           <select
             value={panelFilter || ""}
             onChange={(e) => setPanelFilter(e.target.value ? e.target.value : null)}
             style={{
               padding: "0.3rem 0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-card)",
+              borderRadius: "9999px",
+              backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
               color: "var(--text-main)",
               fontSize: "0.75rem",
@@ -107,15 +108,15 @@ export function SearchFilter() {
           </select>
         )}
 
-        {/* Container filter */}
+        {/* Container filter (pill style) */}
         {containers.length > 0 && (
           <select
             value={containerFilter || ""}
             onChange={(e) => setContainerFilter(e.target.value ? e.target.value : null)}
             style={{
               padding: "0.3rem 0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-card)",
+              borderRadius: "9999px",
+              backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
               color: "var(--text-main)",
               fontSize: "0.75rem",
@@ -133,7 +134,7 @@ export function SearchFilter() {
         )}
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons (pill style) */}
       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
         {/* Cascade select children toggle */}
         <label
@@ -141,10 +142,10 @@ export function SearchFilter() {
             display: "flex",
             alignItems: "center",
             gap: "0.35rem",
-            padding: "0.28rem 0.7rem",
-            borderRadius: "var(--radius-btn, 6px)",
-            border: cascadeSelectChildren ? "1px solid var(--accent-border)" : "1px solid var(--btn-outline-border)",
-            backgroundColor: cascadeSelectChildren ? "var(--accent-subtle)" : "var(--btn-outline-bg)",
+            padding: "0.3rem 0.75rem",
+            borderRadius: "9999px",
+            border: cascadeSelectChildren ? "1px solid var(--accent-solid)" : "1px solid var(--border-subtle)",
+            backgroundColor: cascadeSelectChildren ? "var(--accent-subtle)" : "var(--bg-subtle)",
             color: cascadeSelectChildren ? "var(--accent-text)" : "var(--text-muted)",
             fontSize: "0.75rem",
             cursor: "pointer",
@@ -174,9 +175,9 @@ export function SearchFilter() {
           <Button
             onClick={clearSelection}
             style={{
-              backgroundColor: "rgba(229, 72, 77, 0.15)",
-              borderColor: "rgba(229, 72, 77, 0.35)",
-              color: "var(--danger)",
+              backgroundColor: "rgba(239, 68, 68, 0.15)",
+              borderColor: "rgba(239, 68, 68, 0.3)",
+              color: "#f87171",
             }}
           >
             取消选中 ({selectedIds.size})
