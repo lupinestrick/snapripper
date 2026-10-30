@@ -25,9 +25,13 @@ export default function WorkbenchPage() {
 
   // Sync theme with HTML document element
   useEffect(() => {
-    const activeTheme = theme || "midnight";
+    const activeTheme = theme || "park-light";
     document.documentElement.setAttribute("data-theme", activeTheme);
-    if (activeTheme === "park-light") {
+    const isLight =
+      activeTheme === "park-light" ||
+      activeTheme === "nord-snow-storm" ||
+      activeTheme === "rose-pine-dawn";
+    if (isLight) {
       document.documentElement.classList.remove("dark");
       document.documentElement.classList.add("light");
     } else {

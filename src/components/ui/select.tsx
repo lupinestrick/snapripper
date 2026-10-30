@@ -13,10 +13,10 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         ref={ref}
         className={`${classes} ${className}`}
         style={{
-          borderRadius: pill ? "9999px" : "0.5rem",
-          backgroundColor: "#1e293b",
-          border: "1px solid #334155",
-          color: "#f8fafc",
+          borderRadius: pill ? "9999px" : "var(--radius-btn, 6px)",
+          backgroundColor: "var(--bg-subtle)",
+          border: "1px solid var(--border-subtle)",
+          color: "var(--text-main)",
           padding: "0.35rem 0.85rem",
           outline: "none",
           fontSize: "0.8rem",

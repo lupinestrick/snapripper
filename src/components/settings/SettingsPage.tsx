@@ -106,25 +106,53 @@ export function SettingsPage() {
     colors: string[];
   }[] = [
     {
-      id: "midnight",
-      name: "经典暗蓝 (Midnight)",
-      tag: "经典默认",
-      desc: "沉稳暗夜深蓝底色与科技蓝 Accent，专注夜间整理与护眼。",
-      colors: ["#0b0f19", "#1e293b", "#2563eb", "#38bdf8"],
+      id: "park-light",
+      name: "Park UI 浅色 (Crimson Light)",
+      tag: "默认浅色",
+      desc: "Neutral 极净亮白底色，搭配 Park-UI 经典绯红 Crimson 强调色。",
+      colors: ["#fcfcfc", "#ffffff", "#e93d82", "#cb1d63"],
     },
     {
       id: "park-dark",
       name: "Park UI 深色 (Crimson Dark)",
-      tag: "Park-UI 官方深色",
+      tag: "Park-UI 深色",
       desc: "Neutral 深黑灰底色，搭配 Park-UI 经典绯红 Crimson 强调色。",
       colors: ["#111111", "#202020", "#e93d82", "#ff92ad"],
     },
     {
-      id: "park-light",
-      name: "Park UI 浅色 (Crimson Light)",
-      tag: "Park-UI 官方浅色",
-      desc: "Neutral 极净亮白底色，搭配 Park-UI 经典绯红 Crimson 强调色。",
-      colors: ["#fcfcfc", "#ffffff", "#e93d82", "#cb1d63"],
+      id: "midnight",
+      name: "经典暗蓝 (Midnight)",
+      tag: "经典深色",
+      desc: "沉稳暗夜深蓝底色与科技蓝 Accent，专注夜间整理与护眼。",
+      colors: ["#0b0f19", "#1e293b", "#2563eb", "#38bdf8"],
+    },
+    {
+      id: "nord-snow-storm",
+      name: "Nord Snow Storm",
+      tag: "北欧雪暴",
+      desc: "Nord 极光官方雪暴浅色，高对比冷白基调与 Frost 冰蓝点缀。",
+      colors: ["#eceff4", "#ffffff", "#5e81ac", "#81a1c1"],
+    },
+    {
+      id: "rose-pine-dawn",
+      name: "Rosé Pine Dawn",
+      tag: "晨曦玫瑰",
+      desc: "Rosé Pine 极具人文诗意的柔和暖色晨曦白与复古玫瑰粉。",
+      colors: ["#faf4ed", "#fffaf3", "#b4637a", "#ea9d34"],
+    },
+    {
+      id: "nord-dark",
+      name: "Nord Dark",
+      tag: "北极极光",
+      desc: "Nord 标志性 Polar Night 极夜暗色底，搭配北极冰川青蓝 Accent。",
+      colors: ["#242933", "#3b4252", "#88c0d0", "#81a1c1"],
+    },
+    {
+      id: "catppuccin-mocha",
+      name: "Catppuccin Mocha",
+      tag: "猫普契诺 摩卡",
+      desc: "Catppuccin 广受欢迎的 Mocha 深色方案，温暖基底与淡紫 Mauve 强调色。",
+      colors: ["#1e1e2e", "#252538", "#cba6f7", "#89b4fa"],
     },
   ];
 
@@ -153,14 +181,14 @@ export function SettingsPage() {
           <div>
             <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>界面主题与配色方案</h2>
             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-              支持原版经典暗蓝、以及 Park-UI 官方 Neutral 中性灰与 Crimson 绯红色主题。
+              精选 7 种极简专业主题，含 Park-UI Crimson、Nord 极光与 Rosé Pine / Catppuccin。
             </p>
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
           {THEME_CONFIGS.map((t) => {
-            const isSelected = (theme || "midnight") === t.id;
+            const isSelected = (theme || "park-light") === t.id;
             return (
               <div
                 key={t.id}
@@ -184,23 +212,20 @@ export function SettingsPage() {
                     <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>
                       {t.name}
                     </span>
-                    {isSelected && (
-                      <span
-                        style={{
-                          fontSize: "0.7rem",
-                          fontWeight: 600,
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                          backgroundColor: "var(--accent-solid)",
-                          color: "#ffffff",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "3px",
-                        }}
-                      >
-                        <Check size={11} /> 当前使用
-                      </span>
-                    )}
+                    <span
+                      style={{
+                        fontSize: "0.68rem",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        backgroundColor: isSelected ? "var(--accent-solid)" : "var(--bg-card)",
+                        color: isSelected ? "#ffffff" : "var(--text-muted)",
+                        border: "1px solid",
+                        borderColor: isSelected ? "var(--accent-solid)" : "var(--border-subtle)",
+                        fontWeight: isSelected ? 600 : 400,
+                      }}
+                    >
+                      {t.tag}
+                    </span>
                   </div>
                   <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.45 }}>
                     {t.desc}
@@ -208,7 +233,7 @@ export function SettingsPage() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>色板预览:</span>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>色板:</span>
                   <div style={{ display: "flex", gap: "5px" }}>
                     {t.colors.map((c, i) => (
                       <span

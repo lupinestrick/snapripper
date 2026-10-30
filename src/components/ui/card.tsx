@@ -10,9 +10,9 @@ export const Card = {
           ref={ref}
           className={`${classes.root} ${className}`}
           style={{
-            backgroundColor: "#1e293b",
-            border: "1px solid #334155",
-            borderRadius: "1rem",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
+            borderRadius: "var(--radius-btn, 8px)",
             padding: "1.25rem",
             ...style,
           }}
@@ -41,7 +41,7 @@ export const Card = {
         <h3
           ref={ref}
           className={`${classes.title} ${className}`}
-          style={{ fontSize: "1rem", fontWeight: 600, color: "#f8fafc", ...style }}
+          style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)", ...style }}
           {...props}
         />
       );
@@ -54,7 +54,7 @@ export const Card = {
         <p
           ref={ref}
           className={`${classes.description} ${className}`}
-          style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.25rem", ...style }}
+          style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem", ...style }}
           {...props}
         />
       );

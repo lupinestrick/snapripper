@@ -154,11 +154,11 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   width: "36px",
                   height: "36px",
                   borderRadius: "9999px",
-                  backgroundColor: "rgba(56, 189, 248, 0.15)",
+                  backgroundColor: "var(--accent-subtle)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#38bdf8",
+                  color: "var(--accent-default)",
                 }}
               >
                 <FolderArchive size={18} />
@@ -175,7 +175,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 size="xs"
                 pill
                 onClick={onClose}
-                style={{ color: "#94a3b8", padding: "4px" }}
+                style={{ color: "var(--text-muted)", padding: "4px" }}
                 title="关闭"
               >
                 <X size={18} />
@@ -188,19 +188,19 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
             style={{
               padding: "1.25rem",
               borderRadius: "0.85rem",
-              backgroundColor: "#1e293b",
-              border: "1px solid #334155",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
               marginBottom: "1.5rem",
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <FileText size={16} color="#38bdf8" />
-                <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#f8fafc" }}>
+                <FileText size={16} color="var(--accent-default)" />
+                <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>
                   {fileName || "暂未载入快照文件"}
                 </span>
               </div>
-              <Badge variant={rawSnapshot ? "subtle" : "outline"} style={{ color: rawSnapshot ? "#38bdf8" : "#94a3b8" }}>
+              <Badge variant={rawSnapshot ? "subtle" : "outline"} style={{ color: rawSnapshot ? "var(--accent-default)" : "var(--text-muted)" }}>
                 {rawSnapshot ? "已就绪" : "未加载"}
               </Badge>
             </div>
@@ -211,18 +211,18 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 style={{
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #334155",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
                 }}
               >
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
                   配置文件数据大小
                 </div>
-                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#38bdf8" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--accent-default)" }}>
                   {rawFileSize > 0 ? formatBytes(rawFileSize) : "0 B"}
                 </div>
                 {rawFileSize > 0 && (
-                  <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.15rem" }}>
+                  <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                     {rawFileSize.toLocaleString()} 字节
                   </div>
                 )}
@@ -232,17 +232,17 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 style={{
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #334155",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
                 }}
               >
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
                   标签页总数
                 </div>
-                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)" }}>
                   {totalTabs.toLocaleString()} 个
                 </div>
-                <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "0.15rem" }}>
+                <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                   {rootNodes.length} 个顶层根节点
                 </div>
               </div>
@@ -251,14 +251,14 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 style={{
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #334155",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
                 }}
               >
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
                   侧边栏面板 (Panels)
                 </div>
-                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)" }}>
                   {panelCount} 个
                 </div>
               </div>
@@ -267,14 +267,14 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 style={{
                   padding: "0.75rem",
                   borderRadius: "0.5rem",
-                  backgroundColor: "#0f172a",
-                  border: "1px solid #334155",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
                 }}
               >
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.2rem" }}>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
                   容器环境与窗口
                 </div>
-                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#f8fafc" }}>
+                <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)" }}>
                   {containerCount} 容器 / {winCount} 窗口
                 </div>
               </div>
@@ -283,7 +283,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
 
           {/* Section: Import */}
           <div style={{ marginBottom: "1.5rem" }}>
-            <h4 style={{ fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "0.6rem" }}>
+            <h4 style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.6rem" }}>
               导入新快照
             </h4>
             <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
@@ -292,11 +292,6 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 size="xs"
                 pill
                 onClick={() => fileInputRef.current?.click()}
-                style={{
-                  borderColor: "#334155",
-                  backgroundColor: "#1e293b",
-                  color: "#f8fafc",
-                }}
               >
                 <Upload size={13} />
                 <span>从本地上传 JSON</span>
@@ -308,11 +303,6 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                 pill
                 onClick={handleLoadUserSnapshot}
                 disabled={loadingUserSnapshot}
-                style={{
-                  backgroundColor: "rgba(2, 132, 199, 0.15)",
-                  color: "#38bdf8",
-                  borderColor: "#0284c7",
-                }}
               >
                 {loadingUserSnapshot ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />}
                 <span>载入项目样本 (1,174 标签)</span>
@@ -323,7 +313,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
           {/* Section: Export */}
           {rawSnapshot && (
             <div>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "0.6rem" }}>
+              <h4 style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.6rem" }}>
                 导出整理成果
               </h4>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
@@ -331,18 +321,18 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   style={{
                     padding: "0.85rem 1rem",
                     borderRadius: "0.5rem",
-                    backgroundColor: "#1e293b",
-                    border: "1px solid #334155",
+                    backgroundColor: "var(--bg-subtle)",
+                    border: "1px solid var(--border-subtle)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                       导出 Sidebery Snapshot JSON
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                       保留 v5 树形缩进与 Group 组折叠结构，可直接导入 Sidebery
                     </div>
                   </div>
@@ -352,11 +342,6 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                     size="xs"
                     pill
                     onClick={handleExportJSON}
-                    style={{
-                      backgroundColor: "#2563eb",
-                      borderColor: "#3b82f6",
-                      color: "#fff",
-                    }}
                   >
                     <Download size={13} />
                     <span>下载文件</span>
@@ -367,18 +352,18 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   style={{
                     padding: "0.85rem 1rem",
                     borderRadius: "0.5rem",
-                    backgroundColor: "#1e293b",
-                    border: "1px solid #334155",
+                    backgroundColor: "var(--bg-subtle)",
+                    border: "1px solid var(--border-subtle)",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#f8fafc" }}>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
                       快捷复制标签清单
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                       复制所有有效标签为纯网址或 Markdown 链接列表
                     </div>
                   </div>
@@ -386,33 +371,21 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
                   <div style={{ display: "flex", gap: "0.4rem" }}>
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="xs"
+                      pill
                       onClick={() => handleExportUrls("txt")}
-                      style={{
-                        borderColor: "#334155",
-                        backgroundColor: "#0f172a",
-                        color: "#94a3b8",
-                        fontSize: "0.75rem",
-                        padding: "0.3rem 0.75rem",
-                      }}
                     >
-                      {copiedType === "txt" ? <Check size={13} color="#34d399" /> : <Copy size={13} />}
+                      {copiedType === "txt" ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
                       <span>{copiedType === "txt" ? "已复制" : "复制网址"}</span>
                     </Button>
 
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="xs"
+                      pill
                       onClick={() => handleExportUrls("md")}
-                      style={{
-                        borderColor: "#334155",
-                        backgroundColor: "#0f172a",
-                        color: "#94a3b8",
-                        fontSize: "0.75rem",
-                        padding: "0.3rem 0.75rem",
-                      }}
                     >
-                      {copiedType === "md" ? <Check size={13} color="#34d399" /> : <FileCode size={13} />}
+                      {copiedType === "md" ? <Check size={13} color="#10b981" /> : <FileCode size={13} />}
                       <span>{copiedType === "md" ? "已复制" : "Markdown"}</span>
                     </Button>
                   </div>

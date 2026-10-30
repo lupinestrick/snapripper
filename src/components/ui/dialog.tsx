@@ -73,12 +73,12 @@ export const Dialog = {
           ref={ref}
           className={`${classes.content} ${className}`}
           style={{
-            backgroundColor: "#111827",
-            border: "1px solid #334155",
-            borderRadius: "1rem",
-            boxShadow: "none",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
+            borderRadius: "var(--radius-btn, 12px)",
+            boxShadow: "0 20px 45px rgba(0, 0, 0, 0.3)",
             overflow: "hidden",
-            color: "#f8fafc",
+            color: "var(--text-main)",
             pointerEvents: "auto",
             ...style,
           }}
@@ -94,7 +94,7 @@ export const Dialog = {
         <ArkDialog.Title
           ref={ref}
           className={`${classes.title} ${className}`}
-          style={{ fontSize: "1.05rem", fontWeight: 600, color: "#f8fafc", ...style }}
+          style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-main)", ...style }}
           {...props}
         />
       );
@@ -107,7 +107,7 @@ export const Dialog = {
         <ArkDialog.Description
           ref={ref}
           className={`${classes.description} ${className}`}
-          style={{ fontSize: "0.825rem", color: "#94a3b8", marginTop: "0.25rem", ...style }}
+          style={{ fontSize: "0.825rem", color: "var(--text-muted)", marginTop: "0.25rem", ...style }}
           {...props}
         />
       );

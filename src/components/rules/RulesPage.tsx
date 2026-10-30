@@ -116,29 +116,22 @@ export function RulesPage() {
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "#f8fafc" }}>
+    <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "var(--text-main)" }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div>
           <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>规则与成组设置</h1>
-          <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
             匹配域名与关键词自动归类到目标 Group 分组中
           </p>
         </div>
 
-        {/* Action Controls - Compact Oblong Pill Buttons */}
+        {/* Action Controls - Park UI Make It Yours Button Style */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
           <Button
             variant="subtle"
             size="xs"
-            pill
             onClick={() => setIsAIChatOpen(true)}
-            style={{
-              backgroundColor: "rgba(56, 189, 248, 0.1)",
-              borderColor: "#38bdf8",
-              color: "#38bdf8",
-              padding: "0.25rem 0.75rem",
-            }}
           >
             <Sparkles size={13} />
             <span>AI 生成</span>
@@ -147,14 +140,7 @@ export function RulesPage() {
           <Button
             variant="outline"
             size="xs"
-            pill
             onClick={() => fileInputRef.current?.click()}
-            style={{
-              borderColor: "#334155",
-              backgroundColor: "#1e293b",
-              color: "#94a3b8",
-              padding: "0.25rem 0.75rem",
-            }}
           >
             <Upload size={13} />
             <span>导入</span>
@@ -164,14 +150,7 @@ export function RulesPage() {
           <Button
             variant="outline"
             size="xs"
-            pill
             onClick={handleExport}
-            style={{
-              borderColor: "#334155",
-              backgroundColor: "#1e293b",
-              color: "#94a3b8",
-              padding: "0.25rem 0.75rem",
-            }}
           >
             <Download size={13} />
             <span>导出</span>
@@ -180,13 +159,7 @@ export function RulesPage() {
           <Button
             variant="solid"
             size="xs"
-            pill
             onClick={() => setIsAddOpen(true)}
-            style={{
-              backgroundColor: "#2563eb",
-              color: "#fff",
-              padding: "0.25rem 0.85rem",
-            }}
           >
             <Plus size={13} />
             <span>添加规则</span>
@@ -198,9 +171,9 @@ export function RulesPage() {
       <div
         style={{
           padding: "1.25rem",
-          borderRadius: "1rem",
-          backgroundColor: "#1e293b",
-          border: "1px solid #334155",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
           marginBottom: "2rem",
           display: "flex",
           flexDirection: "column",
@@ -209,8 +182,8 @@ export function RulesPage() {
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>已有 Group 视为不可分割整体</div>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+            <div style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--text-main)" }}>已有 Group 视为不可分割整体</div>
+            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
               快照中已建立的 Group 保持为整体，不拆散其子节点
             </div>
           </div>
@@ -218,14 +191,14 @@ export function RulesPage() {
             type="checkbox"
             checked={rulesSettings.treatExistingGroupsAsUnit}
             onChange={(e) => setRulesSettings({ treatExistingGroupsAsUnit: e.target.checked })}
-            style={{ cursor: "pointer", width: 18, height: 18, accentColor: "#2563eb" }}
+            style={{ cursor: "pointer", width: 18, height: 18, accentColor: "var(--accent-solid)" }}
           />
         </div>
 
-        <div style={{ borderTop: "1px solid #334155", paddingTop: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontWeight: 600, fontSize: "0.95rem" }}>默认最小成组阈值</div>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+            <div style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--text-main)" }}>默认最小成组阈值</div>
+            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
               同类标签达到该数量时才创建新 Group 折叠项
             </div>
           </div>
@@ -242,7 +215,7 @@ export function RulesPage() {
                 textAlign: "center",
               }}
             />
-            <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>个标签</span>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>个标签</span>
           </div>
         </div>
       </div>
@@ -252,17 +225,17 @@ export function RulesPage() {
         <div
           style={{
             padding: "1.5rem",
-            borderRadius: "1rem",
-            backgroundColor: "#1e293b",
-            border: "1px solid #38bdf8",
+            borderRadius: "var(--radius-btn, 8px)",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-focus)",
             marginBottom: "2rem",
           }}
         >
-          <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>新建分类规则</h3>
+          <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "1rem" }}>新建分类规则</h3>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                 Group 名称 (如: 🎬 视频流媒体)
               </label>
               <Input
@@ -274,7 +247,7 @@ export function RulesPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                 应用范围
               </label>
               <Select
@@ -289,7 +262,7 @@ export function RulesPage() {
 
             {newRule.scope === "panel" && (
               <div>
-                <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                   目标面板
                 </label>
                 <Select
@@ -308,7 +281,7 @@ export function RulesPage() {
             )}
 
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                 匹配域名 (逗号分隔)
               </label>
               <Input
@@ -320,7 +293,7 @@ export function RulesPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                 标题关键词 (逗号分隔)
               </label>
               <Input
@@ -332,7 +305,7 @@ export function RulesPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                 成组阈值
               </label>
               <Input
@@ -349,18 +322,14 @@ export function RulesPage() {
             <Button
               variant="outline"
               size="xs"
-              pill
               onClick={() => setIsAddOpen(false)}
-              style={{ borderColor: "#475569", color: "#94a3b8" }}
             >
               取消
             </Button>
             <Button
               variant="solid"
               size="xs"
-              pill
               onClick={handleCreateRule}
-              style={{ backgroundColor: "#2563eb", color: "#fff" }}
             >
               保存规则
             </Button>
@@ -371,8 +340,8 @@ export function RulesPage() {
       {/* Rules List */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <h2 style={{ fontSize: "1.1rem", fontWeight: 600 }}>当前规则列表 ({rulesSettings.rules.length})</h2>
-          <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>从上至下优先级匹配</span>
+          <h2 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--text-main)" }}>当前规则列表 ({rulesSettings.rules.length})</h2>
+          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>从上至下优先级匹配</span>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -381,9 +350,9 @@ export function RulesPage() {
               key={rule.id}
               style={{
                 padding: "1rem 1.25rem",
-                borderRadius: "0.75rem",
-                backgroundColor: "#1e293b",
-                border: "1px solid #334155",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-subtle)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -395,7 +364,7 @@ export function RulesPage() {
                   type="checkbox"
                   checked={rule.enabled}
                   onChange={() => toggleRule(rule.id)}
-                  style={{ cursor: "pointer", width: 16, height: 16, accentColor: "#2563eb" }}
+                  style={{ cursor: "pointer", width: 16, height: 16, accentColor: "var(--accent-solid)" }}
                 />
 
                 <span
@@ -403,13 +372,13 @@ export function RulesPage() {
                     width: 12,
                     height: 12,
                     borderRadius: "50%",
-                    backgroundColor: rule.color || "#38bdf8",
+                    backgroundColor: rule.color || "var(--accent)",
                   }}
                 />
 
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ fontWeight: 600, fontSize: "0.95rem" }}>{rule.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--text-main)" }}>{rule.name}</span>
                     <Badge variant="outline" size="sm">
                       {rule.scope === "all" ? "全局" : `面板: ${rule.targetScopeId || "未指定"}`}
                     </Badge>
@@ -418,7 +387,7 @@ export function RulesPage() {
                     </Badge>
                   </div>
 
-                  <div style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                  <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
                     {rule.matchDomain && (
                       <span style={{ marginRight: "1rem" }}>
                         <strong>域名:</strong> {rule.matchDomain}
@@ -437,10 +406,9 @@ export function RulesPage() {
                 <Button
                   variant="ghost"
                   size="xs"
-                  pill
                   onClick={() => handleOpenEdit(rule)}
                   style={{
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     padding: "0.4rem",
                   }}
                   title="编辑规则"
@@ -451,10 +419,9 @@ export function RulesPage() {
                 <Button
                   variant="ghost"
                   size="xs"
-                  pill
                   onClick={() => deleteRule(rule.id)}
                   style={{
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     padding: "0.4rem",
                   }}
                   title="删除规则"
@@ -481,7 +448,7 @@ export function RulesPage() {
                     size="xs"
                     pill
                     onClick={() => setIsEditOpen(false)}
-                    style={{ color: "#94a3b8", padding: "4px" }}
+                    style={{ color: "var(--text-muted)", padding: "4px" }}
                     title="关闭"
                   >
                     <X size={18} />
@@ -491,7 +458,7 @@ export function RulesPage() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                     Group 名称
                   </label>
                   <Input
@@ -503,7 +470,7 @@ export function RulesPage() {
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                   <div>
-                    <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                    <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                       应用范围
                     </label>
                     <Select
@@ -518,7 +485,7 @@ export function RulesPage() {
 
                   {editingRule.scope === "panel" && (
                     <div>
-                      <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                      <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                         目标面板
                       </label>
                       <Select
@@ -538,7 +505,7 @@ export function RulesPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                     匹配域名 (逗号分隔)
                   </label>
                   <Input
@@ -549,7 +516,7 @@ export function RulesPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                     标题关键词 (逗号分隔)
                   </label>
                   <Input
@@ -560,7 +527,7 @@ export function RulesPage() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", color: "#94a3b8", marginBottom: "0.25rem" }}>
+                  <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
                     成组阈值
                   </label>
                   <Input
@@ -580,7 +547,6 @@ export function RulesPage() {
                   size="sm"
                   pill
                   onClick={handleSaveEdit}
-                  style={{ backgroundColor: "#2563eb", color: "#fff" }}
                 >
                   <Check size={14} />
                   <span>保存修改</span>

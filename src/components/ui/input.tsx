@@ -13,14 +13,15 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         className={`${classes} ${className}`}
         style={{
-          backgroundColor: "#0f172a",
-          border: "1px solid #334155",
-          borderRadius: "0.5rem",
-          color: "#f8fafc",
-          padding: "0.5rem 0.75rem",
+          backgroundColor: "var(--bg-subtle)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "var(--radius-btn, 6px)",
+          color: "var(--text-main)",
+          padding: "0.45rem 0.75rem",
           outline: "none",
           width: "100%",
           fontSize: "0.85rem",
+          transition: "border-color 0.15s ease",
           ...style,
         }}
         {...props}

@@ -13,6 +13,20 @@ interface TopNavProps {
 
 const THEME_OPTIONS: { id: AppTheme; name: string; subtitle: string; icon: React.ReactNode; previewDot: string }[] = [
   {
+    id: "park-light",
+    name: "Park UI 浅色",
+    subtitle: "Crimson + Neutral (默认)",
+    icon: <Sun size={13} />,
+    previewDot: "#e93d82",
+  },
+  {
+    id: "park-dark",
+    name: "Park UI 深色",
+    subtitle: "Crimson + Neutral Dark",
+    icon: <Sparkles size={13} />,
+    previewDot: "#e93d82",
+  },
+  {
     id: "midnight",
     name: "经典暗蓝",
     subtitle: "Dark Slate & Blue",
@@ -20,18 +34,32 @@ const THEME_OPTIONS: { id: AppTheme; name: string; subtitle: string; icon: React
     previewDot: "#2563eb",
   },
   {
-    id: "park-dark",
-    name: "Park UI 深色",
-    subtitle: "Crimson & Neutral Dark",
-    icon: <Sparkles size={13} />,
-    previewDot: "#e93d82",
+    id: "nord-snow-storm",
+    name: "Nord Snow Storm",
+    subtitle: "北欧雪暴 浅色",
+    icon: <Sun size={13} />,
+    previewDot: "#5e81ac",
   },
   {
-    id: "park-light",
-    name: "Park UI 浅色",
-    subtitle: "Crimson & Neutral Light",
+    id: "rose-pine-dawn",
+    name: "Rosé Pine Dawn",
+    subtitle: "晨曦玫瑰 浅色",
     icon: <Sun size={13} />,
-    previewDot: "#e93d82",
+    previewDot: "#b4637a",
+  },
+  {
+    id: "nord-dark",
+    name: "Nord Dark",
+    subtitle: "北极暗夜 深色",
+    icon: <Moon size={13} />,
+    previewDot: "#88c0d0",
+  },
+  {
+    id: "catppuccin-mocha",
+    name: "Catppuccin Mocha",
+    subtitle: "猫普契诺 摩卡深色",
+    icon: <Sparkles size={13} />,
+    previewDot: "#cba6f7",
   },
 ];
 
@@ -59,7 +87,7 @@ export function TopNav({ onOpenExport }: TopNavProps) {
     };
   }, [themeMenuOpen]);
 
-  const currentTheme = THEME_OPTIONS.find((t) => t.id === theme) || THEME_OPTIONS[0];
+  const currentTheme = THEME_OPTIONS.find((t) => t.id === (theme || "park-light")) || THEME_OPTIONS[0];
 
   return (
     <>

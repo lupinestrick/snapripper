@@ -7,7 +7,14 @@ import { DomainMergeConfig, DEFAULT_DOMAIN_MERGE_CONFIG } from "@/services/domai
 
 export type AppPage = "workbench" | "process" | "rules" | "ai" | "settings";
 
-export type AppTheme = "midnight" | "park-dark" | "park-light";
+export type AppTheme =
+  | "park-light"
+  | "park-dark"
+  | "midnight"
+  | "nord-snow-storm"
+  | "rose-pine-dawn"
+  | "nord-dark"
+  | "catppuccin-mocha";
 
 export type ProcessScope = "current" | "all" | "selected";
 
@@ -58,7 +65,7 @@ export const useConfigStore = create<ConfigState>()(
   persist(
     (set, get) => ({
       activePage: "workbench",
-      theme: "midnight",
+      theme: "park-light",
       aiConfig: {
         provider: "deepseek",
         baseURL: AI_PROVIDERS.deepseek.baseUrl,
@@ -171,7 +178,7 @@ export const useConfigStore = create<ConfigState>()(
         })),
     }),
     {
-      name: "snapripper_config_storage_v5",
+      name: "snapripper_config_storage_v6",
     }
   )
 );

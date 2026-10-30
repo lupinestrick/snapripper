@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN" className="dark" data-theme="midnight" suppressHydrationWarning>
+    <html lang="zh-CN" className="light" data-theme="park-light" suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

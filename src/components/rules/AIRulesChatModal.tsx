@@ -162,12 +162,13 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
           maxWidth: "680px",
           height: "80vh",
           maxHeight: "720px",
-          backgroundColor: "#111827",
-          border: "1px solid #334155",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
           borderRadius: "1rem",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          color: "var(--text-main)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -175,16 +176,16 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
         <div
           style={{
             padding: "1rem 1.25rem",
-            borderBottom: "1px solid #1f2937",
+            borderBottom: "1px solid var(--border-subtle)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            backgroundColor: "#1e293b",
+            backgroundColor: "var(--bg-surface)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <Sparkles size={18} color="#38bdf8" />
-            <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#f8fafc" }}>
+            <Sparkles size={18} color="var(--accent-default)" />
+            <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)" }}>
               AI 智能生成规则助手
             </h3>
           </div>
@@ -193,7 +194,7 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
             size="xs"
             pill
             onClick={onClose}
-            style={{ color: "#94a3b8", padding: "4px" }}
+            style={{ color: "var(--text-muted)", padding: "4px" }}
             title="关闭"
           >
             <X size={18} />
@@ -229,15 +230,15 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
                       width: "28px",
                       height: "28px",
                       borderRadius: "9999px",
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #334155",
+                      backgroundColor: "var(--bg-subtle)",
+                      border: "1px solid var(--border-subtle)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
                     }}
                   >
-                    <Bot size={15} color="#38bdf8" />
+                    <Bot size={15} color="var(--accent-default)" />
                   </div>
                 )}
 
@@ -246,11 +247,11 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
                     style={{
                       padding: "0.75rem 1rem",
                       borderRadius: "0.75rem",
-                      backgroundColor: isUser ? "#2563eb" : "#1e293b",
-                      color: "#f8fafc",
+                      backgroundColor: isUser ? "var(--accent-default)" : "var(--bg-subtle)",
+                      color: isUser ? "var(--accent-fg)" : "var(--text-main)",
                       fontSize: "0.85rem",
                       lineHeight: "1.5",
-                      border: isUser ? "none" : "1px solid #334155",
+                      border: isUser ? "none" : "1px solid var(--border-subtle)",
                       whiteSpace: "pre-wrap",
                     }}
                   >
@@ -269,8 +270,8 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
                             style={{
                               padding: "0.85rem",
                               borderRadius: "0.6rem",
-                              backgroundColor: "#0f172a",
-                              border: "1px solid #334155",
+                              backgroundColor: "var(--bg-card)",
+                              border: "1px solid var(--border-subtle)",
                               display: "flex",
                               flexDirection: "column",
                               gap: "0.5rem",
@@ -286,7 +287,7 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
                                     backgroundColor: rule.color,
                                   }}
                                 />
-                                <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "#f8fafc" }}>
+                                <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-main)" }}>
                                   {rule.name}
                                 </span>
                               </div>
@@ -297,26 +298,13 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
                                 variant={isAdded ? "outline" : "solid"}
                                 size="xs"
                                 pill
-                                style={
-                                  isAdded
-                                    ? {
-                                        borderColor: "#059669",
-                                        backgroundColor: "rgba(16, 185, 129, 0.15)",
-                                        color: "#34d399",
-                                      }
-                                    : {
-                                        backgroundColor: "#2563eb",
-                                        borderColor: "#3b82f6",
-                                        color: "#ffffff",
-                                      }
-                                }
                               >
-                                {isAdded ? <Check size={13} /> : <Plus size={13} />}
+                                {isAdded ? <Check size={13} color="#10b981" /> : <Plus size={13} />}
                                 <span>{isAdded ? "已添加" : "添加此规则"}</span>
                               </Button>
                             </div>
 
-                            <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
                               <div><strong>匹配域名:</strong> {rule.matchDomain || "无"}</div>
                               <div><strong>关键词:</strong> {rule.matchKeyword || "无"}</div>
                             </div>
@@ -333,14 +321,15 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
                       width: "28px",
                       height: "28px",
                       borderRadius: "9999px",
-                      backgroundColor: "#3b82f6",
+                      backgroundColor: "var(--accent-default)",
+                      color: "var(--accent-fg)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
                     }}
                   >
-                    <User size={15} color="#fff" />
+                    <User size={15} />
                   </div>
                 )}
               </div>
@@ -348,7 +337,7 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
           })}
 
           {isGenerating && (
-            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", color: "#38bdf8", fontSize: "0.8rem" }}>
+            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", color: "var(--accent-default)", fontSize: "0.8rem" }}>
               <Loader2 size={16} className="animate-spin" />
               <span>AI 正在思考并提取规则模式...</span>
             </div>
@@ -361,8 +350,8 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
         <div
           style={{
             padding: "0.5rem 1rem",
-            backgroundColor: "#0b0f19",
-            borderTop: "1px solid #1f2937",
+            backgroundColor: "var(--bg-subtle)",
+            borderTop: "1px solid var(--border-subtle)",
             display: "flex",
             gap: "0.5rem",
             overflowX: "auto",
@@ -388,8 +377,8 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
         <div
           style={{
             padding: "0.85rem 1.25rem",
-            backgroundColor: "#111827",
-            borderTop: "1px solid #1f2937",
+            backgroundColor: "var(--bg-surface)",
+            borderTop: "1px solid var(--border-subtle)",
             display: "flex",
             gap: "0.6rem",
             alignItems: "center",
@@ -411,9 +400,9 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
               flex: 1,
               padding: "0.45rem 0.85rem",
               borderRadius: "0.5rem",
-              backgroundColor: "#1e293b",
-              border: "1px solid #334155",
-              color: "#fff",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+              color: "var(--text-main)",
               fontSize: "0.8rem",
               outline: "none",
             }}
@@ -425,11 +414,6 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
             variant="solid"
             size="xs"
             pill
-            style={{
-              backgroundColor: !inputPrompt.trim() || isGenerating ? "#334155" : "#2563eb",
-              borderColor: !inputPrompt.trim() || isGenerating ? "#334155" : "#3b82f6",
-              color: "#fff",
-            }}
           >
             {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             <span>发送</span>

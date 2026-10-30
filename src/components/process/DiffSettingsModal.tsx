@@ -98,33 +98,32 @@ export function DiffSettingsModal({
             maxWidth: "540px",
             width: "92vw",
             maxHeight: "85vh",
-            backgroundColor: "#0f172a",
-            border: "1px solid #334155",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
             borderRadius: "1rem",
-            color: "#f8fafc",
+            color: "var(--text-main)",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            boxShadow: "0 20px 40px rgba(0,0,0,0.8)",
           }}
         >
           {/* Header */}
           <div
             style={{
               padding: "0.85rem 1.25rem",
-              borderBottom: "1px solid #1e293b",
+              borderBottom: "1px solid var(--border-subtle)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              backgroundColor: "#111827",
+              backgroundColor: "var(--bg-surface)",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <SlidersHorizontal size={16} color="#38bdf8" />
+              <SlidersHorizontal size={16} color="var(--accent-default)" />
               <Dialog.Title style={{ fontSize: "0.95rem", fontWeight: 600 }}>处理与整理设置</Dialog.Title>
             </div>
             <Dialog.CloseTrigger asChild>
-              <Button variant="ghost" size="xs" pill onClick={onClose} style={{ color: "#94a3b8", padding: "4px" }}>
+              <Button variant="ghost" size="xs" pill onClick={onClose} style={{ color: "var(--text-muted)", padding: "4px" }}>
                 <X size={16} />
               </Button>
             </Dialog.CloseTrigger>
@@ -143,7 +142,7 @@ export function DiffSettingsModal({
           >
             {/* 1. Scope Option */}
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "0.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.5rem" }}>
                 应用范围
               </label>
               <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "0.6rem" }}>
@@ -153,11 +152,6 @@ export function DiffSettingsModal({
                   size="xs"
                   pill
                   onClick={() => setLocalScope("current")}
-                  style={{
-                    backgroundColor: localScope === "current" ? "#2563eb" : "#1e293b",
-                    borderColor: localScope === "current" ? "#3b82f6" : "#334155",
-                    color: localScope === "current" ? "#fff" : "#94a3b8",
-                  }}
                 >
                   当前面板
                 </Button>
@@ -168,11 +162,6 @@ export function DiffSettingsModal({
                   size="xs"
                   pill
                   onClick={() => setLocalScope("all")}
-                  style={{
-                    backgroundColor: localScope === "all" ? "#2563eb" : "#1e293b",
-                    borderColor: localScope === "all" ? "#3b82f6" : "#334155",
-                    color: localScope === "all" ? "#fff" : "#94a3b8",
-                  }}
                 >
                   所有面板
                 </Button>
@@ -183,11 +172,6 @@ export function DiffSettingsModal({
                   size="xs"
                   pill
                   onClick={() => setLocalScope("selected")}
-                  style={{
-                    backgroundColor: localScope === "selected" ? "#2563eb" : "#1e293b",
-                    borderColor: localScope === "selected" ? "#3b82f6" : "#334155",
-                    color: localScope === "selected" ? "#fff" : "#94a3b8",
-                  }}
                 >
                   多项面板
                 </Button>
@@ -198,8 +182,8 @@ export function DiffSettingsModal({
                   style={{
                     padding: "0.65rem 0.85rem",
                     borderRadius: "0.5rem",
-                    backgroundColor: "#1e293b",
-                    border: "1px solid #334155",
+                    backgroundColor: "var(--bg-subtle)",
+                    border: "1px solid var(--border-subtle)",
                     display: "flex",
                     flexDirection: "column",
                     gap: "0.4rem",
@@ -207,7 +191,7 @@ export function DiffSettingsModal({
                     overflowY: "auto",
                   }}
                 >
-                  <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginBottom: "0.2rem" }}>勾选要参与处理的面板:</div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>勾选要参与处理的面板:</div>
                   {panels.map((p) => {
                     const isChecked = localSelectedPanels.includes(p.id);
                     return (
@@ -218,7 +202,7 @@ export function DiffSettingsModal({
                           alignItems: "center",
                           gap: "0.45rem",
                           fontSize: "0.78rem",
-                          color: isChecked ? "#f8fafc" : "#94a3b8",
+                          color: isChecked ? "var(--text-main)" : "var(--text-muted)",
                           cursor: "pointer",
                         }}
                       >
@@ -226,7 +210,7 @@ export function DiffSettingsModal({
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => handleTogglePanelSelect(p.id)}
-                          style={{ accentColor: "#2563eb", cursor: "pointer" }}
+                          style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
                         />
                         <span>{p.name || p.id}</span>
                       </label>
@@ -237,8 +221,8 @@ export function DiffSettingsModal({
             </div>
 
             {/* 2. Organization Settings */}
-            <div style={{ borderTop: "1px solid #1e293b", paddingTop: "1rem" }}>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "#cbd5e1", marginBottom: "0.6rem" }}>
+            <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.6rem" }}>
                 标签整理常规设置
               </label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
@@ -248,7 +232,7 @@ export function DiffSettingsModal({
                     alignItems: "center",
                     gap: "0.45rem",
                     fontSize: "0.78rem",
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     cursor: "pointer",
                   }}
                 >
@@ -256,7 +240,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localExemptPinned}
                     onChange={(e) => setLocalExemptPinned(e.target.checked)}
-                    style={{ accentColor: "#2563eb", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
                   />
                   <span>豁免固定标签</span>
                 </label>
@@ -267,7 +251,7 @@ export function DiffSettingsModal({
                     alignItems: "center",
                     gap: "0.45rem",
                     fontSize: "0.78rem",
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     cursor: "pointer",
                   }}
                 >
@@ -275,7 +259,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localExemptInternal}
                     onChange={(e) => setLocalExemptInternal(e.target.checked)}
-                    style={{ accentColor: "#2563eb", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
                   />
                   <span>豁免关于与内建页</span>
                 </label>
@@ -286,7 +270,7 @@ export function DiffSettingsModal({
                     alignItems: "center",
                     gap: "0.45rem",
                     fontSize: "0.78rem",
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     cursor: "pointer",
                   }}
                 >
@@ -294,7 +278,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localPreserveSubtrees}
                     onChange={(e) => setLocalPreserveSubtrees(e.target.checked)}
-                    style={{ accentColor: "#2563eb", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
                   />
                   <span>保持子树完整性</span>
                 </label>
@@ -305,7 +289,7 @@ export function DiffSettingsModal({
                     alignItems: "center",
                     gap: "0.45rem",
                     fontSize: "0.78rem",
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     cursor: "pointer",
                   }}
                 >
@@ -313,7 +297,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localTreatGroupAsUnit}
                     onChange={(e) => setLocalTreatGroupAsUnit(e.target.checked)}
-                    style={{ accentColor: "#2563eb", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
                   />
                   <span>原有 Group 视为整体</span>
                 </label>
@@ -324,7 +308,7 @@ export function DiffSettingsModal({
                     alignItems: "center",
                     gap: "0.45rem",
                     fontSize: "0.78rem",
-                    color: "#94a3b8",
+                    color: "var(--text-muted)",
                     cursor: "pointer",
                     gridColumn: "span 2",
                   }}
@@ -333,7 +317,7 @@ export function DiffSettingsModal({
                     type="checkbox"
                     checked={localCascade}
                     onChange={(e) => setLocalCascade(e.target.checked)}
-                    style={{ accentColor: "#2563eb", cursor: "pointer" }}
+                    style={{ accentColor: "var(--accent-default)", cursor: "pointer" }}
                   />
                   <span>勾选标签时默认级联包含子标签</span>
                 </label>
@@ -341,10 +325,10 @@ export function DiffSettingsModal({
             </div>
 
             {/* 3. Domain Merge Scheme */}
-            <div style={{ borderTop: "1px solid #1e293b", paddingTop: "1rem" }}>
+            <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.5rem" }}>
-                <Globe size={14} color="#38bdf8" />
-                <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#cbd5e1" }}>
+                <Globe size={14} color="var(--accent-default)" />
+                <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-main)" }}>
                   同域名合并方案
                 </label>
               </div>
@@ -356,11 +340,6 @@ export function DiffSettingsModal({
                   size="xs"
                   pill
                   onClick={() => setLocalMatchMode("full")}
-                  style={{
-                    backgroundColor: localMatchMode === "full" ? "#2563eb" : "#1e293b",
-                    borderColor: localMatchMode === "full" ? "#3b82f6" : "#334155",
-                    color: localMatchMode === "full" ? "#fff" : "#94a3b8",
-                  }}
                 >
                   匹配完整域名
                 </Button>
@@ -371,11 +350,6 @@ export function DiffSettingsModal({
                   size="xs"
                   pill
                   onClick={() => setLocalMatchMode("suffix")}
-                  style={{
-                    backgroundColor: localMatchMode === "suffix" ? "#2563eb" : "#1e293b",
-                    borderColor: localMatchMode === "suffix" ? "#3b82f6" : "#334155",
-                    color: localMatchMode === "suffix" ? "#fff" : "#94a3b8",
-                  }}
                 >
                   匹配域名后缀
                 </Button>
@@ -386,11 +360,6 @@ export function DiffSettingsModal({
                   size="xs"
                   pill
                   onClick={() => setLocalMatchMode("keyword")}
-                  style={{
-                    backgroundColor: localMatchMode === "keyword" ? "#2563eb" : "#1e293b",
-                    borderColor: localMatchMode === "keyword" ? "#3b82f6" : "#334155",
-                    color: localMatchMode === "keyword" ? "#fff" : "#94a3b8",
-                  }}
                 >
                   域名关键字匹配
                 </Button>
@@ -401,11 +370,6 @@ export function DiffSettingsModal({
                   size="xs"
                   pill
                   onClick={() => setLocalMatchMode("custom")}
-                  style={{
-                    backgroundColor: localMatchMode === "custom" ? "#2563eb" : "#1e293b",
-                    borderColor: localMatchMode === "custom" ? "#3b82f6" : "#334155",
-                    color: localMatchMode === "custom" ? "#fff" : "#94a3b8",
-                  }}
                 >
                   自定义选项
                 </Button>
@@ -422,9 +386,9 @@ export function DiffSettingsModal({
                       width: "100%",
                       padding: "0.35rem 0.65rem",
                       borderRadius: "0.4rem",
-                      backgroundColor: "#1e293b",
-                      border: "1px solid #334155",
-                      color: "#fff",
+                      backgroundColor: "var(--bg-subtle)",
+                      border: "1px solid var(--border-subtle)",
+                      color: "var(--text-main)",
                       fontSize: "0.78rem",
                       outline: "none",
                     }}
@@ -433,7 +397,7 @@ export function DiffSettingsModal({
               )}
 
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>同域名成组阈值:</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>同域名成组阈值:</span>
                 <input
                   type="number"
                   min={1}
@@ -444,15 +408,15 @@ export function DiffSettingsModal({
                     width: "55px",
                     padding: "0.25rem 0.5rem",
                     borderRadius: "0.4rem",
-                    backgroundColor: "#1e293b",
-                    border: "1px solid #334155",
-                    color: "#fff",
+                    backgroundColor: "var(--bg-subtle)",
+                    border: "1px solid var(--border-subtle)",
+                    color: "var(--text-main)",
                     fontSize: "0.75rem",
                     textAlign: "center",
                     outline: "none",
                   }}
                 />
-                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>个标签</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>个标签</span>
               </div>
             </div>
           </div>
@@ -461,12 +425,12 @@ export function DiffSettingsModal({
           <div
             style={{
               padding: "0.85rem 1.25rem",
-              borderTop: "1px solid #1e293b",
+              borderTop: "1px solid var(--border-subtle)",
               display: "flex",
               justifyContent: "flex-end",
               alignItems: "center",
               gap: "0.5rem",
-              backgroundColor: "#111827",
+              backgroundColor: "var(--bg-surface)",
             }}
           >
             <Button variant="ghost" size="xs" pill onClick={onClose}>
@@ -477,7 +441,6 @@ export function DiffSettingsModal({
               size="xs"
               pill
               onClick={handleSaveAndApply}
-              style={{ backgroundColor: "#2563eb", borderColor: "#3b82f6", color: "#fff" }}
             >
               <Check size={13} />
               <span>保存并应用</span>
