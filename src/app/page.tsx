@@ -41,23 +41,6 @@ export default function WorkbenchPage() {
     }
   }, [theme]);
 
-  // Auto load project snapshot on first load if none is present
-  useEffect(() => {
-    if (!rawSnapshot) {
-      fetch("/api/user-snapshot")
-        .then((res) => {
-          if (res.ok) return res.text();
-          throw new Error("No default snapshot file found");
-        })
-        .then((jsonText) => {
-          loadSnapshot(jsonText, "sidebery-snapshot-2026.10.22-00.48.27.json");
-        })
-        .catch(() => {
-          // Ignore if user hasn't put snapshot or error
-        });
-    }
-  }, [rawSnapshot, loadSnapshot]);
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(true);

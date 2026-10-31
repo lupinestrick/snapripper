@@ -4,3 +4,8 @@ styled-system
 dist
 .env*.local
 *.log
+
+# Sidebery snapshots & personal files
+sidebery-snapshot*.json
+*-snapshot*.json
+*.snapshot.json
