@@ -18,7 +18,6 @@ import {
   List,
   HardDrive,
   Copy,
-  PlayCircle,
   Loader2,
 } from "lucide-react";
 
@@ -47,7 +46,6 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
     getExportSnapshot,
   } = useSnapshotStore();
 
-  const [loadingUserSnapshot, setLoadingUserSnapshot] = useState(false);
   const [copiedType, setCopiedType] = useState<string | null>(null);
 
   const totalTabs = rawSnapshot
@@ -72,20 +70,6 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
     };
     reader.readAsText(file);
     e.target.value = "";
-  };
-
-  const handleLoadUserSnapshot = async () => {
-    setLoadingUserSnapshot(true);
-    try {
-      const res = await fetch("/api/user-snapshot");
-      if (!res.ok) throw new Error("无法读取目录中的快照文件");
-      const jsonText = await res.text();
-      loadSnapshot(jsonText, "sidebery-snapshot-2026.10.22-00.48.27.json");
-    } catch (err: any) {
-      alert(err.message || "载入失败");
-    } finally {
-      setLoadingUserSnapshot(false);
-    }
   };
 
   const handleExportJSON = () => {
@@ -295,17 +279,6 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
               >
                 <Upload size={13} />
                 <span>从本地上传 JSON</span>
-              </Button>
-
-              <Button
-                variant="subtle"
-                size="xs"
-                pill
-                onClick={handleLoadUserSnapshot}
-                disabled={loadingUserSnapshot}
-              >
-                {loadingUserSnapshot ? <Loader2 size={13} className="animate-spin" /> : <PlayCircle size={13} />}
-                <span>载入项目样本 (1,174 标签)</span>
               </Button>
             </div>
           </div>

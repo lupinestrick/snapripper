@@ -274,10 +274,10 @@ export function SettingsPage() {
             />
             <div>
               <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                隐藏文件名
+                隐藏配置文件
               </div>
               <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                在顶栏隐藏当前快照的文件名展示。
+                在顶栏隐藏当前快照的配置文件展示。
               </div>
             </div>
           </label>
@@ -307,35 +307,6 @@ export function SettingsPage() {
               </div>
               <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                 在顶栏右上角隐藏调色板快速主题切换菜单。
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle: Show Ready Status on right of file name */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={uiSettings?.showReadyStatus || false}
-              onChange={(e) => setUISettings({ showReadyStatus: e.target.checked })}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                在文件名字的右边显示“已就绪”
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                开启后，在顶栏文件名右侧显示快照文件的就绪或等待导入状态胶囊。
               </div>
             </div>
           </label>

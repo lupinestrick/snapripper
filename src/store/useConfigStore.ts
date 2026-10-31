@@ -20,13 +20,11 @@ export type AppTheme =
 export type ProcessScope = "current" | "all" | "selected";
 
 export interface UISettings {
-  showReadyStatus: boolean;
   hideFileName: boolean;
   hideQuickTheme: boolean;
 }
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
-  showReadyStatus: false,
   hideFileName: false,
   hideQuickTheme: false,
 };
