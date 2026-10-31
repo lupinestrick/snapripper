@@ -403,19 +403,13 @@ export function SettingsPage() {
           marginBottom: "2rem",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <MessageSquareCode size={20} style={{ color: "var(--accent)" }} />
-            <div>
-              <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>AI 提示词模板配置</h2>
-              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                自定义两个 AI 应用特性的提示词模板，支持自由修改与随时一键恢复预设。
-              </p>
-            </div>
-          </div>
-
-          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", backgroundColor: "var(--bg-subtle)", padding: "0.3rem 0.6rem", borderRadius: "var(--radius-btn, 6px)", border: "1px solid var(--border-subtle)" }}>
-            默认提示词文件：<code style={{ color: "var(--accent-text)", fontWeight: 600 }}>src/constants/aiPrompts.ts</code>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
+          <MessageSquareCode size={20} style={{ color: "var(--accent)" }} />
+          <div>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>AI 提示词模板配置</h2>
+            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+              自定义两个 AI 应用特性的提示词模板，支持自由修改与随时一键恢复预设。
+            </p>
           </div>
         </div>
 
@@ -457,7 +451,7 @@ export function SettingsPage() {
 
             <textarea
               rows={8}
-              value={aiPrompts?.proportionAnalysisPrompt ?? DEFAULT_PROPORTION_ANALYSIS_PROMPT}
+              value={aiPrompts?.proportionAnalysisPrompt || DEFAULT_PROPORTION_ANALYSIS_PROMPT}
               onChange={(e) => setAIPrompt("proportionAnalysisPrompt", e.target.value)}
               placeholder="请输入标签比例分析提示词模板..."
               style={{
@@ -513,7 +507,7 @@ export function SettingsPage() {
 
             <textarea
               rows={8}
-              value={aiPrompts?.rulesGeneratorPrompt ?? DEFAULT_RULES_GENERATOR_PROMPT}
+              value={aiPrompts?.rulesGeneratorPrompt || DEFAULT_RULES_GENERATOR_PROMPT}
               onChange={(e) => setAIPrompt("rulesGeneratorPrompt", e.target.value)}
               placeholder="请输入规则生成助手的系统提示词..."
               style={{

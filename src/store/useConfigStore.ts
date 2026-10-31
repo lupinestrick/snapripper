@@ -203,6 +203,18 @@ export const useConfigStore = create<ConfigState>()(
     }),
     {
       name: "snapripper_config_storage_v9",
+      merge: (persistedState: any, currentState: any) => ({
+        ...currentState,
+        ...persistedState,
+        aiPrompts: {
+          proportionAnalysisPrompt:
+            persistedState?.aiPrompts?.proportionAnalysisPrompt ||
+            DEFAULT_AI_PROMPTS.proportionAnalysisPrompt,
+          rulesGeneratorPrompt:
+            persistedState?.aiPrompts?.rulesGeneratorPrompt ||
+            DEFAULT_AI_PROMPTS.rulesGeneratorPrompt,
+        },
+      }),
     }
   )
 );
