@@ -114,17 +114,17 @@ export function SettingsPage() {
   }[] = [
     {
       id: "park-light",
-      name: "Park UI 浅色 (Crimson Light)",
+      name: "Crimson Light",
       colors: ["#fcfcfc", "#f0f0f0", "#e93d82", "#cb1d63"],
     },
     {
       id: "park-dark",
-      name: "Park UI 深色 (Crimson Dark)",
+      name: "Crimson Dark",
       colors: ["#111111", "#202020", "#e93d82", "#ff92ad"],
     },
     {
       id: "midnight",
-      name: "经典暗蓝 (Midnight)",
+      name: "Midnight",
       colors: ["#0b0f19", "#1e293b", "#2563eb", "#38bdf8"],
     },
     {

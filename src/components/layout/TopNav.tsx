@@ -14,17 +14,17 @@ interface TopNavProps {
 const THEME_OPTIONS: { id: AppTheme; name: string; previewDot: string }[] = [
   {
     id: "park-light",
-    name: "Park UI 浅色",
+    name: "Crimson Light",
     previewDot: "#e93d82",
   },
   {
     id: "park-dark",
-    name: "Park UI 深色",
+    name: "Crimson Dark",
     previewDot: "#e93d82",
   },
   {
     id: "midnight",
-    name: "经典暗蓝",
+    name: "Midnight",
     previewDot: "#2563eb",
   },
   {
