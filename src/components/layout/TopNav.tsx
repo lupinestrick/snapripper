@@ -39,7 +39,7 @@ const THEME_OPTIONS: { id: AppTheme; name: string; previewDot: string }[] = [
   },
   {
     id: "nord-dark",
-    name: "Nord Dark",
+    name: "Nord Polar Night",
     previewDot: "#88c0d0",
   },
   {
@@ -51,7 +51,7 @@ const THEME_OPTIONS: { id: AppTheme; name: string; previewDot: string }[] = [
 
 export function TopNav({ onOpenExport }: TopNavProps) {
   const { undoStack, undo, rawSnapshot, fileName, rawFileSize } = useSnapshotStore();
-  const { theme, setTheme } = useConfigStore();
+  const { theme, setTheme, uiSettings } = useConfigStore();
   const [fileHopupOpen, setFileHopupOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
   const themeMenuRef = useRef<HTMLDivElement>(null);
@@ -90,166 +90,9 @@ export function TopNav({ onOpenExport }: TopNavProps) {
           zIndex: 30,
         }}
       >
-        {/* Snapshot Info */}
+        {/* Left Side: File size / Snapshot management button, File name, Ready status badge */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-            {fileName ? fileName : "未加载快照"}
-          </span>
-          {rawSnapshot ? (
-            <span
-              style={{
-                fontSize: "0.7rem",
-                padding: "2px 8px",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "var(--accent-subtle)",
-                color: "var(--accent-text)",
-                border: "1px solid var(--accent-border)",
-                fontWeight: 600,
-              }}
-            >
-              已就绪
-            </span>
-          ) : (
-            <span
-              style={{
-                fontSize: "0.7rem",
-                padding: "2px 8px",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "var(--bg-subtle)",
-                color: "var(--text-muted)",
-                border: "1px solid var(--border-subtle)",
-              }}
-            >
-              等待导入
-            </span>
-          )}
-        </div>
-
-        {/* Action Controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-          {/* Quick Theme Switcher */}
-          <div ref={themeMenuRef} style={{ position: "relative" }}>
-            <Button
-              onClick={() => setThemeMenuOpen(!themeMenuOpen)}
-              style={{
-                gap: "0.35rem",
-                color: "var(--text-main)",
-                borderColor: themeMenuOpen ? "var(--border-focus)" : "var(--btn-outline-border)",
-              }}
-              title="切换主题配色"
-            >
-              <Palette size={13} style={{ color: "var(--accent)" }} />
-              <span style={{ fontSize: "0.75rem" }}>{currentTheme.name}</span>
-            </Button>
-
-            {/* Theme Dropdown Hop-up */}
-            {themeMenuOpen && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "calc(100% + 6px)",
-                  right: 0,
-                  width: "170px",
-                  backgroundColor: "var(--bg-surface)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: "var(--radius-btn, 6px)",
-                  padding: "0.35rem",
-                  boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
-                  zIndex: 50,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.15rem",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "0.68rem",
-                    fontWeight: 600,
-                    color: "var(--text-muted)",
-                    padding: "0.2rem 0.45rem",
-                    borderBottom: "1px solid var(--border-subtle)",
-                    marginBottom: "0.15rem",
-                  }}
-                >
-                  外观与主题
-                </div>
-
-                {THEME_OPTIONS.map((item) => {
-                  const isActive = (theme || "park-light") === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        setTheme(item.id);
-                        setThemeMenuOpen(false);
-                      }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "0.35rem 0.5rem",
-                        borderRadius: "var(--radius-btn, 6px)",
-                        border: "1px solid",
-                        borderColor: isActive ? "var(--accent-border)" : "transparent",
-                        backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
-                        color: isActive ? "var(--accent-text)" : "var(--text-main)",
-                        cursor: "pointer",
-                        outline: "none",
-                        transition: "all 0.15s ease",
-                        textAlign: "left",
-                        width: "100%",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <span
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            backgroundColor: item.previewDot,
-                            display: "inline-block",
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span style={{ fontSize: "0.78rem", fontWeight: isActive ? 600 : 500 }}>
-                          {item.name}
-                        </span>
-                      </div>
-                      {isActive && <Check size={13} style={{ color: "var(--accent)" }} />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {hasData && (
-            <Button
-              onClick={undo}
-              disabled={undoStack.length === 0}
-              style={{
-                width: "30px",
-                height: "30px",
-                padding: 0,
-                color: undoStack.length > 0 ? "var(--text-main)" : "var(--text-muted)",
-              }}
-              title="撤销 (Undo)"
-            >
-              <Undo2 size={14} />
-            </Button>
-          )}
-
-          {/* Single File Icon Button Opening the File Management Hop-up */}
+          {/* File Size / Snapshot Management Button (moved from top-right to left of file name) */}
           <Button
             onClick={() => setFileHopupOpen(true)}
             style={{
@@ -267,6 +110,172 @@ export function TopNav({ onOpenExport }: TopNavProps) {
                 : "导入文件"}
             </span>
           </Button>
+
+          {/* File Name (can be hidden in UI settings) */}
+          {!uiSettings?.hideFileName && (
+            <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+              {fileName ? fileName : "未加载快照"}
+            </span>
+          )}
+
+          {/* Ready Status Badge (shown on right of file name if enabled in UI settings) */}
+          {uiSettings?.showReadyStatus && (
+            rawSnapshot ? (
+              <span
+                style={{
+                  fontSize: "0.7rem",
+                  padding: "2px 8px",
+                  borderRadius: "var(--radius-btn, 6px)",
+                  backgroundColor: "var(--accent-subtle)",
+                  color: "var(--accent-text)",
+                  border: "1px solid var(--accent-border)",
+                  fontWeight: 600,
+                }}
+              >
+                已就绪
+              </span>
+            ) : (
+              <span
+                style={{
+                  fontSize: "0.7rem",
+                  padding: "2px 8px",
+                  borderRadius: "var(--radius-btn, 6px)",
+                  backgroundColor: "var(--bg-subtle)",
+                  color: "var(--text-muted)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                等待导入
+              </span>
+            )
+          )}
+        </div>
+
+        {/* Right Side: Quick Theme Switcher & Undo */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+          {/* Quick Theme Switcher (can be hidden in UI settings) */}
+          {!uiSettings?.hideQuickTheme && (
+            <div ref={themeMenuRef} style={{ position: "relative" }}>
+              <Button
+                onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+                style={{
+                  gap: "0.35rem",
+                  color: "var(--text-main)",
+                  borderColor: themeMenuOpen ? "var(--border-focus)" : "var(--btn-outline-border)",
+                }}
+                title="切换主题配色"
+              >
+                <Palette size={13} style={{ color: "var(--accent)" }} />
+                <span style={{ fontSize: "0.75rem" }}>{currentTheme.name}</span>
+              </Button>
+
+              {/* Theme Dropdown Hop-up */}
+              {themeMenuOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 6px)",
+                    right: 0,
+                    width: "170px",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "var(--radius-btn, 6px)",
+                    padding: "0.35rem",
+                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
+                    zIndex: 50,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.15rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 600,
+                      color: "var(--text-muted)",
+                      padding: "0.2rem 0.45rem",
+                      borderBottom: "1px solid var(--border-subtle)",
+                      marginBottom: "0.15rem",
+                    }}
+                  >
+                    外观与主题
+                  </div>
+
+                  {THEME_OPTIONS.map((item) => {
+                    const isActive = (theme || "park-light") === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setTheme(item.id);
+                          setThemeMenuOpen(false);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "0.35rem 0.5rem",
+                          borderRadius: "var(--radius-btn, 6px)",
+                          border: "1px solid",
+                          borderColor: isActive ? "var(--accent-border)" : "transparent",
+                          backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
+                          color: isActive ? "var(--accent-text)" : "var(--text-main)",
+                          cursor: "pointer",
+                          outline: "none",
+                          transition: "all 0.15s ease",
+                          textAlign: "left",
+                          width: "100%",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.backgroundColor = "transparent";
+                          }
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <span
+                            style={{
+                              width: "8px",
+                              height: "8px",
+                              borderRadius: "50%",
+                              backgroundColor: item.previewDot,
+                              display: "inline-block",
+                              flexShrink: 0,
+                            }}
+                          />
+                          <span style={{ fontSize: "0.78rem", fontWeight: isActive ? 600 : 500 }}>
+                            {item.name}
+                          </span>
+                        </div>
+                        {isActive && <Check size={13} style={{ color: "var(--accent)" }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {hasData && (
+            <Button
+              onClick={undo}
+              disabled={undoStack.length === 0}
+              style={{
+                width: "30px",
+                height: "30px",
+                padding: 0,
+                color: undoStack.length > 0 ? "var(--text-main)" : "var(--text-muted)",
+              }}
+              title="撤销 (Undo)"
+            >
+              <Undo2 size={14} />
+            </Button>
+          )}
         </div>
       </header>
 

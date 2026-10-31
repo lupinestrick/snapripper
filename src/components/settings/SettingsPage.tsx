@@ -23,6 +23,7 @@ import {
   RotateCcw,
   MessageSquareCode,
   Save,
+  LayoutGrid,
 } from "lucide-react";
 import {
   DEFAULT_PROPORTION_ANALYSIS_PROMPT,
@@ -36,6 +37,8 @@ export function SettingsPage() {
     aiConfig,
     setAIConfig,
     aiPrompts,
+    uiSettings,
+    setUISettings,
     setAIPrompt,
     resetAIPrompt,
     exemptPinned,
@@ -149,7 +152,7 @@ export function SettingsPage() {
     },
     {
       id: "nord-dark",
-      name: "Nord Dark",
+      name: "Nord Polar Night",
       colors: ["#2e3440", "#3b4252", "#88c0d0", "#81a1c1"],
     },
     {
@@ -231,6 +234,111 @@ export function SettingsPage() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* Section: UI Settings */}
+      <div
+        style={{
+          padding: "1.5rem",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
+          marginBottom: "2rem",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
+          <LayoutGrid size={20} style={{ color: "var(--accent)" }} />
+          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>界面设置</h2>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {/* Toggle: Hide File Name */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+              cursor: "pointer",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={uiSettings?.hideFileName || false}
+              onChange={(e) => setUISettings({ hideFileName: e.target.checked })}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+            />
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                隐藏文件名
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                在顶栏隐藏当前快照的文件名展示。
+              </div>
+            </div>
+          </label>
+
+          {/* Toggle: Hide Quick Theme Button */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+              cursor: "pointer",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={uiSettings?.hideQuickTheme || false}
+              onChange={(e) => setUISettings({ hideQuickTheme: e.target.checked })}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+            />
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                隐藏快速主题按钮
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                在顶栏右上角隐藏调色板快速主题切换菜单。
+              </div>
+            </div>
+          </label>
+
+          {/* Toggle: Show Ready Status on right of file name */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+              cursor: "pointer",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={uiSettings?.showReadyStatus || false}
+              onChange={(e) => setUISettings({ showReadyStatus: e.target.checked })}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+            />
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                在文件名字的右边显示“已就绪”
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                开启后，在顶栏文件名右侧显示快照文件的就绪或等待导入状态胶囊。
+              </div>
+            </div>
+          </label>
         </div>
       </div>
 

@@ -19,6 +19,18 @@ export type AppTheme =
 
 export type ProcessScope = "current" | "all" | "selected";
 
+export interface UISettings {
+  showReadyStatus: boolean;
+  hideFileName: boolean;
+  hideQuickTheme: boolean;
+}
+
+export const DEFAULT_UI_SETTINGS: UISettings = {
+  showReadyStatus: false,
+  hideFileName: false,
+  hideQuickTheme: false,
+};
+
 export interface AIThresholds {
   minTabsPerGroup: number;
   maxCategories: number;
@@ -40,6 +52,8 @@ interface ConfigState {
   selectedProcessPanelIds: string[];
   domainMergeConfig: DomainMergeConfig;
   aiPrompts: AIPromptsConfig;
+  uiSettings: UISettings;
+  setUISettings: (settings: Partial<UISettings>) => void;
 
   setActivePage: (page: AppPage) => void;
   setTheme: (theme: AppTheme) => void;
@@ -92,6 +106,8 @@ export const useConfigStore = create<ConfigState>()(
       selectedProcessPanelIds: [],
       domainMergeConfig: DEFAULT_DOMAIN_MERGE_CONFIG,
       aiPrompts: DEFAULT_AI_PROMPTS,
+      uiSettings: DEFAULT_UI_SETTINGS,
+      setUISettings: (settings) => set((state) => ({ uiSettings: { ...state.uiSettings, ...settings } })),
 
       setActivePage: (page) => set({ activePage: page }),
       setTheme: (theme) => set({ theme }),
@@ -206,6 +222,10 @@ export const useConfigStore = create<ConfigState>()(
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
+        uiSettings: {
+          ...DEFAULT_UI_SETTINGS,
+          ...(persistedState?.uiSettings || {}),
+        },
         aiPrompts: {
           proportionAnalysisPrompt:
             persistedState?.aiPrompts?.proportionAnalysisPrompt ||

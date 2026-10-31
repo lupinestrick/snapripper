@@ -87,7 +87,7 @@ export function DiffHopupModal({
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
-              <Dialog.Title>Diff 变更确认</Dialog.Title>
+              <Dialog.Title>变更确认</Dialog.Title>
               <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                 {totalDeduped > 0 && (
                   <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(239, 68, 68, 0.15)", color: "var(--danger)" }}>
@@ -203,7 +203,7 @@ export function DiffHopupModal({
                 onClick={() => setViewMode("git")}
               >
                 <GitCommit size={13} />
-                <span>Git 差分</span>
+                <span>差分</span>
               </Button>
             </div>
           </div>
