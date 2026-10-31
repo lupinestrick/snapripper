@@ -22,6 +22,7 @@ import {
   Sparkles,
   RotateCcw,
   MessageSquareCode,
+  Save,
 } from "lucide-react";
 import {
   DEFAULT_PROPORTION_ANALYSIS_PROMPT,
@@ -53,6 +54,15 @@ export function SettingsPage() {
 
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSaveAIConfig = () => {
+    setAIConfig(aiConfig);
+    setSaveSuccess(true);
+    setTimeout(() => {
+      setSaveSuccess(false);
+    }, 2000);
+  };
 
   const currentPreset = AI_PROVIDERS[aiConfig.provider] || AI_PROVIDERS.custom;
 
@@ -154,9 +164,6 @@ export function SettingsPage() {
       {/* Header */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>系统设置</h1>
-        <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-          个性化主题外观、配置生成式大模型服务接口与标签页整理交互偏好。
-        </p>
       </div>
 
       {/* Theme Section */}
@@ -171,12 +178,7 @@ export function SettingsPage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
           <Palette size={20} style={{ color: "var(--accent)" }} />
-          <div>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>界面主题与配色方案</h2>
-            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-              支持 Park-UI 官方浅色与深色、经典暗蓝、以及 Nord、Rosé Pine、Catppuccin 等精选设计配色。
-            </p>
-          </div>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>界面主题与配色方案</h2>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem" }}>
@@ -363,9 +365,21 @@ export function SettingsPage() {
           </div>
         </div>
 
-        {/* Test Connection Button */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "1.25rem" }}>
+        {/* Actions: Save & Test Connection */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "1.25rem", flexWrap: "wrap" }}>
           <Button
+            type="button"
+            onClick={handleSaveAIConfig}
+            variant="solid"
+            size="xs"
+            pill
+          >
+            <Save size={13} />
+            <span>保存</span>
+          </Button>
+
+          <Button
+            type="button"
             onClick={handleTestConnection}
             disabled={isTesting}
             variant="outline"
@@ -375,6 +389,21 @@ export function SettingsPage() {
             {isTesting ? <Loader2 size={13} className="animate-spin" /> : null}
             <span>测试连接</span>
           </Button>
+
+          {saveSuccess && (
+            <span
+              style={{
+                fontSize: "0.8rem",
+                color: "#34d399",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+            >
+              <Check size={14} />
+              已保存
+            </span>
+          )}
 
           {testResult && (
             <span
@@ -405,12 +434,7 @@ export function SettingsPage() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
           <MessageSquareCode size={20} style={{ color: "var(--accent)" }} />
-          <div>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>AI 提示词模板配置</h2>
-            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-              自定义两个 AI 应用特性的提示词模板，支持自由修改与随时一键恢复预设。
-            </p>
-          </div>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>AI 提示词模板配置</h2>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
