@@ -4,6 +4,7 @@ import { AIConfig, AI_PROVIDERS } from "@/types/ai";
 import { CategorizationRule, RulesSettings } from "@/types/sidebery";
 import { DEFAULT_RULES_SETTINGS } from "@/services/ruleEngine";
 import { DomainMergeConfig, DEFAULT_DOMAIN_MERGE_CONFIG } from "@/services/domainMergeEngine";
+import { AIPromptsConfig, DEFAULT_AI_PROMPTS } from "@/constants/aiPrompts";
 
 export type AppPage = "workbench" | "process" | "rules" | "ai" | "settings";
 
@@ -38,6 +39,7 @@ interface ConfigState {
   processScope: ProcessScope;
   selectedProcessPanelIds: string[];
   domainMergeConfig: DomainMergeConfig;
+  aiPrompts: AIPromptsConfig;
 
   setActivePage: (page: AppPage) => void;
   setTheme: (theme: AppTheme) => void;
@@ -59,6 +61,9 @@ interface ConfigState {
   setProcessScope: (scope: ProcessScope) => void;
   setSelectedProcessPanelIds: (panelIds: string[]) => void;
   setDomainMergeConfig: (config: Partial<DomainMergeConfig>) => void;
+  setAIPrompt: (key: keyof AIPromptsConfig, prompt: string) => void;
+  resetAIPrompt: (key: keyof AIPromptsConfig) => void;
+  resetAllAIPrompts: () => void;
 }
 
 export const useConfigStore = create<ConfigState>()(
@@ -86,6 +91,7 @@ export const useConfigStore = create<ConfigState>()(
       processScope: "all",
       selectedProcessPanelIds: [],
       domainMergeConfig: DEFAULT_DOMAIN_MERGE_CONFIG,
+      aiPrompts: DEFAULT_AI_PROMPTS,
 
       setActivePage: (page) => set({ activePage: page }),
       setTheme: (theme) => set({ theme }),
@@ -176,6 +182,24 @@ export const useConfigStore = create<ConfigState>()(
         set((state) => ({
           domainMergeConfig: { ...state.domainMergeConfig, ...config },
         })),
+      setAIPrompt: (key, prompt) =>
+        set((state) => ({
+          aiPrompts: {
+            ...(state.aiPrompts || DEFAULT_AI_PROMPTS),
+            [key]: prompt,
+          },
+        })),
+      resetAIPrompt: (key) =>
+        set((state) => ({
+          aiPrompts: {
+            ...(state.aiPrompts || DEFAULT_AI_PROMPTS),
+            [key]: DEFAULT_AI_PROMPTS[key],
+          },
+        })),
+      resetAllAIPrompts: () =>
+        set({
+          aiPrompts: DEFAULT_AI_PROMPTS,
+        }),
     }),
     {
       name: "snapripper_config_storage_v9",

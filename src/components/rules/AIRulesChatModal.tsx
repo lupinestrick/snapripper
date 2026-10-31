@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { sendAIChatRequest } from "@/services/aiService";
 import { CategorizationRule } from "@/types/sidebery";
+import { DEFAULT_RULES_GENERATOR_PROMPT } from "@/constants/aiPrompts";
 import { Button } from "@/components/ui/button";
 import {
   X,
@@ -37,7 +38,7 @@ const QUICK_PROMPTS = [
 ];
 
 export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
-  const { aiConfig, addRule } = useConfigStore();
+  const { aiConfig, addRule, aiPrompts } = useConfigStore();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -70,22 +71,7 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
     setIsGenerating(true);
 
     try {
-      const systemPrompt = `你是一个 Sidebery 标签页分类规则生成专家。
-用户的目标是将特定领域的浏览器标签页自动匹配并归类到 Group 分组中。
-请使用友好精简的中文回答用户，并在回复末尾附带严格符合以下 JSON 格式的推荐规则数组代码块：
-\`\`\`json
-[
-  {
-    "name": "🎨 分组名称（带emoji）",
-    "matchDomain": "domain1.com, domain2.com",
-    "matchKeyword": "keyword1, keyword2, 关键词",
-    "minThreshold": 2,
-    "color": "#3b82f6",
-    "scope": "all"
-  }
-]
-\`\`\`
-规则中的 matchDomain 和 matchKeyword 必须是逗号分隔的精确字符串。`;
+      const systemPrompt = aiPrompts?.rulesGeneratorPrompt || DEFAULT_RULES_GENERATOR_PROMPT;
 
       const aiResponse = await sendAIChatRequest(aiConfig, systemPrompt, prompt);
 

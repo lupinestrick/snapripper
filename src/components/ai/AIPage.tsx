@@ -15,6 +15,7 @@ import { Sliders, Sparkles, Loader2, Settings } from "lucide-react";
 export function AIPage() {
   const {
     aiConfig,
+    aiPrompts,
     setActivePage,
     aiThresholds,
     setAiThresholds,
@@ -46,9 +47,14 @@ export function AIPage() {
     setIsAnalyzing(true, "提取 URL 指纹并发送至 AI 分析...");
 
     try {
-      const report = await analyzeTabProportions(allTabs, aiConfig, (status) => {
-        setIsAnalyzing(true, status);
-      });
+      const report = await analyzeTabProportions(
+        allTabs,
+        aiConfig,
+        (status) => {
+          setIsAnalyzing(true, status);
+        },
+        aiPrompts?.proportionAnalysisPrompt
+      );
       setProportionReport(report);
       setIsAnalyzing(false);
     } catch (err: any) {

@@ -1,6 +1,7 @@
 import { AIConfig, CategoryProportion, ProportionReport, AI_PROVIDERS, AIProviderKey } from "@/types/ai";
 import { SideberyTab } from "@/types/sidebery";
 import { cleanUrlForAI, extractDomain, isExemptUrl } from "@/utils/urlHelper";
+import { DEFAULT_PROPORTION_ANALYSIS_PROMPT } from "@/constants/aiPrompts";
 
 const PRESET_COLORS = [
   "#3b82f6", // blue
@@ -141,7 +142,8 @@ export const pingAIEndpoint = testAIConnection;
 export async function analyzeTabProportions(
   tabs: SideberyTab[],
   config: AIConfig,
-  onProgress?: (status: string) => void
+  onProgress?: (status: string) => void,
+  customPrompt?: string
 ): Promise<ProportionReport> {
   onProgress?.("正在提取标签指纹并过滤固定与特殊页面...");
 
@@ -162,36 +164,11 @@ export async function analyzeTabProportions(
   onProgress?.(`正在发送 ${nonExemptTabs.length} 个标签特征至 AI 分析比例...`);
 
   const systemPrompt = "你是一个专业的浏览器标签页管理专家。必须严格返回合法的 JSON 格式，不要包含任何闲聊文本。";
-  const userPrompt = `以下是用户的浏览器标签页列表摘要（包含 id、域名 domain、路径 path、标题 title）：
-
-${JSON.stringify(tabFingerprints, null, 1)}
-
-请依据互联网主流用户的通用日常浏览与生产力习惯，对这批标签页进行语义分析，归纳出 4 到 8 个高层次、清晰且互斥的主题类别，并计算每个分类在当前标签库中的占比（各比例相加总和必须为 100%）。
-
-分类建议参考互联网公认的标准习惯体系：
-- 💻 开发与技术 (Dev & Engineering)
-- 🤖 AI 与大模型 (AI & LLMs)
-- 🎬 影音与流媒体 (Media & Entertainment)
-- 💬 社交与社区 (Social & Community)
-- 📚 知识库与学术研究 (Research & Knowledge)
-- 💼 办公协作与文档 (Productivity & Work)
-- 🛒 电商与生活消费 (Shopping & Life)
-- 📰 科技与新闻资讯 (News & Feeds)
-- 🎨 设计与创意灵感 (Design & Inspiration)
-（若有其他突出的垂直领域，如特定同人资源、游戏攻略等，也可单独归纳为专属类别）
-
-必须严格返回如下合法的 JSON 格式：
-{
-  "categories": [
-    {
-      "name": "类别名称（例如：💻 开发与技术）",
-      "ratio": 30,
-      "description": "涵盖的网站特征说明",
-      "keywords": ["关键词1", "关键词2"]
-    }
-  ],
-  "suggestedAction": "简短的整理建议"
-}`;
+  const promptTemplate = (customPrompt && customPrompt.trim()) ? customPrompt.trim() : DEFAULT_PROPORTION_ANALYSIS_PROMPT;
+  const tabsJson = JSON.stringify(tabFingerprints, null, 1);
+  const userPrompt = promptTemplate.includes("{{tabsSummary}}")
+    ? promptTemplate.replace("{{tabsSummary}}", tabsJson)
+    : `${promptTemplate}\n\n${tabsJson}`;
 
   const rawContent = await sendAIChatRequest(config, systemPrompt, userPrompt);
 

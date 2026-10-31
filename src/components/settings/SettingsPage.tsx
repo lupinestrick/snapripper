@@ -20,7 +20,13 @@ import {
   Sun,
   Moon,
   Sparkles,
+  RotateCcw,
+  MessageSquareCode,
 } from "lucide-react";
+import {
+  DEFAULT_PROPORTION_ANALYSIS_PROMPT,
+  DEFAULT_RULES_GENERATOR_PROMPT,
+} from "@/constants/aiPrompts";
 
 export function SettingsPage() {
   const {
@@ -28,6 +34,9 @@ export function SettingsPage() {
     setTheme,
     aiConfig,
     setAIConfig,
+    aiPrompts,
+    setAIPrompt,
+    resetAIPrompt,
     exemptPinned,
     setExemptPinned,
     exemptInternalPages,
@@ -384,7 +393,148 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* Section 2: General & Interaction Preferences */}
+      {/* Section 2: AI Prompt Templates Configuration */}
+      <div
+        style={{
+          padding: "1.5rem",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
+          marginBottom: "2rem",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <MessageSquareCode size={20} style={{ color: "var(--accent)" }} />
+            <div>
+              <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>AI 提示词模板配置</h2>
+              <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                自定义两个 AI 应用特性的提示词模板，支持自由修改与随时一键恢复预设。
+              </p>
+            </div>
+          </div>
+
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", backgroundColor: "var(--bg-subtle)", padding: "0.3rem 0.6rem", borderRadius: "var(--radius-btn, 6px)", border: "1px solid var(--border-subtle)" }}>
+            默认提示词文件：<code style={{ color: "var(--accent-text)", fontWeight: 600 }}>src/constants/aiPrompts.ts</code>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Prompt 1: Tab Proportion Analysis */}
+          <div
+            style={{
+              padding: "1.1rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  1. 标签比例分析提示词 (User Prompt)
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem", lineHeight: 1.4 }}>
+                  用于在「AI 比例」分析当前标签的主题分布。系统会自动将待分析标签摘要注入到 <code style={{ color: "var(--accent-text)" }}>{"{{tabsSummary}}"}</code> 占位符处。
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                pill
+                onClick={() => resetAIPrompt("proportionAnalysisPrompt")}
+                title="重置为官方预设提示词"
+              >
+                <RotateCcw size={12} />
+                <span>恢复默认</span>
+              </Button>
+            </div>
+
+            <textarea
+              rows={8}
+              value={aiPrompts?.proportionAnalysisPrompt ?? DEFAULT_PROPORTION_ANALYSIS_PROMPT}
+              onChange={(e) => setAIPrompt("proportionAnalysisPrompt", e.target.value)}
+              placeholder="请输入标签比例分析提示词模板..."
+              style={{
+                width: "100%",
+                padding: "0.65rem 0.85rem",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
+                fontSize: "0.8rem",
+                lineHeight: "1.5",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                outline: "none",
+                resize: "vertical",
+              }}
+            />
+          </div>
+
+          {/* Prompt 2: Categorization Rules Generator */}
+          <div
+            style={{
+              padding: "1.1rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  2. 规则生成助手提示词 (System Prompt)
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem", lineHeight: 1.4 }}>
+                  用于在「规则管理」的“AI 生成”对话框中，指导 AI 模型如何根据用户的自然语言需求提炼输出规范的 Sidebery 标签匹配规则。
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                pill
+                onClick={() => resetAIPrompt("rulesGeneratorPrompt")}
+                title="重置为官方预设提示词"
+              >
+                <RotateCcw size={12} />
+                <span>恢复默认</span>
+              </Button>
+            </div>
+
+            <textarea
+              rows={8}
+              value={aiPrompts?.rulesGeneratorPrompt ?? DEFAULT_RULES_GENERATOR_PROMPT}
+              onChange={(e) => setAIPrompt("rulesGeneratorPrompt", e.target.value)}
+              placeholder="请输入规则生成助手的系统提示词..."
+              style={{
+                width: "100%",
+                padding: "0.65rem 0.85rem",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
+                fontSize: "0.8rem",
+                lineHeight: "1.5",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                outline: "none",
+                resize: "vertical",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Section 3: General & Interaction Preferences */}
       <div
         style={{
           padding: "1.5rem",
@@ -547,7 +697,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* Section 3: Backup & Restore */}
+      {/* Section 4: Backup & Restore */}
       <div
         style={{
           padding: "1.5rem",
