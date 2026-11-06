@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useConfigStore, AppTheme } from "@/store/useConfigStore";
-import { testAIConnection } from "@/services/aiService";
+import { testAIConnection, fetchAvailableModels } from "@/services/aiService";
 import { AI_PROVIDERS, AIProviderKey } from "@/types/ai";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,8 @@ import {
   MessageSquareCode,
   Save,
   LayoutGrid,
+  ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import {
   DEFAULT_PROPORTION_ANALYSIS_PROMPT,
@@ -69,6 +71,49 @@ export function SettingsPage() {
 
   const currentPreset = AI_PROVIDERS[aiConfig.provider] || AI_PROVIDERS.custom;
 
+  const [availableModels, setAvailableModels] = useState<string[]>(() => currentPreset.models || []);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [fetchModelsStatus, setFetchModelsStatus] = useState<{ success: boolean; message: string } | null>(null);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close model dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+      }
+    };
+    if (modelDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [modelDropdownOpen]);
+
+  const handleFetchModelsList = async () => {
+    setIsFetchingModels(true);
+    setFetchModelsStatus(null);
+    try {
+      const models = await fetchAvailableModels(aiConfig);
+      setAvailableModels(models);
+      setFetchModelsStatus({
+        success: true,
+        message: `已获取 ${models.length} 个模型`,
+      });
+      setModelDropdownOpen(true);
+      setTimeout(() => setFetchModelsStatus(null), 3500);
+    } catch (err: any) {
+      setFetchModelsStatus({
+        success: false,
+        message: err.message || "获取模型列表失败",
+      });
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
   const handleSelectProvider = (key: AIProviderKey) => {
     const preset = AI_PROVIDERS[key];
     setAIConfig({
@@ -77,7 +122,10 @@ export function SettingsPage() {
       model: preset.model,
       type: preset.type,
     });
+    setAvailableModels(preset.models || []);
     setTestResult(null);
+    setFetchModelsStatus(null);
+    setModelDropdownOpen(false);
   };
 
   const handleTestConnection = async () => {
@@ -380,45 +428,193 @@ export function SettingsPage() {
               <label style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
                 模型名称
               </label>
-              {currentPreset.models.length > 0 && (
-                <div style={{ display: "flex", gap: "0.3rem" }}>
-                  {currentPreset.models.map((m) => {
-                    const isModelActive = aiConfig.model === m;
-                    return (
-                      <Button
-                        key={m}
-                        type="button"
-                        variant={isModelActive ? "solid" : "outline"}
-                        size="xs"
-                        onClick={() => setAIConfig({ model: m })}
+
+              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                {fetchModelsStatus && (
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      color: fetchModelsStatus.success ? "#34d399" : "#f87171",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.2rem",
+                    }}
+                  >
+                    {fetchModelsStatus.success ? <Check size={12} /> : <AlertCircle size={12} />}
+                    {fetchModelsStatus.message}
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  pill
+                  onClick={handleFetchModelsList}
+                  disabled={isFetchingModels}
+                  title="向当前配置的 API 端点拉取可用模型列表"
+                  style={{ fontSize: "0.72rem", padding: "0.15rem 0.5rem" }}
+                >
+                  {isFetchingModels ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                  <span>获取模型列表</span>
+                </Button>
+              </div>
+            </div>
+
+            <div style={{ position: "relative" }} ref={modelDropdownRef}>
+              <input
+                type="text"
+                placeholder="请输入或下拉选择模型标识符"
+                value={aiConfig.model}
+                onChange={(e) => setAIConfig({ model: e.target.value })}
+                style={{
+                  width: "100%",
+                  padding: "0.5rem 2.2rem 0.5rem 0.75rem",
+                  borderRadius: "var(--radius-btn, 6px)",
+                  backgroundColor: "var(--bg-subtle)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-main)",
+                  fontSize: "0.85rem",
+                  outline: "none",
+                }}
+              />
+
+              {/* Embedded dropdown button on the right inside the input */}
+              <button
+                type="button"
+                onClick={() => setModelDropdownOpen((prev) => !prev)}
+                title={availableModels.length > 0 ? "展开模型列表下拉菜单" : "暂无获取到的模型，可点击右上角「获取模型列表」"}
+                style={{
+                  position: "absolute",
+                  right: "6px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: "24px",
+                  height: "24px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                  color: modelDropdownOpen ? "var(--accent)" : "var(--text-muted)",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--bg-card)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                <ChevronDown
+                  size={15}
+                  style={{
+                    transform: modelDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.15s ease",
+                  }}
+                />
+              </button>
+
+              {/* Dropdown Menu Popup */}
+              {modelDropdownOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    left: 0,
+                    right: 0,
+                    maxHeight: "220px",
+                    overflowY: "auto",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "var(--radius-btn, 6px)",
+                    padding: "0.35rem",
+                    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.4)",
+                    zIndex: 60,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.15rem",
+                  }}
+                >
+                  {availableModels.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "0.6rem 0.75rem",
+                        fontSize: "0.78rem",
+                        color: "var(--text-muted)",
+                        textAlign: "center",
+                      }}
+                    >
+                      暂无已获取的模型，请点击右上角「获取模型列表」
+                    </div>
+                  ) : (
+                    <>
+                      <div
                         style={{
-                          padding: "0.15rem 0.5rem",
-                          fontSize: "0.7rem",
+                          fontSize: "0.68rem",
+                          fontWeight: 600,
+                          color: "var(--text-muted)",
+                          padding: "0.2rem 0.45rem",
+                          borderBottom: "1px solid var(--border-subtle)",
+                          marginBottom: "0.15rem",
+                          display: "flex",
+                          justifyContent: "space-between",
                         }}
                       >
-                        {m}
-                      </Button>
-                    );
-                  })}
+                        <span>可用模型 ({availableModels.length})</span>
+                      </div>
+
+                      {availableModels.map((m) => {
+                        const isSelected = aiConfig.model === m;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => {
+                              setAIConfig({ model: m });
+                              setModelDropdownOpen(false);
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "0.35rem 0.55rem",
+                              borderRadius: "var(--radius-btn, 4px)",
+                              border: "1px solid",
+                              borderColor: isSelected ? "var(--accent-border)" : "transparent",
+                              backgroundColor: isSelected ? "var(--accent-subtle)" : "transparent",
+                              color: isSelected ? "var(--accent-text)" : "var(--text-main)",
+                              cursor: "pointer",
+                              outline: "none",
+                              transition: "all 0.15s ease",
+                              textAlign: "left",
+                              fontSize: "0.78rem",
+                              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.backgroundColor = "transparent";
+                              }
+                            }}
+                          >
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {m}
+                            </span>
+                            {isSelected && <Check size={13} style={{ color: "var(--accent)", flexShrink: 0 }} />}
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
                 </div>
               )}
             </div>
-            <input
-              type="text"
-              placeholder="模型标识符"
-              value={aiConfig.model}
-              onChange={(e) => setAIConfig({ model: e.target.value })}
-              style={{
-                width: "100%",
-                padding: "0.5rem 0.75rem",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "var(--bg-subtle)",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-main)",
-                fontSize: "0.85rem",
-                outline: "none",
-              }}
-            />
           </div>
 
           <div style={{ gridColumn: "span 2" }}>

@@ -139,6 +139,133 @@ export async function testAIConnection(config: AIConfig): Promise<{ success: boo
 
 export const pingAIEndpoint = testAIConnection;
 
+/**
+ * 动态获取当前配置服务商所支持的可用模型列表
+ */
+export async function fetchAvailableModels(config: AIConfig): Promise<string[]> {
+  const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
+  const protocol = config.type || providerDef.type || "openai";
+  const apiKey = (config.apiKey || "").trim();
+  const rawBaseUrl = (config.baseURL || providerDef.baseUrl).trim().replace(/\/+$/, "");
+
+  if (!rawBaseUrl) {
+    throw new Error("请先填写有效的 API Base URL");
+  }
+
+  // 1. Anthropic Claude Protocol
+  if (protocol === "anthropic") {
+    let endpoint = rawBaseUrl;
+    if (endpoint.endsWith("/messages")) {
+      endpoint = endpoint.replace(/\/messages$/, "/models");
+    } else if (!endpoint.endsWith("/models")) {
+      endpoint = `${endpoint}/models`;
+    }
+
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "dangerously-allow-browser": "true",
+      },
+    });
+
+    if (!res.ok) {
+      const err = await res.text().catch(() => "");
+      throw new Error(`获取 Claude 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+    }
+
+    const data = await res.json();
+    const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+    const models: string[] = list.map((m: any) => String(m.id || m.name || m || "")).filter(Boolean);
+    if (models.length > 0) return Array.from(new Set(models)).sort();
+    throw new Error("未解析到有效的 Claude 模型列表");
+  }
+
+  // 2. Google Gemini Protocol
+  if (protocol === "gemini") {
+    const isNativeGemini = rawBaseUrl.includes("generativelanguage.googleapis.com");
+    if (isNativeGemini) {
+      const endpoint = `${rawBaseUrl}/models?key=${apiKey}`;
+      const res = await fetch(endpoint, { method: "GET" });
+      if (!res.ok) {
+        const err = await res.text().catch(() => "");
+        throw new Error(`获取 Gemini 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+      }
+      const data = await res.json();
+      const list = Array.isArray(data.models) ? data.models : [];
+      const models: string[] = list
+        .map((m: any) => String(m.name ? m.name.replace(/^models\//, "") : m.id || m || ""))
+        .filter(Boolean);
+      if (models.length > 0) return Array.from(new Set(models)).sort();
+      throw new Error("未解析到有效的 Gemini 模型列表");
+    }
+  }
+
+  // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, OneAPI, vLLM, etc.)
+  let endpoint = rawBaseUrl;
+  if (endpoint.endsWith("/chat/completions")) {
+    endpoint = endpoint.replace(/\/chat\/completions$/, "/models");
+  } else if (!endpoint.endsWith("/models")) {
+    endpoint = `${endpoint}/models`;
+  }
+
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  let res = await fetch(endpoint, { method: "GET", headers });
+
+  // If 404, try ${rawBaseUrl}/v1/models if endpoint wasn't /v1/models
+  if (!res.ok && res.status === 404 && !endpoint.includes("/v1/models")) {
+    const fallbackEndpoint = `${rawBaseUrl}/v1/models`;
+    const fallbackRes = await fetch(fallbackEndpoint, { method: "GET", headers }).catch(() => null);
+    if (fallbackRes && fallbackRes.ok) {
+      res = fallbackRes;
+    }
+  }
+
+  // If Ollama native port 11434, fallback to /api/tags
+  if (!res.ok && (rawBaseUrl.includes("11434") || rawBaseUrl.includes("localhost"))) {
+    const ollamaEndpoint = `${rawBaseUrl.replace(/\/v1$/, "")}/api/tags`;
+    const ollamaRes = await fetch(ollamaEndpoint, { method: "GET" }).catch(() => null);
+    if (ollamaRes && ollamaRes.ok) {
+      const ollamaData = await ollamaRes.json();
+      if (Array.isArray(ollamaData.models)) {
+        const models: string[] = ollamaData.models.map((m: any) => String(m.name || m.model || m || "")).filter(Boolean);
+        if (models.length > 0) return Array.from(new Set(models)).sort();
+      }
+    }
+  }
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`获取模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+  }
+
+  const data = await res.json();
+  let list: any[] = [];
+  if (Array.isArray(data.data)) {
+    list = data.data;
+  } else if (Array.isArray(data.models)) {
+    list = data.models;
+  } else if (Array.isArray(data)) {
+    list = data;
+  }
+
+  const models: string[] = list
+    .map((m: any) => String(m.id || m.name || m || ""))
+    .filter(Boolean);
+
+  if (models.length === 0) {
+    throw new Error("接口返回的数据中未包含模型标识 (id/name)");
+  }
+
+  return Array.from(new Set(models)).sort((a, b) => a.localeCompare(b));
+}
+
+
 export async function analyzeTabProportions(
   tabs: SideberyTab[],
   config: AIConfig,
