@@ -2,10 +2,13 @@
 
 import React from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { useConfigStore } from "@/store/useConfigStore";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { extractDomain } from "@/utils/urlHelper";
-import { X, Layers, Globe } from "lucide-react";
+import { matchTabWithRule } from "@/services/ruleEngine";
+import { X, Layers, Globe, BarChart3, Sparkles } from "lucide-react";
 
 interface OverviewHopupProps {
   isOpen: boolean;
@@ -13,7 +16,8 @@ interface OverviewHopupProps {
 }
 
 export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
-  const { rawSnapshot } = useSnapshotStore();
+  const { rawSnapshot, aiProcessedCache, proportionReport } = useSnapshotStore();
+  const { rulesSettings } = useConfigStore();
 
   if (!isOpen || !rawSnapshot) return null;
 
@@ -43,6 +47,114 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
 
   const groupCount = tabs.filter((t) => t.isGroup).length;
   const pinnedCount = tabs.filter((t) => t.pinned).length;
+
+  // Classification breakdown calculation
+  interface BreakdownItem {
+    name: string;
+    count: number;
+    pct: string;
+    pctNum: number;
+    color: string;
+  }
+
+  const PRESET_COLORS = [
+    "#3b82f6", "#10b981", "#ef4444", "#06b6d4",
+    "#8b5cf6", "#f59e0b", "#ec4899", "#64748b", "#f97316"
+  ];
+
+  let breakdownBadge = "";
+  let categorizedList: BreakdownItem[] = [];
+  let uncategorizedItem: BreakdownItem | null = null;
+
+  if (aiProcessedCache) {
+    breakdownBadge = "AI 归类缓存";
+    const total = tabs.length;
+    categorizedList = aiProcessedCache.categoryNames.map((name, i) => {
+      const cnt = aiProcessedCache.summary.categoryCounts[name] || 0;
+      const pctNum = total > 0 ? (cnt / total) * 100 : 0;
+      return {
+        name,
+        count: cnt,
+        pct: pctNum.toFixed(1),
+        pctNum,
+        color: PRESET_COLORS[i % PRESET_COLORS.length],
+      };
+    }).filter((it) => it.count > 0);
+
+    const uncatCount = aiProcessedCache.summary.uncategorizedCount;
+    const uncatPct = total > 0 ? (uncatCount / total) * 100 : 0;
+    uncategorizedItem = {
+      name: "未分类 (Uncategorized)",
+      count: uncatCount,
+      pct: uncatPct.toFixed(1),
+      pctNum: uncatPct,
+      color: "#94a3b8",
+    };
+  } else if (proportionReport && proportionReport.categories.length > 0) {
+    breakdownBadge = "AI 比例分析预测";
+    const total = tabs.length;
+    categorizedList = proportionReport.categories.map((c, i) => {
+      const estimatedCount = Math.round((c.ratio / 100) * proportionReport.totalAnalyzed);
+      const pctNum = total > 0 ? (estimatedCount / total) * 100 : c.ratio;
+      return {
+        name: c.name,
+        count: estimatedCount,
+        pct: pctNum.toFixed(1),
+        pctNum,
+        color: c.color || PRESET_COLORS[i % PRESET_COLORS.length],
+      };
+    });
+    const categorizedTotal = categorizedList.reduce((acc, it) => acc + it.count, 0);
+    const uncatCount = Math.max(0, total - categorizedTotal);
+    const uncatPct = total > 0 ? (uncatCount / total) * 100 : 0;
+    uncategorizedItem = {
+      name: "未分类 / 豁免保护",
+      count: uncatCount,
+      pct: uncatPct.toFixed(1),
+      pctNum: uncatPct,
+      color: "#94a3b8",
+    };
+  } else {
+    const activeRules = (rulesSettings?.rules || []).filter((r) => r.enabled);
+    if (activeRules.length > 0) {
+      breakdownBadge = "规则引擎匹配";
+      const ruleCounts = new Map<string, number>();
+      let matchedTotal = 0;
+
+      for (const t of tabs) {
+        if (t.pinned || t.url?.startsWith("about:")) continue;
+        for (const rule of activeRules) {
+          if (matchTabWithRule(t, rule)) {
+            ruleCounts.set(rule.name, (ruleCounts.get(rule.name) || 0) + 1);
+            matchedTotal++;
+            break;
+          }
+        }
+      }
+
+      categorizedList = activeRules.map((rule, i) => {
+        const cnt = ruleCounts.get(rule.name) || 0;
+        const pctNum = tabs.length > 0 ? (cnt / tabs.length) * 100 : 0;
+        return {
+          name: rule.name,
+          count: cnt,
+          pct: pctNum.toFixed(1),
+          pctNum,
+          color: rule.color || PRESET_COLORS[i % PRESET_COLORS.length],
+        };
+      }).filter((it) => it.count > 0);
+
+      const uncatCount = Math.max(0, tabs.length - matchedTotal);
+      const uncatPct = tabs.length > 0 ? (uncatCount / tabs.length) * 100 : 0;
+      uncategorizedItem = {
+        name: "未分类 (未匹配既有规则)",
+        count: uncatCount,
+        pct: uncatPct.toFixed(1),
+        pctNum: uncatPct,
+        color: "#94a3b8",
+      };
+    }
+  }
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -128,6 +240,145 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
                 );
               })}
             </div>
+          </div>
+
+          {/* Classification Breakdown (AI or Rules + Uncategorized) */}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>
+                <Sparkles size={16} style={{ color: "var(--accent)" }} />
+                <span>分类比例分布与未分类</span>
+              </div>
+              {breakdownBadge && (
+                <Badge variant="subtle" size="sm" style={{ backgroundColor: "var(--accent-subtle)", color: "var(--accent-text)", fontSize: "0.72rem" }}>
+                  来源: {breakdownBadge}
+                </Badge>
+              )}
+            </div>
+
+            {categorizedList.length > 0 || (uncategorizedItem && uncategorizedItem.count > 0) ? (
+              <div>
+                {/* Segmented bar */}
+                <div
+                  style={{
+                    height: "10px",
+                    borderRadius: "9999px",
+                    overflow: "hidden",
+                    display: "flex",
+                    backgroundColor: "var(--bg-subtle)",
+                    border: "1px solid var(--border-subtle)",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  {categorizedList.map((item) => (
+                    <div
+                      key={item.name}
+                      title={`${item.name}: ${item.count} (${item.pct}%)`}
+                      style={{
+                        width: `${item.pctNum}%`,
+                        backgroundColor: item.color,
+                        height: "100%",
+                      }}
+                    />
+                  ))}
+                  {uncategorizedItem && uncategorizedItem.count > 0 && (
+                    <div
+                      title={`${uncategorizedItem.name}: ${uncategorizedItem.count} (${uncategorizedItem.pct}%)`}
+                      style={{
+                        width: `${uncategorizedItem.pctNum}%`,
+                        backgroundColor: uncategorizedItem.color,
+                        height: "100%",
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Items grid */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.5rem" }}>
+                  {categorizedList.map((item) => (
+                    <div
+                      key={item.name}
+                      style={{
+                        backgroundColor: "var(--bg-subtle)",
+                        border: "1px solid var(--border-subtle)",
+                        padding: "0.5rem 0.75rem",
+                        borderRadius: "0.5rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: "0.8rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
+                        <span
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: item.color,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-main)" }}>
+                          {item.name}
+                        </span>
+                      </div>
+                      <span style={{ color: "var(--text-muted)", fontWeight: 600, flexShrink: 0, marginLeft: "0.5rem" }}>
+                        {item.count} ({item.pct}%)
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Explicit Uncategorized item */}
+                  {uncategorizedItem && (
+                    <div
+                      style={{
+                        backgroundColor: "var(--bg-subtle)",
+                        border: "1px dashed var(--border-subtle)",
+                        padding: "0.5rem 0.75rem",
+                        borderRadius: "0.5rem",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        fontSize: "0.8rem",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
+                        <span
+                          style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: uncategorizedItem.color,
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-muted)", fontWeight: 500 }}>
+                          {uncategorizedItem.name}
+                        </span>
+                      </div>
+                      <span style={{ color: "var(--text-muted)", fontWeight: 600, flexShrink: 0, marginLeft: "0.5rem" }}>
+                        {uncategorizedItem.count} ({uncategorizedItem.pct}%)
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "0.85rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: "var(--bg-subtle)",
+                  border: "1px dashed var(--border-subtle)",
+                  fontSize: "0.78rem",
+                  color: "var(--text-muted)",
+                  textAlign: "center",
+                }}
+              >
+                尚未进行 AI 分类或规则匹配。前往「AI 比例」分析后，将自动在此展示精确的类别与未分类比例。
+              </div>
+            )}
           </div>
 
           {/* Top Domains */}

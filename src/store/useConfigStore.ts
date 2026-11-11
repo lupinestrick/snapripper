@@ -44,6 +44,7 @@ interface ConfigState {
   preserveSubtrees: boolean;
   cascadeSelectChildren: boolean;
   aiThresholds: AIThresholds;
+  aiGenerateRulesFirst: boolean;
 
   // Process & Diff Scope Settings
   processScope: ProcessScope;
@@ -69,6 +70,7 @@ interface ConfigState {
   setPreserveSubtrees: (val: boolean) => void;
   setCascadeSelectChildren: (val: boolean) => void;
   setAiThresholds: (thresholds: Partial<AIThresholds>) => void;
+  setAiGenerateRulesFirst: (val: boolean) => void;
 
   setProcessScope: (scope: ProcessScope) => void;
   setSelectedProcessPanelIds: (panelIds: string[]) => void;
@@ -100,6 +102,7 @@ export const useConfigStore = create<ConfigState>()(
         minTabsPerGroup: 2,
         maxCategories: 6,
       },
+      aiGenerateRulesFirst: true,
       processScope: "all",
       selectedProcessPanelIds: [],
       domainMergeConfig: DEFAULT_DOMAIN_MERGE_CONFIG,
@@ -189,6 +192,7 @@ export const useConfigStore = create<ConfigState>()(
         set((state) => ({
           aiThresholds: { ...state.aiThresholds, ...thresholds },
         })),
+      setAiGenerateRulesFirst: (val) => set({ aiGenerateRulesFirst: val }),
 
       setProcessScope: (processScope) => set({ processScope }),
       setSelectedProcessPanelIds: (selectedProcessPanelIds) => set({ selectedProcessPanelIds }),
@@ -220,6 +224,7 @@ export const useConfigStore = create<ConfigState>()(
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
+        aiGenerateRulesFirst: persistedState?.aiGenerateRulesFirst ?? true,
         uiSettings: {
           ...DEFAULT_UI_SETTINGS,
           ...(persistedState?.uiSettings || {}),

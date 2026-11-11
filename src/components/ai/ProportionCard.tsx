@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Sparkles, ArrowRight, Plus, Trash2, PieChart, X } from "lucide-react";
+import { Sparkles, ArrowRight, Plus, Trash2, PieChart, X, GitCompare, FileEdit } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,9 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
     updateCategoryName,
     removeCategory,
     addCategory,
+    aiProcessedCache,
+    setIsAIDiffModalOpen,
+    enterPostEditMode,
   } = useSnapshotStore();
 
   const [newCatName, setNewCatName] = useState("");
@@ -270,21 +273,50 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
         </div>
       </Card.Body>
 
-      <Card.Footer style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <Card.Footer style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
         <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-          💡 确认上述分类满意后，点击右侧按钮，AI 将根据该分类标准自动重新组织标签。
+          💡 确认上述分类满意后，点击右侧按钮，AI 将依据该分类标准自动生成重组缓存与差分。
         </span>
 
-        <Button
-          variant="solid"
-          size="xs"
-          pill
-          onClick={onStartClassification}
-        >
-          <Sparkles size={13} />
-          <span>确认分类标准并执行批量归类</span>
-          <ArrowRight size={13} />
-        </Button>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          {aiProcessedCache && (
+            <>
+              <Button
+                variant="outline"
+                size="xs"
+                pill
+                onClick={() => setIsAIDiffModalOpen(true)}
+                title="查看已生成的 AI 分类差分对比"
+              >
+                <GitCompare size={13} />
+                <span>DIFF 对比</span>
+              </Button>
+
+              <Button
+                variant="solid"
+                size="xs"
+                pill
+                onClick={enterPostEditMode}
+                style={{ backgroundColor: "var(--accent-solid)", color: "#fff" }}
+                title="进入工作台加载被 AI 处理后的数据"
+              >
+                <FileEdit size={13} />
+                <span>AI 处理后编辑 (Post Edit)</span>
+              </Button>
+            </>
+          )}
+
+          <Button
+            variant="solid"
+            size="xs"
+            pill
+            onClick={onStartClassification}
+          >
+            <Sparkles size={13} />
+            <span>{aiProcessedCache ? "重新归类与生成差分" : "确认标准并执行智能归类"}</span>
+            <ArrowRight size={13} />
+          </Button>
+        </div>
       </Card.Footer>
     </Card.Root>
   );

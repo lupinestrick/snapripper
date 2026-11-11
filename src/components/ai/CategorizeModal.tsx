@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Sparkles, FolderTree, PanelsTopLeft, Loader2 } from "lucide-react";
-import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { X, Sparkles, FolderTree, PanelsTopLeft, Loader2, GitCompare, Check } from "lucide-react";
+import { useSnapshotStore, buildProcessedSnapshot } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
-import { classifyTabs } from "@/services/aiService";
+import { classifyTabsWithRulesOrAI } from "@/services/aiService";
 import { flattenTabTree } from "@/services/snapshotParser";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AIProcessedCache } from "@/types/ai";
 
 interface CategorizeModalProps {
   isOpen: boolean;
@@ -17,49 +18,81 @@ interface CategorizeModalProps {
 
 export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
   const {
+    rawSnapshot,
     rootNodes,
     proportionReport,
     isClassifying,
     setIsClassifying,
     classificationProgress,
-    applyTreeCategorization,
-    applyPanelCategorization,
+    setAiProcessedCache,
+    setIsAIDiffModalOpen,
   } = useSnapshotStore();
 
-  const { aiConfig } = useConfigStore();
+  const { aiConfig, aiGenerateRulesFirst, setAiGenerateRulesFirst, aiPrompts } = useConfigStore();
   const [restructureMode, setRestructureMode] = useState<"tree" | "panel">("tree");
+  const [generateRulesFirst, setLocalGenerateRulesFirst] = useState<boolean>(aiGenerateRulesFirst);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen || !proportionReport) return null;
 
   const handleExecute = async () => {
+    if (!rawSnapshot) return;
     setErrorMsg(null);
     const allTabs = flattenTabTree(rootNodes);
     setIsClassifying(true, { current: 0, total: allTabs.length });
 
     try {
-      const classificationMap = await classifyTabs(
+      const { classificationMap, generatedRules } = await classifyTabsWithRulesOrAI(
         allTabs,
         proportionReport.categories,
         aiConfig,
-        (current, total) => {
+        generateRulesFirst,
+        aiPrompts?.rulesGeneratorPrompt,
+        (_status, current, total) => {
           setIsClassifying(true, { current, total });
         }
       );
 
       const categoryNames = proportionReport.categories.map((c) => c.name);
+      const total = allTabs.length;
+      const categorizedCount = classificationMap.size;
+      const uncategorizedCount = Math.max(0, total - categorizedCount);
 
-      if (restructureMode === "tree") {
-        applyTreeCategorization(classificationMap, categoryNames);
-      } else {
-        applyPanelCategorization(
-          classificationMap,
-          proportionReport.categories.map((c) => ({ id: c.id, name: c.name }))
-        );
+      const categoryCounts: Record<string, number> = {};
+      for (const name of categoryNames) {
+        categoryCounts[name] = 0;
+      }
+      for (const catName of classificationMap.values()) {
+        categoryCounts[catName] = (categoryCounts[catName] || 0) + 1;
       }
 
+      const { processedSnapshot } = buildProcessedSnapshot(
+        rawSnapshot,
+        classificationMap,
+        proportionReport.categories.map((c) => ({ id: c.id, name: c.name })),
+        restructureMode
+      );
+
+      const cache: AIProcessedCache = {
+        originalSnapshot: rawSnapshot,
+        processedSnapshot,
+        timestamp: Date.now(),
+        categoryNames,
+        classificationMap: Object.fromEntries(classificationMap),
+        generatedRules,
+        summary: {
+          total,
+          categorizedCount,
+          uncategorizedCount,
+          categoryCounts,
+        },
+        targetMode: restructureMode,
+      };
+
+      setAiProcessedCache(cache);
       setIsClassifying(false);
       onClose();
+      setIsAIDiffModalOpen(true);
     } catch (err: any) {
       setIsClassifying(false);
       setErrorMsg(err.message || "分类归纳执行失败");
@@ -100,8 +133,8 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
                 <Sparkles size={18} />
               </div>
               <div>
-                <Dialog.Title>按 AI 探查比例自动重构</Dialog.Title>
-                <Dialog.Description>选择重组形式并将标签批量分配到对应目标</Dialog.Description>
+                <Dialog.Title>按 AI 探查比例智能归类</Dialog.Title>
+                <Dialog.Description>分类后将自动保存缓存并进入差分确认界面</Dialog.Description>
               </div>
             </div>
 
@@ -115,6 +148,37 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
             >
               <X size={18} />
             </Button>
+          </div>
+
+          {/* AI rules first option checkbox */}
+          <div
+            style={{
+              padding: "0.85rem 1rem",
+              borderRadius: "0.75rem",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+              marginBottom: "1rem",
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={generateRulesFirst}
+                onChange={(e) => {
+                  setLocalGenerateRulesFirst(e.target.checked);
+                  setAiGenerateRulesFirst(e.target.checked);
+                }}
+                style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+              />
+              <div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  先提炼生成规则，再用 AI 补充分类 (推荐)
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.15rem", lineHeight: 1.4 }}>
+                  开启后将先依据各主题提取域名与关键词生成高精度匹配规则，快速匹配主流网站，再对剩余未匹配标签调用大模型归纳。
+                </div>
+              </div>
+            </label>
           </div>
 
           {/* Mode Selection Cards */}
@@ -139,7 +203,7 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
                   生成树形目录（创建分类 Group 组）
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                  在当前面板内创建对应类别的 Group 标签，并将同类标签移入作为子标签。保持子树整体。
+                  在指定面板内创建对应类别的 Group 组标签，将同类标签移入作为子标签。进入差分后可选择具体面板。
                 </div>
               </div>
             </div>
@@ -174,7 +238,7 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
           {isClassifying && (
             <div style={{ marginBottom: "1.25rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--accent-text)", marginBottom: "0.35rem" }}>
-                <span>AI 正在逐批归类标签...</span>
+                <span>正在执行分类归类...</span>
                 <span>
                   {classificationProgress.current} / {classificationProgress.total} ({percent}%)
                 </span>
@@ -207,8 +271,8 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
               onClick={handleExecute}
               disabled={isClassifying}
             >
-              {isClassifying ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-              <span>{isClassifying ? "正在重组..." : "确认并执行重构"}</span>
+              {isClassifying ? <Loader2 size={15} className="animate-spin" /> : <GitCompare size={15} />}
+              <span>{isClassifying ? "正在分类处理..." : "开始分类并生成差分"}</span>
             </Button>
           </div>
         </Dialog.Content>

@@ -7,17 +7,19 @@ import { StatsHeader } from "@/components/layout/StatsHeader";
 import { SearchFilter } from "@/components/editor/SearchFilter";
 import { TabTreeView } from "@/components/editor/TabTreeView";
 import { BatchBar } from "@/components/editor/BatchBar";
+import { PostEditBanner } from "@/components/editor/PostEditBanner";
 import { ProcessPage } from "@/components/process/ProcessPage";
 import { RulesPage } from "@/components/rules/RulesPage";
 import { AIPage } from "@/components/ai/AIPage";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { ExportDialog } from "@/components/export/ExportDialog";
+import { AIDiffModal } from "@/components/ai/AIDiffModal";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
 import { Loader2 } from "lucide-react";
 
 export default function WorkbenchPage() {
-  const { rawSnapshot, loadSnapshot } = useSnapshotStore();
+  const { rawSnapshot, loadSnapshot, isAIDiffModalOpen, setIsAIDiffModalOpen } = useSnapshotStore();
   const { activePage, theme } = useConfigStore();
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -135,6 +137,7 @@ export default function WorkbenchPage() {
           {activePage === "workbench" && (
             <>
               <StatsHeader />
+              <PostEditBanner />
               {rawSnapshot && <SearchFilter />}
               <TabTreeView />
               <BatchBar />
@@ -152,6 +155,7 @@ export default function WorkbenchPage() {
       </div>
 
       <ExportDialog isOpen={exportDialogOpen} onClose={() => setExportDialogOpen(false)} />
+      <AIDiffModal isOpen={isAIDiffModalOpen} onClose={() => setIsAIDiffModalOpen(false)} />
     </div>
   );
 }

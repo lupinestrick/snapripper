@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { SideberySnapshot, SideberyTab, TabTreeNode } from "@/types/sidebery";
-import { ProportionReport } from "@/types/ai";
+import { SideberySnapshot, SideberyTab, TabTreeNode, CategorizationRule } from "@/types/sidebery";
+import { ProportionReport, AIProcessedCache } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
 import { useConfigStore } from "./useConfigStore";
 import {
@@ -35,6 +35,64 @@ function findNodeAndDescendants(nodes: TabTreeNode[], targetId: string): string[
   return [];
 }
 
+export function buildProcessedSnapshot(
+  originalSnapshot: SideberySnapshot,
+  classificationMap: Map<string, string>,
+  categories: { id: string; name: string }[],
+  targetMode: "tree" | "panel",
+  targetPanelId?: string
+): { processedSnapshot: SideberySnapshot; processedTree: TabTreeNode[] } {
+  const primaryWinId = Object.keys(originalSnapshot.windows)[0] || "1";
+  const tabs = originalSnapshot.windows[primaryWinId]?.tabs || [];
+  const categoryNames = categories.map((c) => c.name);
+
+  if (targetMode === "panel") {
+    const { tabs: updatedTabs, panels: updatedPanels } = reorganizeTabsIntoPanels(
+      tabs,
+      classificationMap,
+      categories,
+      originalSnapshot.panels || {}
+    );
+    const processedTree = buildTabTree(updatedTabs);
+    const processedSnapshot: SideberySnapshot = {
+      ...originalSnapshot,
+      panels: updatedPanels,
+      windows: {
+        ...originalSnapshot.windows,
+        [primaryWinId]: { tabs: updatedTabs },
+      },
+    };
+    return { processedSnapshot, processedTree };
+  } else {
+    const originalTree = buildTabTree(tabs);
+    let processedTree = reorganizeTreeIntoCategories(originalTree, classificationMap, categoryNames);
+    if (targetPanelId) {
+      processedTree = processedTree.map((node) => {
+        if (node.isCategoryHeader) {
+          return {
+            ...node,
+            tab: { ...node.tab, panelId: targetPanelId },
+            children: node.children.map((c) => ({
+              ...c,
+              tab: { ...c.tab, panelId: targetPanelId },
+            })),
+          };
+        }
+        return node;
+      });
+    }
+    const updatedTabs = flattenTabTree(processedTree);
+    const processedSnapshot: SideberySnapshot = {
+      ...originalSnapshot,
+      windows: {
+        ...originalSnapshot.windows,
+        [primaryWinId]: { tabs: updatedTabs },
+      },
+    };
+    return { processedSnapshot, processedTree };
+  }
+}
+
 interface SnapshotStoreState {
   rawSnapshot: SideberySnapshot | null;
   fileName: string;
@@ -55,6 +113,10 @@ interface SnapshotStoreState {
   isClassifying: boolean;
   progressStatus: string;
   classificationProgress: { current: number; total: number };
+
+  aiProcessedCache: AIProcessedCache | null;
+  isPostEditMode: boolean;
+  isAIDiffModalOpen: boolean;
 
   undoStack: SideberySnapshot[];
   redoStack: SideberySnapshot[];
@@ -90,6 +152,12 @@ interface SnapshotStoreState {
   applyTreeCategorization: (classificationMap: Map<string, string>, categoryNames: string[]) => void;
   applyPanelCategorization: (classificationMap: Map<string, string>, categories: { id: string; name: string }[]) => void;
   getExportSnapshot: (mode: "tree" | "panel" | "container") => SideberySnapshot;
+
+  setAiProcessedCache: (cache: AIProcessedCache | null) => void;
+  setIsAIDiffModalOpen: (open: boolean) => void;
+  enterPostEditMode: () => void;
+  exitPostEditMode: (apply: boolean) => void;
+  updateProcessedTreeTarget: (targetMode: "tree" | "panel", targetPanelId?: string) => void;
 }
 
 export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
@@ -112,6 +180,10 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
   isClassifying: false,
   progressStatus: "",
   classificationProgress: { current: 0, total: 0 },
+
+  aiProcessedCache: null,
+  isPostEditMode: false,
+  isAIDiffModalOpen: false,
 
   undoStack: [],
   redoStack: [],
@@ -142,6 +214,9 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
       undoStack: [],
       redoStack: [],
       proportionReport: null,
+      aiProcessedCache: null,
+      isPostEditMode: false,
+      isAIDiffModalOpen: false,
     });
   },
 
@@ -510,5 +585,84 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
         [activeWindowId]: { tabs },
       },
     };
+  },
+
+  setAiProcessedCache: (cache) => set({ aiProcessedCache: cache }),
+  setIsAIDiffModalOpen: (open) => set({ isAIDiffModalOpen: open }),
+
+  enterPostEditMode: () => {
+    const { aiProcessedCache, activeWindowId } = get();
+    if (!aiProcessedCache) return;
+    const procWinTabs = aiProcessedCache.processedSnapshot.windows[activeWindowId]?.tabs || [];
+    const tree = buildTabTree(procWinTabs);
+    const expandedIds = new Set<string>(tree.map((n) => n.id));
+    set({
+      isPostEditMode: true,
+      rootNodes: tree,
+      expandedIds,
+      selectedIds: new Set<string>(),
+    });
+    useConfigStore.getState().setActivePage("workbench");
+  },
+
+  exitPostEditMode: (apply) => {
+    const { aiProcessedCache, rootNodes, rawSnapshot, activeWindowId, undoStack } = get();
+    if (!aiProcessedCache || !rawSnapshot) {
+      set({ isPostEditMode: false });
+      return;
+    }
+
+    if (apply) {
+      const updatedTabs = flattenTabTree(rootNodes);
+      const committedSnapshot: SideberySnapshot = {
+        ...aiProcessedCache.processedSnapshot,
+        windows: {
+          ...aiProcessedCache.processedSnapshot.windows,
+          [activeWindowId]: { tabs: updatedTabs },
+        },
+      };
+      set({
+        undoStack: [...undoStack, rawSnapshot],
+        redoStack: [],
+        rawSnapshot: committedSnapshot,
+        isPostEditMode: false,
+      });
+    } else {
+      const origWinTabs = aiProcessedCache.originalSnapshot.windows[activeWindowId]?.tabs || [];
+      const origTree = buildTabTree(origWinTabs);
+      set({
+        rawSnapshot: aiProcessedCache.originalSnapshot,
+        rootNodes: origTree,
+        isPostEditMode: false,
+      });
+    }
+  },
+
+  updateProcessedTreeTarget: (targetMode, targetPanelId) => {
+    const { aiProcessedCache, isPostEditMode } = get();
+    if (!aiProcessedCache) return;
+
+    const classificationMap = new Map<string, string>(Object.entries(aiProcessedCache.classificationMap));
+    const categories = aiProcessedCache.categoryNames.map((name, i) => ({ id: `cat_${i}`, name }));
+
+    const { processedSnapshot, processedTree } = buildProcessedSnapshot(
+      aiProcessedCache.originalSnapshot,
+      classificationMap,
+      categories,
+      targetMode,
+      targetPanelId
+    );
+
+    const updatedCache: AIProcessedCache = {
+      ...aiProcessedCache,
+      processedSnapshot,
+      targetMode,
+      targetPanelId,
+    };
+
+    set({
+      aiProcessedCache: updatedCache,
+      ...(isPostEditMode ? { rootNodes: processedTree } : {}),
+    });
   },
 }));

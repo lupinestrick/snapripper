@@ -4,6 +4,7 @@ styled-system
 dist
 .env*.local
 *.log
+*.tsbuildinfo
 
 # Sidebery snapshots & personal files
 sidebery-snapshot*.json

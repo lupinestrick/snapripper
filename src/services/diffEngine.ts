@@ -2,6 +2,7 @@ import { SideberySnapshot, SideberyTab, TabTreeNode, PanelDiffResult, RulesSetti
 import { buildTabTree, flattenTabTree } from "./snapshotParser";
 import { applyRulesToTreeNodes, deduplicateTreeNodes } from "./ruleEngine";
 import { applyDomainMergeToTreeNodes, DomainMergeConfig } from "./domainMergeEngine";
+import { reorganizeTreeIntoCategories } from "./treeOperations";
 
 export type ProcessScope = "current" | "all" | "selected";
 
@@ -119,6 +120,15 @@ export function computeSnapshotDiff(
         currentTree = ruleResult.newNodes;
         panelGroupsCreated += ruleResult.groupsCreated;
         totalGroupsCreated += ruleResult.groupsCreated;
+      }
+
+      // 4. AI-based category clustering
+      if (options.enableAICategorize && options.aiClassificationMap && options.aiCategoryNames) {
+        currentTree = reorganizeTreeIntoCategories(
+          currentTree,
+          options.aiClassificationMap,
+          options.aiCategoryNames
+        );
       }
     }
 

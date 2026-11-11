@@ -53,6 +53,8 @@ export function SettingsPage() {
     setCascadeSelectChildren,
     rulesSettings,
     setRulesSettings,
+    aiGenerateRulesFirst,
+    setAiGenerateRulesFirst,
     exportRulesJSON,
     importRulesJSON,
   } = useConfigStore();
@@ -843,6 +845,35 @@ export function SettingsPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {/* AI generate rules first toggle */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+              cursor: "pointer",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={aiGenerateRulesFirst}
+              onChange={(e) => setAiGenerateRulesFirst(e.target.checked)}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+            />
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                AI 分类前先生成匹配规则
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                开启后，AI 比例重构将先依据分析主题提炼域名与关键词匹配规则，优先通过规则引擎快速分类，再对剩余未匹配标签进行 AI 补充归纳；关闭则直接逐批调用大模型分类。
+              </div>
+            </div>
+          </label>
+
           {/* Cascade select children toggle */}
           <label
             style={{

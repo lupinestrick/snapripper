@@ -1,3 +1,5 @@
+import { SideberySnapshot, CategorizationRule } from "./sidebery";
+
 export type AIProviderKey = "deepseek" | "claude" | "openai" | "gemini" | "custom";
 export type AIProtocolType = "openai" | "anthropic" | "gemini";
 
@@ -84,4 +86,21 @@ export interface TabClassificationResult {
   categoryId: string;
   categoryName: string;
   confidence?: number;
+}
+
+export interface AIProcessedCache {
+  originalSnapshot: SideberySnapshot;
+  processedSnapshot: SideberySnapshot;
+  timestamp: number;
+  categoryNames: string[];
+  classificationMap: Record<string, string>; // tabId -> categoryName
+  generatedRules?: CategorizationRule[];
+  summary: {
+    total: number;
+    categorizedCount: number;
+    uncategorizedCount: number;
+    categoryCounts: Record<string, number>;
+  };
+  targetMode: "tree" | "panel";
+  targetPanelId?: string;
 }
