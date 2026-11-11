@@ -56,7 +56,17 @@ export async function sendAIChatRequest(
     }
 
     const data = await res.json();
-    return data.content?.[0]?.text || "";
+    // 兼容 Claude 3.7 / 思考模式等多 Block 响应结构，聚合所有 text 块
+    if (Array.isArray(data.content)) {
+      const textBlocks = data.content
+        .filter((b: any) => b.type === "text" || (typeof b.text === "string" && b.type !== "thinking"))
+        .map((b: any) => b.text || "");
+      if (textBlocks.length > 0) {
+        return textBlocks.join("");
+      }
+      return data.content[0]?.text || data.content[0]?.thinking || "";
+    }
+    return "";
   }
 
   // 2. Google Gemini Protocol
@@ -82,11 +92,18 @@ export async function sendAIChatRequest(
       }
 
       const data = await res.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const textParts = parts
+        .filter((p: any) => typeof p.text === "string" && !p.thought)
+        .map((p: any) => p.text);
+      if (textParts.length > 0) {
+        return textParts.join("");
+      }
+      return parts.map((p: any) => p.text || "").join("");
     }
   }
 
-  // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Custom, etc.)
+  // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, SiliconFlow, Groq, etc.)
   let endpoint = baseUrl;
   if (!endpoint.endsWith("/chat/completions")) {
     endpoint = endpoint.endsWith("/v1") ? `${endpoint}/chat/completions` : `${endpoint}/v1/chat/completions`;
@@ -99,17 +116,25 @@ export async function sendAIChatRequest(
     headers["Authorization"] = `Bearer ${apiKey}`;
   }
 
+  const requestBody: Record<string, any> = {
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  };
+
+  if (model.startsWith("o1") || model.startsWith("o3")) {
+    requestBody.max_completion_tokens = 4096;
+  } else {
+    requestBody.max_tokens = 4096;
+    requestBody.temperature = config.temperature ?? 0.2;
+  }
+
   const res = await fetch(endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: config.temperature ?? 0.2,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   if (!res.ok) {
@@ -118,7 +143,24 @@ export async function sendAIChatRequest(
   }
 
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || "";
+  const choice = data.choices?.[0];
+  const message = choice?.message;
+
+  let content = "";
+  if (typeof message?.content === "string") {
+    content = message.content;
+  } else if (Array.isArray(message?.content)) {
+    content = message.content.map((p: any) => p.text || p.content || "").join("");
+  } else if (typeof choice?.text === "string") {
+    content = choice.text;
+  }
+
+  // 针对 DeepSeek-R1 / QwQ 等推理模型，若 content 为空则提取 reasoning_content
+  if (!content.trim() && typeof message?.reasoning_content === "string") {
+    content = message.reasoning_content;
+  }
+
+  return content;
 }
 
 export async function testAIConnection(config: AIConfig): Promise<{ success: boolean; message: string }> {
@@ -266,6 +308,213 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
   return Array.from(new Set(models)).sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * 修复 LLM 返回的常见非标准 JSON 语法缺陷：
+ * 1. 弯引号 / 全角引号替换
+ * 2. 去除行尾或单行注释 // ...
+ * 3. 去除多行注释
+ * 4. 去除数组与对象尾部多余逗号 (Trailing Commas)
+ * 5. 去除省略号 ...
+ */
+export function repairJSONString(str: string): string {
+  let s = str.trim();
+
+  // 替换全角/弯引号
+  s = s.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+
+  // 移除整行或末尾的 JS 单行注释 (避免误伤 http:// 或 https://)
+  s = s.replace(/(^|\n|\r)\s*\/\/[^\r\n]*/g, "$1");
+  s = s.replace(/([0-9a-zA-Z"'\],\}])\s*\/\/(?!\/)[^\r\n]*/g, "$1");
+
+  // 移除多行注释 /* ... */
+  s = s.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // 移除对象或数组末尾多余逗号
+  s = s.replace(/,+(\s*[\]\}])/g, "$1");
+
+  // 移除多余省略号 ...
+  s = s.replace(/\.{3,}/g, "");
+
+  return s;
+}
+
+/**
+ * 鲁棒性 JSON 提取与解析器：
+ * - 剥离 DeepSeek-R1 / QwQ 等推理模型的 <think>...</think> 标签
+ * - 支持解析 Markdown ```json ``` 代码块
+ * - 自动寻找最外层匹配的 { ... } 或 [ ... ] 边界
+ * - 语法修复 (容错尾部逗号、注释等)
+ * - 若 JSON 严重残缺或被截断，启用正则智能回退提取分类比例
+ */
+export function extractAndParseJSON<T = any>(rawContent: string): T {
+  if (!rawContent || typeof rawContent !== "string") {
+    throw new Error("AI 未返回任何文本内容");
+  }
+
+  // 1. 过滤思考标签 (<think>...</think> 或 <thought>...</thought>)
+  let text = rawContent
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<thought>[\s\S]*?<\/thought>/gi, "")
+    .trim();
+
+  if (!text) {
+    // 若过滤后为空（例如模型未正常闭合思考标签），尝试在原文本中提取
+    text = rawContent;
+  }
+
+  // 2. 优先匹配 Markdown 代码块 ```json ... ```
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (codeBlockMatch && codeBlockMatch[1].trim()) {
+    const inner = codeBlockMatch[1].trim();
+    try {
+      return JSON.parse(inner);
+    } catch {
+      try {
+        return JSON.parse(repairJSONString(inner));
+      } catch {
+        // 继续向下尝试更宽容的提取
+      }
+    }
+  }
+
+  // 3. 寻找最外层的合法 JSON 边界（支持 {...} 或 [...]）
+  const firstBrace = text.indexOf("{");
+  const firstBracket = text.indexOf("[");
+
+  let candidate = "";
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    const lastBrace = text.lastIndexOf("}");
+    if (lastBrace > firstBrace) {
+      candidate = text.slice(firstBrace, lastBrace + 1);
+    }
+  } else if (firstBracket !== -1) {
+    const lastBracket = text.lastIndexOf("]");
+    if (lastBracket > firstBracket) {
+      candidate = text.slice(firstBracket, lastBracket + 1);
+    }
+  }
+
+  if (candidate) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      try {
+        return JSON.parse(repairJSONString(candidate));
+      } catch {
+        // 尝试解析整段修复文本
+      }
+    }
+  }
+
+  // 4. 尝试修复整段文本直接解析
+  try {
+    return JSON.parse(repairJSONString(text));
+  } catch {
+    // 无法直接 JSON.parse，尝试正则兜底提取
+  }
+
+  // 5. 模式回退提取：扫描类似 "name": "...", "ratio": 30 的结构
+  const categoryRegex = /"name"\s*:\s*"([^"]+)"[\s\S]*?"(?:ratio|percentage)"\s*:\s*"?(\d+(?:\.\d+)?)%?"?/gi;
+  const extractedCategories: Array<{ name: string; ratio: number }> = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = categoryRegex.exec(text)) !== null) {
+    const name = match[1].trim();
+    const ratio = parseFloat(match[2]);
+    if (name && !isNaN(ratio)) {
+      extractedCategories.push({ name, ratio });
+    }
+  }
+
+  if (extractedCategories.length >= 2) {
+    return {
+      categories: extractedCategories,
+      suggestedAction: "建议按上述比例分类并折叠为分组。",
+    } as unknown as T;
+  }
+
+  // 6. 列表文本回退提取：扫描类似 "1. 💻 开发与技术 (35%)" 或 "- 影音娱乐: 20%"
+  const bulletRegex = /(?:^|\n)\s*(?:[\d\.\-\*#]+)?\s*([^\n\:\(\)]{2,30}?)\s*[:：\(（]\s*(\d+(?:\.\d+)?)\s*[%％]/g;
+  const bulletCategories: Array<{ name: string; ratio: number }> = [];
+  while ((match = bulletRegex.exec(text)) !== null) {
+    const name = match[1].trim().replace(/^[-*•\d\.\s]+/, "");
+    const ratio = parseFloat(match[2]);
+    if (name && !isNaN(ratio) && ratio > 0 && ratio <= 100) {
+      bulletCategories.push({ name, ratio });
+    }
+  }
+
+  if (bulletCategories.length >= 2) {
+    return {
+      categories: bulletCategories,
+      suggestedAction: "建议按上述比例分类并折叠为分组。",
+    } as unknown as T;
+  }
+
+  throw new Error(`AI 返回的内容中未找到有效 JSON (原始内容预览: ${rawContent.slice(0, 100).replace(/\s+/g, " ")}...)`);
+}
+
+/**
+ * 智能标签特征摘要压缩引擎：
+ * - 针对中小规模快照 (<= 100 标签)，输出详细指纹特征
+ * - 针对超大规模快照 (> 100 标签)，按高频域名聚合并附带典型标题，降低 90% 提示词 Token 消耗，杜绝模型上下文超限与截断报错
+ */
+export function generateTabsSummary(tabs: SideberyTab[]): string {
+  const nonExempt = tabs.filter((t) => !isExemptUrl(t.url, t.pinned));
+  if (nonExempt.length === 0) return "[]";
+
+  if (nonExempt.length <= 100) {
+    return JSON.stringify(
+      nonExempt.map((t) => ({
+        id: String(t.id),
+        domain: extractDomain(t.url),
+        path: cleanUrlForAI(t.url),
+        title: (t.title || "").slice(0, 45),
+      })),
+      null,
+      1
+    );
+  }
+
+  // 大规模标签聚合并统计高频域名
+  const domainMap = new Map<string, { count: number; sampleTitles: Set<string> }>();
+  for (const t of nonExempt) {
+    const domain = extractDomain(t.url);
+    const existing = domainMap.get(domain);
+    const title = (t.title || "").trim();
+    if (!existing) {
+      const titles = new Set<string>();
+      if (title) titles.add(title.slice(0, 40));
+      domainMap.set(domain, { count: 1, sampleTitles: titles });
+    } else {
+      existing.count++;
+      if (title && existing.sampleTitles.size < 3) {
+        existing.sampleTitles.add(title.slice(0, 40));
+      }
+    }
+  }
+
+  const sortedDomains = Array.from(domainMap.entries()).sort((a, b) => b[1].count - a[1].count);
+
+  const domainSummary = sortedDomains.map(([domain, data]) => {
+    const samples = Array.from(data.sampleTitles);
+    return {
+      domain,
+      tabCount: data.count,
+      percentage: `${((data.count / nonExempt.length) * 100).toFixed(1)}%`,
+      sampleTitles: samples.length > 0 ? samples : undefined,
+    };
+  });
+
+  return JSON.stringify(
+    {
+      totalTabs: nonExempt.length,
+      domainDistribution: domainSummary,
+    },
+    null,
+    1
+  );
+}
 
 export async function analyzeTabProportions(
   tabs: SideberyTab[],
@@ -282,18 +531,11 @@ export async function analyzeTabProportions(
     throw new Error("没有可分析的有效标签页（所有标签均已被豁免保护或为空）。");
   }
 
-  const tabFingerprints = nonExemptTabs.map((t) => ({
-    id: String(t.id),
-    domain: extractDomain(t.url),
-    path: cleanUrlForAI(t.url),
-    title: (t.title || "").slice(0, 45),
-  }));
-
-  onProgress?.(`正在发送 ${nonExemptTabs.length} 个标签特征至 AI 分析比例...`);
+  onProgress?.(`正在生成 ${nonExemptTabs.length} 个标签特征摘要至 AI 分析比例...`);
 
   const systemPrompt = "你是一个专业的浏览器标签页管理专家。必须严格返回合法的 JSON 格式，不要包含任何闲聊文本。";
   const promptTemplate = (customPrompt && customPrompt.trim()) ? customPrompt.trim() : DEFAULT_PROPORTION_ANALYSIS_PROMPT;
-  const tabsJson = JSON.stringify(tabFingerprints, null, 1);
+  const tabsJson = generateTabsSummary(nonExemptTabs);
   const userPrompt = promptTemplate.includes("{{tabsSummary}}")
     ? promptTemplate.replace("{{tabsSummary}}", tabsJson)
     : `${promptTemplate}\n\n${tabsJson}`;
@@ -302,22 +544,71 @@ export async function analyzeTabProportions(
 
   let parsed: any;
   try {
-    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("AI 返回的内容中未找到有效 JSON");
-    parsed = JSON.parse(jsonMatch[0]);
+    parsed = extractAndParseJSON(rawContent);
   } catch (err: any) {
     throw new Error(`无法解析 AI 返回的比例数据: ${err.message}`);
   }
 
-  const categories: CategoryProportion[] = (parsed.categories || []).map((cat: any, i: number) => ({
-    id: `cat_${i}_${Date.now()}`,
-    name: cat.name || `分类 ${i + 1}`,
-    color: PRESET_COLORS[i % PRESET_COLORS.length],
-    ratio: typeof cat.ratio === "number" ? cat.ratio : 0,
-    targetRatio: typeof cat.ratio === "number" ? cat.ratio : 0,
-    description: cat.description || "",
-    matchCount: 0,
-  }));
+  // 灵活提取各类返回外壳 (Array, { categories: [...] }, { data: [...] }, { proportions: [...] })
+  let rawCategories: any[] = [];
+  if (Array.isArray(parsed)) {
+    rawCategories = parsed;
+  } else if (Array.isArray(parsed?.categories)) {
+    rawCategories = parsed.categories;
+  } else if (Array.isArray(parsed?.data)) {
+    rawCategories = parsed.data;
+  } else if (Array.isArray(parsed?.proportions)) {
+    rawCategories = parsed.proportions;
+  } else if (parsed && typeof parsed === "object") {
+    const entries = Object.entries(parsed).filter(
+      ([k, v]) => k !== "suggestedAction" && (typeof v === "number" || typeof v === "string")
+    );
+    if (entries.length >= 2) {
+      rawCategories = entries.map(([k, v]) => ({ name: k, ratio: v }));
+    }
+  }
+
+  if (rawCategories.length === 0) {
+    throw new Error("AI 返回的 JSON 中未包含有效的 categories 分类列表");
+  }
+
+  // 解析并归一化比例 (兼容 0.35 浮点小数、"30%" 字符串、整数等)
+  let totalRatio = 0;
+  const parsedItems = rawCategories.map((cat: any, i: number) => {
+    let r = 0;
+    if (typeof cat.ratio === "number") {
+      r = cat.ratio;
+    } else if (typeof cat.ratio === "string") {
+      r = parseFloat(cat.ratio.replace(/%/, "")) || 0;
+    } else if (typeof cat.percentage === "number") {
+      r = cat.percentage;
+    } else if (typeof cat.percentage === "string") {
+      r = parseFloat(cat.percentage.replace(/%/, "")) || 0;
+    }
+    totalRatio += r;
+    return { cat, r, i };
+  });
+
+  const isDecimal = totalRatio > 0 && totalRatio <= 1.05;
+  const multiplier = isDecimal ? 100 : 1;
+
+  const categories: CategoryProportion[] = parsedItems.map(({ cat, r, i }) => {
+    const rawVal = r * multiplier;
+    const finalRatio = totalRatio > 0 && !isDecimal && Math.abs(totalRatio - 100) > 5
+      ? Math.round((rawVal / totalRatio) * 100)
+      : Math.round(rawVal);
+
+    return {
+      id: `cat_${i}_${Date.now()}`,
+      name: String(cat.name || `分类 ${i + 1}`).trim(),
+      color: cat.color || PRESET_COLORS[i % PRESET_COLORS.length],
+      ratio: finalRatio,
+      targetRatio: finalRatio,
+      description: cat.description || "",
+      keywords: Array.isArray(cat.keywords) ? cat.keywords.map(String) : undefined,
+      matchCount: 0,
+    };
+  });
 
   return {
     totalAnalyzed: nonExemptTabs.length,
@@ -365,9 +656,8 @@ ${JSON.stringify(chunkSummary)}
 
     try {
       const content = await sendAIChatRequest(config, systemPrompt, userPrompt);
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const mapping = JSON.parse(jsonMatch[0]);
+      const mapping = extractAndParseJSON<Record<string, any>>(content);
+      if (mapping && typeof mapping === "object") {
         for (const [tabId, catVal] of Object.entries(mapping)) {
           const valStr = String(catVal);
           const resolvedName = idToNameMap.get(valStr) || (nameSet.has(valStr) ? valStr : "");
@@ -430,19 +720,15 @@ ${JSON.stringify(categoriesSummary, null, 2)}
 
   try {
     const rawContent = await sendAIChatRequest(config, systemPrompt, userPrompt);
-    let parsed: any[] = [];
-    const jsonBlockMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonBlockMatch) {
-      parsed = JSON.parse(jsonBlockMatch[1]);
-    } else {
-      const arrayMatch = rawContent.match(/\[[\s\S]*\]/);
-      if (arrayMatch) {
-        parsed = JSON.parse(arrayMatch[0]);
-      }
-    }
+    const parsed = extractAndParseJSON<any>(rawContent);
+    const rulesArray: any[] = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.rules)
+      ? parsed.rules
+      : [];
 
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed.map((item, idx) => ({
+    if (rulesArray.length > 0) {
+      return rulesArray.map((item, idx) => ({
         id: `ai_rule_${Date.now()}_${idx}`,
         name: String(item.name || categories[idx]?.name || `分类 ${idx + 1}`),
         enabled: true,

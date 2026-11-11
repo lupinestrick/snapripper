@@ -3,6 +3,16 @@ import { CategoryProportion } from "../src/types/ai";
 import { buildProcessedSnapshot } from "../src/store/useSnapshotStore";
 import { matchTabWithRule } from "../src/services/ruleEngine";
 
+import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
+import { CategoryProportion } from "../src/types/ai";
+import { buildProcessedSnapshot } from "../src/store/useSnapshotStore";
+import { matchTabWithRule } from "../src/services/ruleEngine";
+import {
+  repairJSONString,
+  extractAndParseJSON,
+  generateTabsSummary,
+} from "../src/services/aiService";
+
 export function runAIRestructureTests(): { passed: number; failed: number } {
   console.log("\n▶ Running AI Restructure & Caching Tests...");
   let passed = 0;
@@ -17,6 +27,99 @@ export function runAIRestructureTests(): { passed: number; failed: number } {
       failed++;
     }
   }
+
+  // --- Test Set 1: JSON Parsing & Repair Engine ---
+  // 1.1 Trailing commas and comments
+  const sloppyJSON = `
+  {
+    // Category config
+    "categories": [
+      { "name": "💻 开发", "ratio": 60, },
+      { "name": "🎬 影音", "ratio": 40, },
+    ],
+    /* Action note */
+    "suggestedAction": "整理分组",
+  }
+  `;
+  const repairedObj = JSON.parse(repairJSONString(sloppyJSON));
+  assert(repairedObj.categories.length === 2, "repairJSONString fixes trailing commas and comments");
+  assert(repairedObj.categories[0].ratio === 60, "Repaired object preserves numbers");
+
+  // 1.2 DeepSeek-R1 style response with <think> tag containing curly braces
+  const deepseekR1Output = `
+<think>
+User asked to categorize tabs.
+Looking at tab 1: { "id": "1", "title": "github" }.
+This belongs to Development.
+Let's assemble the JSON:
+{ "incomplete": true
+</think>
+\`\`\`json
+{
+  "categories": [
+    { "name": "💻 开发与技术", "ratio": 70, "description": "代码与开源项目" },
+    { "name": "🤖 AI 工具", "ratio": 30, "description": "对话与大模型" }
+  ],
+  "suggestedAction": "分类并折叠"
+}
+\`\`\`
+`;
+  const parsedDeepseek = extractAndParseJSON<{ categories: any[]; suggestedAction: string }>(deepseekR1Output);
+  assert(parsedDeepseek.categories?.length === 2, "extractAndParseJSON strips <think> block and parses code fence");
+  assert(parsedDeepseek.categories[0].name === "💻 开发与技术", "extractAndParseJSON extracts correct category from reasoning model");
+
+  // 1.3 Direct array response without wrapping object
+  const directArrayOutput = `
+Here is the category analysis:
+[
+  { "name": "💻 开发", "ratio": 50 },
+  { "name": "💬 社交", "ratio": 50 }
+]
+`;
+  const parsedArray = extractAndParseJSON<any[]>(directArrayOutput);
+  assert(Array.isArray(parsedArray) && parsedArray.length === 2, "extractAndParseJSON parses direct array JSON");
+
+  // 1.4 Fallback extraction for bullet point text format
+  const bulletTextOutput = `
+Based on your tabs, here is the distribution:
+1. 💻 开发与技术 (55%)
+2. 🎬 影音娱乐 (25%)
+3. 💼 办公协作 (20%)
+`;
+  const parsedBullet = extractAndParseJSON<{ categories: any[] }>(bulletTextOutput);
+  assert(parsedBullet.categories?.length === 3, "extractAndParseJSON fallback extracts bullet list ratios");
+  assert(parsedBullet.categories[0].ratio === 55, "Bullet fallback parses numeric percentage correctly");
+
+  // --- Test Set 2: generateTabsSummary Token Compression ---
+  const smallTabList: SideberyTab[] = [
+    { id: 1, panelId: "main", parentId: -1, lvl: 0, title: "React", url: "https://react.dev/" },
+    { id: 2, panelId: "main", parentId: -1, lvl: 0, title: "Vue", url: "https://vuejs.org/" },
+  ];
+  const smallSummary = generateTabsSummary(smallTabList);
+  const parsedSmall = JSON.parse(smallSummary);
+  assert(Array.isArray(parsedSmall) && parsedSmall.length === 2, "generateTabsSummary outputs individual tabs for <= 100 tabs");
+
+  // Large tab list (> 100 tabs)
+  const largeTabList: SideberyTab[] = [];
+  for (let i = 1; i <= 150; i++) {
+    const domain = i <= 90 ? "github.com" : i <= 130 ? "bilibili.com" : "chatgpt.com";
+    largeTabList.push({
+      id: i,
+      panelId: "main",
+      parentId: -1,
+      lvl: 0,
+      title: `Tab ${i}`,
+      url: `https://${domain}/page/${i}`,
+    });
+  }
+  const largeSummary = generateTabsSummary(largeTabList);
+  const parsedLarge = JSON.parse(largeSummary);
+  assert(parsedLarge.totalTabs === 150, "generateTabsSummary includes totalTabs count for large snapshot");
+  assert(parsedLarge.domainDistribution?.length === 3, "generateTabsSummary groups 150 tabs into 3 domain clusters");
+  assert(parsedLarge.domainDistribution[0].domain === "github.com", "generateTabsSummary orders top domain first");
+  assert(parsedLarge.domainDistribution[0].tabCount === 90, "generateTabsSummary counts tabs accurately per domain");
+
+  // --- Test Set 3: Snapshot Restructure & Filtering ---
 
   const sampleTabs: SideberyTab[] = [
     { id: 1, panelId: "main", parentId: -1, lvl: 0, title: "GitHub - Repo", url: "https://github.com/facebook/react" },
