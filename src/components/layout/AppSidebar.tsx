@@ -18,8 +18,7 @@ import {
 
 export function AppSidebar() {
   const { activePage, setActivePage } = useConfigStore();
-  const { rawSnapshot } = useSnapshotStore();
-  const [overviewOpen, setOverviewOpen] = useState(false);
+  const { rawSnapshot, isOverviewHopupOpen, setIsOverviewHopupOpen } = useSnapshotStore();
   const [isCompact, setIsCompact] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -100,7 +99,7 @@ export function AppSidebar() {
           <Button
             size="xs"
             variant="ghost"
-            onClick={() => setOverviewOpen(true)}
+            onClick={() => setIsOverviewHopupOpen(true)}
             style={{
               padding: "4px 8px",
               gap: "4px",
@@ -112,7 +111,6 @@ export function AppSidebar() {
             <span>{totalTabs}</span>
           </Button>
         </div>
-        <OverviewHopup isOpen={overviewOpen} onClose={() => setOverviewOpen(false)} />
       </>
     );
   }
@@ -199,40 +197,38 @@ export function AppSidebar() {
               <ChevronLeft size={15} />
             </Button>
 
-            {/* Snapshot Overview Button (slightly shrunk to fit beside the circle button) */}
-            {rawSnapshot && (
-              <Button
-                variant="outline"
-                onClick={() => setOverviewOpen(true)}
-                style={{
-                  flex: 1,
-                  padding: "0.4rem 0.55rem",
-                  borderRadius: "0.65rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "stretch",
-                  gap: "0.2rem",
-                  textAlign: "left",
-                  backgroundColor: "var(--bg-subtle)",
-                  borderColor: "var(--border-subtle)",
-                  minWidth: 0,
-                }}
-                title="查看概览数据"
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>快照概览</span>
-                  <BarChart2 size={12} style={{ color: "var(--accent)" }} />
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", overflow: "hidden" }}>
-                  <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)", lineHeight: 1.1 }}>
-                    {totalTabs}
-                  </span>
-                  <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                    标签 / {panelCount} 面板
-                  </span>
-                </div>
-              </Button>
-            )}
+            {/* Snapshot Overview Button (always visible in footer) */}
+            <Button
+              variant="outline"
+              onClick={() => setIsOverviewHopupOpen(true)}
+              style={{
+                flex: 1,
+                padding: "0.4rem 0.55rem",
+                borderRadius: "0.65rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "stretch",
+                gap: "0.2rem",
+                textAlign: "left",
+                backgroundColor: "var(--bg-subtle)",
+                borderColor: "var(--border-subtle)",
+                minWidth: 0,
+              }}
+              title="查看快照总览数据分析"
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>快照概览</span>
+                <BarChart2 size={12} style={{ color: "var(--accent)" }} />
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", overflow: "hidden" }}>
+                <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)", lineHeight: 1.1 }}>
+                  {totalTabs}
+                </span>
+                <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                  {rawSnapshot ? `标签 / ${panelCount} 面板` : "等待导入"}
+                </span>
+              </div>
+            </Button>
           </div>
         ) : (
           <div
@@ -244,25 +240,23 @@ export function AppSidebar() {
               gap: "0.45rem",
             }}
           >
-            {rawSnapshot && (
-              <Button
-                variant="outline"
-                onClick={() => setOverviewOpen(true)}
-                style={{
-                  width: "100%",
-                  padding: "0.45rem 0",
-                  flexDirection: "column",
-                  gap: "2px",
-                  backgroundColor: "var(--bg-subtle)",
-                  borderColor: "var(--border-subtle)",
-                  borderRadius: "0.5rem",
-                }}
-                title="查看概览数据"
-              >
-                <BarChart2 size={14} style={{ color: "var(--accent)" }} />
-                <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-main)" }}>{totalTabs}</span>
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              onClick={() => setIsOverviewHopupOpen(true)}
+              style={{
+                width: "100%",
+                padding: "0.45rem 0",
+                flexDirection: "column",
+                gap: "2px",
+                backgroundColor: "var(--bg-subtle)",
+                borderColor: "var(--border-subtle)",
+                borderRadius: "0.5rem",
+              }}
+              title="查看快照总览数据分析"
+            >
+              <BarChart2 size={14} style={{ color: "var(--accent)" }} />
+              <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-main)" }}>{totalTabs}</span>
+            </Button>
 
             <Button
               variant="ghost"
@@ -288,8 +282,6 @@ export function AppSidebar() {
           </div>
         )}
       </aside>
-
-      <OverviewHopup isOpen={overviewOpen} onClose={() => setOverviewOpen(false)} />
     </>
   );
 }

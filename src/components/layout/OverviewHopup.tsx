@@ -19,7 +19,55 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
   const { rawSnapshot, aiProcessedCache, proportionReport } = useSnapshotStore();
   const { rulesSettings } = useConfigStore();
 
-  if (!isOpen || !rawSnapshot) return null;
+  if (!isOpen) return null;
+
+  if (!rawSnapshot) {
+    return (
+      <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content style={{ maxWidth: "480px", padding: "2rem", textAlign: "center" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
+              <Button
+                variant="ghost"
+                size="xs"
+                pill
+                onClick={onClose}
+                style={{ width: "32px", height: "32px", padding: 0, color: "var(--text-muted)" }}
+                title="关闭"
+              >
+                <X size={16} />
+              </Button>
+            </div>
+            <div
+              style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                backgroundColor: "var(--accent-subtle)",
+                color: "var(--accent)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 1.25rem",
+              }}
+            >
+              <BarChart3 size={24} />
+            </div>
+            <Dialog.Title style={{ fontSize: "1.1rem", fontWeight: 700 }}>暂未载入快照数据</Dialog.Title>
+            <Dialog.Description style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
+              请先在工作台拖入或载入 Sidebery 快照 JSON 文件，即可在此查看完整的标签统计分布、面板结构与分类比例分析。
+            </Dialog.Description>
+            <div style={{ marginTop: "1.5rem" }}>
+              <Button variant="solid" size="sm" pill onClick={onClose}>
+                知道了
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+    );
+  }
 
   const primaryWinId = Object.keys(rawSnapshot.windows)[0] || "1";
   const tabs = rawSnapshot.windows[primaryWinId]?.tabs || [];

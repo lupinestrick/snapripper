@@ -117,6 +117,7 @@ interface SnapshotStoreState {
   aiProcessedCache: AIProcessedCache | null;
   isPostEditMode: boolean;
   isAIDiffModalOpen: boolean;
+  isOverviewHopupOpen: boolean;
 
   undoStack: SideberySnapshot[];
   redoStack: SideberySnapshot[];
@@ -155,6 +156,7 @@ interface SnapshotStoreState {
 
   setAiProcessedCache: (cache: AIProcessedCache | null) => void;
   setIsAIDiffModalOpen: (open: boolean) => void;
+  setIsOverviewHopupOpen: (open: boolean) => void;
   enterPostEditMode: () => void;
   exitPostEditMode: (apply: boolean) => void;
   updateProcessedTreeTarget: (targetMode: "tree" | "panel", targetPanelId?: string) => void;
@@ -184,6 +186,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
   aiProcessedCache: null,
   isPostEditMode: false,
   isAIDiffModalOpen: false,
+  isOverviewHopupOpen: false,
 
   undoStack: [],
   redoStack: [],
@@ -589,6 +592,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
 
   setAiProcessedCache: (cache) => set({ aiProcessedCache: cache }),
   setIsAIDiffModalOpen: (open) => set({ isAIDiffModalOpen: open }),
+  setIsOverviewHopupOpen: (open) => set({ isOverviewHopupOpen: open }),
 
   enterPostEditMode: () => {
     const { aiProcessedCache, activeWindowId } = get();
