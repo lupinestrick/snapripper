@@ -18,7 +18,7 @@ import { OverviewHopup } from "@/components/layout/OverviewHopup";
 import { Button } from "@/components/ui/button";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
-import { Loader2, BarChart2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 export default function WorkbenchPage() {
   const {
@@ -166,54 +166,6 @@ export default function WorkbenchPage() {
       <ExportDialog isOpen={exportDialogOpen} onClose={() => setExportDialogOpen(false)} />
       <AIDiffModal isOpen={isAIDiffModalOpen} onClose={() => setIsAIDiffModalOpen(false)} />
       <OverviewHopup isOpen={isOverviewHopupOpen} onClose={() => setIsOverviewHopupOpen(false)} />
-
-      {/* Bottom Right Floating Snapshot Overview Button */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: "1.5rem",
-          right: "1.5rem",
-          zIndex: 45,
-        }}
-      >
-        <Button
-          variant="outline"
-          size="xs"
-          pill
-          onClick={() => setIsOverviewHopupOpen(true)}
-          style={{
-            boxShadow: "0 4px 16px rgba(0, 0, 0, 0.2)",
-            backgroundColor: "var(--bg-card)",
-            borderColor: "var(--border-subtle)",
-            color: "var(--text-main)",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.45rem",
-            padding: "0.45rem 0.85rem",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-          title="打开快照总览数据分析"
-        >
-          <BarChart2 size={14} style={{ color: "var(--accent)" }} />
-          <span>快照总览</span>
-          {rawSnapshot && (
-            <span
-              style={{
-                padding: "1px 6px",
-                borderRadius: "9999px",
-                backgroundColor: "var(--accent-subtle)",
-                color: "var(--accent-text)",
-                fontSize: "0.7rem",
-                fontWeight: 700,
-              }}
-            >
-              {Object.values(rawSnapshot.windows).reduce((acc, w) => acc + (w.tabs?.length || 0), 0)}
-            </span>
-          )}
-        </Button>
-      </div>
     </div>
   );
 }

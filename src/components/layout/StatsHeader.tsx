@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Pin, Copy, GitFork, ListFilter, ShieldCheck } from "lucide-react";
+import { Pin, Copy, GitFork, ListFilter } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { flattenTabTree } from "@/services/snapshotParser";
 import { Button } from "@/components/ui/button";
@@ -64,11 +64,6 @@ export function StatsHeader() {
           <span style={{ fontSize: "0.65rem", opacity: 0.8 }}>({onlyDuplicates ? "显示全部" : "仅看重复"})</span>
         </Button>
       )}
-
-      <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.75rem", color: "var(--text-muted)" }}>
-        <ShieldCheck size={13} style={{ color: "var(--accent)" }} />
-        <span>本地纯前端沙盒运算</span>
-      </div>
     </div>
   );
 }

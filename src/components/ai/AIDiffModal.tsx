@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { buildTabTree } from "@/services/snapshotParser";
-import { TabTreeNode } from "@/types/sidebery";
+import { Select } from "@/components/ui/select";
+import { buildTabTree, flattenTabTree } from "@/services/snapshotParser";
+import { TabTreeNode, SideberyTab } from "@/types/sidebery";
 import {
   Sparkles,
   X,
@@ -15,13 +16,10 @@ import {
   FolderTree,
   PanelsTopLeft,
   FileEdit,
-  GitCompare,
-  Layers,
-  Globe,
-  Sliders,
-  ChevronRight,
+  GitCommit,
   ListTree,
-  BarChart3,
+  Folder,
+  Globe,
 } from "lucide-react";
 import { extractDomain } from "@/utils/urlHelper";
 
@@ -42,9 +40,10 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     applySnapshotUpdate,
   } = useSnapshotStore();
 
-  const { setActivePage } = useConfigStore();
+  const [activePanelId, setActivePanelId] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"tree" | "git">("tree");
+  const [isNarrowScreen, setIsNarrowScreen] = useState(false);
 
-  const [viewMode, setViewMode] = useState<"tree" | "stats">("tree");
   const [selectedMode, setSelectedMode] = useState<"tree" | "panel">(
     aiProcessedCache?.targetMode || "tree"
   );
@@ -52,24 +51,59 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     aiProcessedCache?.targetPanelId || ""
   );
 
+  useEffect(() => {
+    const checkWidth = () => {
+      setIsNarrowScreen(window.innerWidth < 800);
+    };
+    checkWidth();
+    window.addEventListener("resize", checkWidth);
+    return () => window.removeEventListener("resize", checkWidth);
+  }, []);
+
+  useEffect(() => {
+    if (aiProcessedCache && !activePanelId) {
+      const panelKeys = Object.keys(aiProcessedCache.originalSnapshot.panels || {});
+      setActivePanelId(panelKeys[0] || "main");
+    }
+  }, [aiProcessedCache, activePanelId]);
+
   if (!isOpen || !aiProcessedCache) return null;
 
   const originalTabs = aiProcessedCache.originalSnapshot.windows[activeWindowId]?.tabs || [];
-  const originalTree = buildTabTree(originalTabs);
-
-  // If in post-edit mode, compare with currently edited rootNodes; otherwise use processedSnapshot tree
   const processedTabs = isPostEditMode
-    ? []
+    ? flattenTabTree(rootNodes)
     : aiProcessedCache.processedSnapshot.windows[activeWindowId]?.tabs || [];
-  const currentAfterTree: TabTreeNode[] = isPostEditMode
-    ? rootNodes
-    : buildTabTree(processedTabs);
 
   const panels = aiProcessedCache.originalSnapshot.panels || {};
   const panelList = Object.entries(panels).map(([id, p]) => ({
     id,
     name: p.name || (id === "main" ? "主面板" : id),
   }));
+  if (panelList.length === 0) {
+    panelList.push({ id: "main", name: "主面板" });
+  }
+
+  const effectivePanelId = activePanelId || panelList[0]?.id || "main";
+
+  // Filter tabs for the active panel
+  const beforePanelTabs = originalTabs.filter(
+    (t) => (t.panelId || "main") === effectivePanelId
+  );
+  const afterPanelTabs = processedTabs.filter(
+    (t) => (t.panelId || "main") === effectivePanelId
+  );
+
+  const beforeTree = buildTabTree(beforePanelTabs);
+  const afterTree = isPostEditMode
+    ? rootNodes.filter(
+        (n) => (n.tab.panelId || "main") === effectivePanelId || (!n.tab.panelId && effectivePanelId === "main")
+      )
+    : buildTabTree(afterPanelTabs);
+
+  // Identify new category groups created by AI in the active panel
+  const newlyCreatedGroups = afterTree.filter(
+    (n) => n.isGroup || (n as any).categoryName || n.id.startsWith("group_") || n.id.startsWith("cat_header_")
+  );
 
   const handleModeChange = (mode: "tree" | "panel") => {
     setSelectedMode(mode);
@@ -120,7 +154,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
             overflow: "hidden",
           }}
         >
-          {/* Header */}
+          {/* Top Header */}
           <div
             style={{
               padding: "0.85rem 1.5rem",
@@ -148,7 +182,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
               </div>
               <div>
                 <Dialog.Title style={{ fontSize: "1.05rem", fontWeight: 600 }}>
-                  AI 比例重组 — 差分对比与重构设置
+                  变更确认
                 </Dialog.Title>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                   {isPostEditMode
@@ -159,35 +193,42 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-              <Badge variant="subtle" size="sm" style={{ backgroundColor: "var(--accent-subtle)", color: "var(--accent-text)" }}>
-                总计 {summary.total} 标签
-              </Badge>
-              <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
+              <Badge
+                variant="subtle"
+                size="sm"
+                style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "var(--success, #10b981)" }}
+              >
                 已分类 {summary.categorizedCount} ({categorizedPercent}%)
               </Badge>
               {summary.uncategorizedCount > 0 && (
-                <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(148, 163, 184, 0.2)", color: "var(--text-muted)" }}>
+                <Badge
+                  variant="subtle"
+                  size="sm"
+                  style={{ backgroundColor: "rgba(148, 163, 184, 0.2)", color: "var(--text-muted)" }}
+                >
                   未分类 {summary.uncategorizedCount} ({uncategorizedPercent}%)
                 </Badge>
               )}
 
-              <Button
-                variant="ghost"
-                size="xs"
-                pill
-                onClick={onClose}
-                style={{ color: "var(--text-muted)", marginLeft: "0.5rem" }}
-                title="关闭"
-              >
-                <X size={18} />
-              </Button>
+              <Dialog.CloseTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  pill
+                  onClick={onClose}
+                  style={{ color: "var(--text-muted)", padding: "4px", marginLeft: "0.5rem" }}
+                  title="关闭"
+                >
+                  <X size={18} />
+                </Button>
+              </Dialog.CloseTrigger>
             </div>
           </div>
 
-          {/* Subheader: Target placement configuration bar */}
+          {/* Subheader: Panel Selector & Target Mode & View Mode Switcher */}
           <div
             style={{
-              padding: "0.75rem 1.5rem",
+              padding: "0.6rem 1.5rem",
               borderBottom: "1px solid var(--border-subtle)",
               backgroundColor: "var(--bg-subtle)",
               display: "flex",
@@ -197,12 +238,57 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
               flexWrap: "wrap",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-              <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-main)" }}>
-                重组目标形式：
-              </span>
+            {/* Panel Selector */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flex: 1, overflowX: "auto" }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", flexShrink: 0 }}>面板:</span>
 
-              {/* Mode Segmented Controls */}
+              {isNarrowScreen ? (
+                <Select
+                  value={effectivePanelId}
+                  onChange={(e) => setActivePanelId(e.target.value)}
+                  style={{ flex: 1, maxWidth: "260px" }}
+                >
+                  {panelList.map((p) => {
+                    const beforeCount = originalTabs.filter((t) => (t.panelId || "main") === p.id).length;
+                    const afterCount = processedTabs.filter((t) => (t.panelId || "main") === p.id).length;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({beforeCount} → {afterCount})
+                      </option>
+                    );
+                  })}
+                </Select>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", overflowX: "auto" }}>
+                  {panelList.map((p) => {
+                    const isActive = p.id === effectivePanelId;
+                    const beforeCount = originalTabs.filter((t) => (t.panelId || "main") === p.id).length;
+                    const afterCount = processedTabs.filter((t) => (t.panelId || "main") === p.id).length;
+                    return (
+                      <Button
+                        key={p.id}
+                        variant={isActive ? "solid" : "outline"}
+                        size="xs"
+                        pill
+                        onClick={() => setActivePanelId(p.id)}
+                        style={{
+                          fontSize: "0.75rem",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <span>{p.name}</span>
+                        <span style={{ opacity: 0.7, fontSize: "0.7rem" }}>
+                          ({beforeCount} → {afterCount})
+                        </span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Target Reorganization Mode (AI Specific Control) */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <div
                 style={{
                   display: "inline-flex",
@@ -218,20 +304,21 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.4rem",
-                    padding: "0.3rem 0.75rem",
+                    gap: "0.3rem",
+                    padding: "0.25rem 0.6rem",
                     borderRadius: "4px",
                     border: "none",
                     backgroundColor: selectedMode === "tree" ? "var(--accent-solid)" : "transparent",
                     color: selectedMode === "tree" ? "#fff" : "var(--text-muted)",
-                    fontSize: "0.78rem",
+                    fontSize: "0.75rem",
                     fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                   }}
+                  title="在当前面板内创建 Category Group 折叠目录"
                 >
-                  <FolderTree size={14} />
-                  <span>树状目录 (Group 组)</span>
+                  <FolderTree size={13} />
+                  <span>树状目录</span>
                 </button>
 
                 <button
@@ -240,322 +327,193 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.4rem",
-                    padding: "0.3rem 0.75rem",
+                    gap: "0.3rem",
+                    padding: "0.25rem 0.6rem",
                     borderRadius: "4px",
                     border: "none",
                     backgroundColor: selectedMode === "panel" ? "var(--accent-solid)" : "transparent",
                     color: selectedMode === "panel" ? "#fff" : "var(--text-muted)",
-                    fontSize: "0.78rem",
+                    fontSize: "0.75rem",
                     fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.15s ease",
                   }}
+                  title="为每个主题创建独立的 Sidebery 标签页独立面板"
                 >
-                  <PanelsTopLeft size={14} />
-                  <span>独立面板 (Panels)</span>
+                  <PanelsTopLeft size={13} />
+                  <span>独立面板</span>
                 </button>
               </div>
 
-              {/* Panel dropdown when tree mode is chosen */}
               {selectedMode === "tree" && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>归入位置：</span>
-                  <select
-                    value={selectedPanelId}
-                    onChange={(e) => handlePanelChange(e.target.value)}
-                    style={{
-                      padding: "0.3rem 0.6rem",
-                      borderRadius: "6px",
-                      backgroundColor: "var(--bg-card)",
-                      border: "1px solid var(--border-subtle)",
-                      color: "var(--text-main)",
-                      fontSize: "0.78rem",
-                      outline: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="">保持原标签所在面板</option>
-                    {panelList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.id})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={selectedPanelId}
+                  onChange={(e) => handlePanelChange(e.target.value)}
+                  style={{
+                    padding: "0.25rem 0.5rem",
+                    borderRadius: "6px",
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border-subtle)",
+                    color: "var(--text-main)",
+                    fontSize: "0.75rem",
+                    outline: "none",
+                    cursor: "pointer",
+                  }}
+                  title="选择将分类树归入哪个目标面板"
+                >
+                  <option value="">保持原面板</option>
+                  {panelList.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      归入: {p.name}
+                    </option>
+                  ))}
+                </select>
               )}
             </div>
 
-            {/* View Mode Toggle */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {/* View Mode Switcher (完整结构 vs 差分) */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexShrink: 0 }}>
               <Button
-                variant={viewMode === "tree" ? "solid" : "ghost"}
+                variant={viewMode === "tree" ? "solid" : "outline"}
                 size="xs"
                 pill
                 onClick={() => setViewMode("tree")}
-                style={{ fontSize: "0.75rem" }}
               >
                 <ListTree size={13} />
-                <span>树状对比</span>
+                <span>完整结构</span>
               </Button>
+
               <Button
-                variant={viewMode === "stats" ? "solid" : "ghost"}
+                variant={viewMode === "git" ? "solid" : "outline"}
                 size="xs"
                 pill
-                onClick={() => setViewMode("stats")}
-                style={{ fontSize: "0.75rem" }}
+                onClick={() => setViewMode("git")}
               >
-                <BarChart3 size={13} />
-                <span>分类比例</span>
+                <GitCommit size={13} />
+                <span>差分</span>
               </Button>
             </div>
           </div>
 
-          {/* Main Diff Content */}
-          <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex" }}>
-            {viewMode === "tree" ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", width: "100%", height: "100%" }}>
-                {/* Left: Original Snapshot Tree */}
-                <div
-                  style={{
-                    borderRight: "1px solid var(--border-subtle)",
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "100%",
-                    backgroundColor: "var(--bg-card)",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "0.6rem 1rem",
-                      borderBottom: "1px solid var(--border-subtle)",
-                      backgroundColor: "var(--bg-subtle)",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--text-muted)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span>原始快照结构 (Before)</span>
-                    <span>{originalTabs.length} 标签</span>
-                  </div>
-
-                  <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem" }}>
-                    <TabTreePreview nodes={originalTree} />
-                  </div>
-                </div>
-
-                {/* Right: AI Processed Tree */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    height: "100%",
-                    backgroundColor: "var(--bg-card)",
-                  }}
-                >
-                  <div
-                    style={{
-                      padding: "0.6rem 1rem",
-                      borderBottom: "1px solid var(--border-subtle)",
-                      backgroundColor: "var(--bg-subtle)",
-                      fontSize: "0.8rem",
-                      fontWeight: 600,
-                      color: "var(--accent)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span>AI 重构后结构 (After)</span>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      {selectedMode === "tree" ? "树状 Group 归组" : "新建独立面板"}
-                    </span>
-                  </div>
-
-                  <div style={{ flex: 1, overflowY: "auto", padding: "0.75rem" }}>
-                    <TabTreePreview nodes={currentAfterTree} isAfterView />
-                  </div>
-                </div>
+          {/* Main Diff Content Area */}
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", overflow: "hidden" }}>
+            {/* Left: Before */}
+            <div
+              style={{
+                borderRight: "1px solid var(--border-subtle)",
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                backgroundColor: "var(--bg-canvas)",
+              }}
+            >
+              <div
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "var(--bg-surface)",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "var(--text-muted)",
+                }}
+              >
+                <span>处理前原始结构</span>
+                <Badge variant="outline" size="sm">
+                  {beforePanelTabs.length} 标签
+                </Badge>
               </div>
-            ) : (
-              /* Stats & Distribution View */
-              <div style={{ width: "100%", padding: "2rem", overflowY: "auto" }}>
-                <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>
-                  AI 分类比例与规则匹配概览
-                </h3>
 
-                {/* Segmented Bar */}
-                <div
-                  style={{
-                    width: "100%",
-                    height: "14px",
-                    borderRadius: "9999px",
-                    overflow: "hidden",
-                    display: "flex",
-                    backgroundColor: "var(--bg-subtle)",
-                    border: "1px solid var(--border-subtle)",
-                    marginBottom: "1.5rem",
-                  }}
-                >
-                  {aiProcessedCache.categoryNames.map((catName, idx) => {
-                    const count = summary.categoryCounts[catName] || 0;
-                    const pct = summary.total > 0 ? (count / summary.total) * 100 : 0;
-                    if (pct <= 0) return null;
-                    const colors = [
-                      "#3b82f6", "#10b981", "#ef4444", "#06b6d4",
-                      "#8b5cf6", "#f59e0b", "#ec4899", "#64748b",
-                    ];
-                    return (
-                      <div
-                        key={catName}
-                        title={`${catName}: ${count} 个 (${pct.toFixed(1)}%)`}
-                        style={{
-                          width: `${pct}%`,
-                          backgroundColor: colors[idx % colors.length],
-                          height: "100%",
-                        }}
-                      />
-                    );
-                  })}
-                  {summary.uncategorizedCount > 0 && (
-                    <div
-                      title={`未分类: ${summary.uncategorizedCount} 个 (${uncategorizedPercent}%)`}
-                      style={{
-                        width: `${uncategorizedPercent}%`,
-                        backgroundColor: "var(--border-strong, #64748b)",
-                        height: "100%",
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Breakdown Table */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.75rem" }}>
-                  {aiProcessedCache.categoryNames.map((catName, idx) => {
-                    const count = summary.categoryCounts[catName] || 0;
-                    const pct = summary.total > 0 ? ((count / summary.total) * 100).toFixed(1) : "0";
-                    const colors = [
-                      "#3b82f6", "#10b981", "#ef4444", "#06b6d4",
-                      "#8b5cf6", "#f59e0b", "#ec4899", "#64748b",
-                    ];
-                    return (
-                      <div
-                        key={catName}
-                        style={{
-                          padding: "0.75rem 1rem",
-                          borderRadius: "0.5rem",
-                          backgroundColor: "var(--bg-subtle)",
-                          border: "1px solid var(--border-subtle)",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <span
-                            style={{
-                              width: "10px",
-                              height: "10px",
-                              borderRadius: "50%",
-                              backgroundColor: colors[idx % colors.length],
-                              display: "inline-block",
-                            }}
-                          />
-                          <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                            {catName}
-                          </span>
-                        </div>
-                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>
-                          {count} 个 ({pct}%)
-                        </span>
-                      </div>
-                    );
-                  })}
-
-                  {/* Explicit Uncategorized Entry */}
-                  <div
-                    style={{
-                      padding: "0.75rem 1rem",
-                      borderRadius: "0.5rem",
-                      backgroundColor: "var(--bg-subtle)",
-                      border: "1px dashed var(--border-subtle)",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <span
-                        style={{
-                          width: "10px",
-                          height: "10px",
-                          borderRadius: "50%",
-                          backgroundColor: "#94a3b8",
-                          display: "inline-block",
-                        }}
-                      />
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-muted)" }}>
-                        📁 未分类 (Uncategorized)
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", fontWeight: 600 }}>
-                      {summary.uncategorizedCount} 个 ({uncategorizedPercent}%)
-                    </span>
-                  </div>
-                </div>
+              <div style={{ flex: 1, overflowY: "auto", padding: "0.85rem" }}>
+                <DiffTreeColumn nodes={beforeTree} isBefore={true} />
               </div>
-            )}
+            </div>
+
+            {/* Right: After / Git Diff */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+                backgroundColor: "var(--bg-canvas)",
+              }}
+            >
+              <div
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "var(--bg-surface)",
+                  borderBottom: "1px solid var(--border-subtle)",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  color: "var(--accent-text)",
+                }}
+              >
+                <span>{viewMode === "git" ? "变更差分(+ / -)" : "处理后结构"}</span>
+                <Badge variant="subtle" size="sm">
+                  {afterPanelTabs.length} 标签
+                </Badge>
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto", padding: "0.85rem" }}>
+                {viewMode === "git" ? (
+                  <AIGitDiffView
+                    newGroups={newlyCreatedGroups}
+                    afterTabsCount={afterPanelTabs.length}
+                  />
+                ) : (
+                  <DiffTreeColumn nodes={afterTree} isBefore={false} />
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Footer Actions */}
+          {/* Bottom Footer Actions */}
           <div
             style={{
-              padding: "0.85rem 1.5rem",
+              padding: "0.75rem 1.5rem",
               borderTop: "1px solid var(--border-subtle)",
               backgroundColor: "var(--bg-surface)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              flexWrap: "wrap",
+              gap: "0.75rem",
             }}
           >
-            <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-              提示：进入工作台后，将加载 AI 分类后的树状数据供您自由拖拽、编辑，并可随时点击 DIFF 按钮重新打开对比。
+            <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+              确认应用后写入快照树，可通过撤销按钮回滚。
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-              <Button variant="outline" size="xs" pill onClick={onClose}>
-                稍后处理 (保留缓存)
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <Button
+                variant="outline"
+                size="sm"
+                pill
+                onClick={handleEnterPostEdit}
+                style={{
+                  borderColor: "var(--accent-solid)",
+                  color: "var(--accent-text)",
+                  fontWeight: 600,
+                }}
+                title="进入工作台可自由手动调整分类与结构"
+              >
+                <FileEdit size={14} />
+                <span>进入工作台微调 (Post Edit)</span>
               </Button>
 
               <Button
                 variant="solid"
-                size="xs"
-                pill
-                onClick={handleEnterPostEdit}
-                style={{
-                  backgroundColor: "var(--accent-solid)",
-                  color: "#fff",
-                  fontWeight: 600,
-                }}
-              >
-                <FileEdit size={14} />
-                <span>进入工作台编辑 (Post Edit)</span>
-              </Button>
-
-              <Button
-                variant="outline"
-                size="xs"
+                size="sm"
                 pill
                 onClick={handleDirectApply}
-                style={{
-                  borderColor: "var(--success, #10b981)",
-                  color: "var(--success, #10b981)",
-                  fontWeight: 600,
-                }}
               >
-                <Check size={14} />
-                <span>直接应用更改</span>
+                <Check size={15} />
+                <span>确认应用修改</span>
               </Button>
             </div>
           </div>
@@ -565,27 +523,28 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
   );
 }
 
-/**
- * 树状轻量预览组件
- */
-function TabTreePreview({ nodes, isAfterView }: { nodes: TabTreeNode[]; isAfterView?: boolean }) {
+// Tree Column Display (Consistent with DiffHopupModal)
+function DiffTreeColumn({ nodes, isBefore }: { nodes: TabTreeNode[]; isBefore: boolean }) {
   if (nodes.length === 0) {
-    return <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", padding: "1rem" }}>没有标签数据</div>;
+    return (
+      <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+        该面板暂无标签页
+      </div>
+    );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
       {nodes.map((node) => (
-        <PreviewTreeNodeItem key={node.id} node={node} isAfterView={isAfterView} />
+        <DiffNodeItem key={node.id} node={node} isBefore={isBefore} />
       ))}
     </div>
   );
 }
 
-function PreviewTreeNodeItem({ node, isAfterView }: { node: TabTreeNode; isAfterView?: boolean }) {
-  const isCategoryHeader = node.isCategoryHeader;
+function DiffNodeItem({ node, isBefore }: { node: TabTreeNode; isBefore: boolean }) {
   const isGroup = node.isGroup;
-  const isUncategorized = node.categoryName === "未分类";
+  const isCategoryHeader = (node as any).categoryName || (!isBefore && isGroup && (node.id.startsWith("group_") || node.id.startsWith("cat_header_")));
 
   return (
     <div>
@@ -593,72 +552,160 @@ function PreviewTreeNodeItem({ node, isAfterView }: { node: TabTreeNode; isAfter
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.45rem",
-          padding: isCategoryHeader ? "0.4rem 0.6rem" : "0.25rem 0.5rem",
-          paddingLeft: `${node.depth * 18 + (isCategoryHeader ? 6 : 14)}px`,
-          borderRadius: "4px",
-          backgroundColor: isCategoryHeader
-            ? isUncategorized
-              ? "rgba(148, 163, 184, 0.12)"
-              : "var(--accent-subtle)"
-            : "transparent",
-          border: isCategoryHeader
-            ? isUncategorized
-              ? "1px dashed var(--border-subtle)"
-              : "1px solid var(--border-subtle)"
-            : "none",
-          fontSize: isCategoryHeader ? "0.82rem" : "0.78rem",
-          fontWeight: isCategoryHeader ? 600 : 400,
-          color: isCategoryHeader
-            ? isUncategorized
-              ? "var(--text-muted)"
-              : "var(--accent-text)"
-            : "var(--text-main)",
+          gap: "0.4rem",
+          padding: "0.3rem 0.5rem",
+          borderRadius: "0.375rem",
+          backgroundColor: isCategoryHeader ? "rgba(16, 185, 129, 0.12)" : "var(--bg-subtle)",
+          border: isCategoryHeader ? "1px solid rgba(16, 185, 129, 0.4)" : "1px solid var(--border-subtle)",
+          fontSize: "0.8rem",
+          color: isCategoryHeader ? "var(--success, #10b981)" : "var(--text-main)",
         }}
       >
-        {isCategoryHeader ? (
-          <FolderTree size={14} style={{ color: isUncategorized ? "var(--text-muted)" : "var(--accent)" }} />
-        ) : isGroup ? (
-          <FolderTree size={13} style={{ color: "var(--text-muted)" }} />
-        ) : (
-          <Globe size={12} style={{ color: "var(--text-muted)", opacity: 0.7 }} />
-        )}
-
-        <span
-          style={{
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            maxWidth: "380px",
-          }}
-          title={node.tab.title || node.tab.url}
-        >
-          {node.tab.title || node.tab.url || "无标题标签"}
-        </span>
-
-        {isAfterView && isCategoryHeader && (
-          <Badge
-            variant="subtle"
-            size="sm"
+        {isCategoryHeader && (
+          <span
             style={{
-              marginLeft: "auto",
-              fontSize: "0.68rem",
-              backgroundColor: isUncategorized ? "rgba(148, 163, 184, 0.2)" : "rgba(16, 185, 129, 0.15)",
-              color: isUncategorized ? "var(--text-muted)" : "#10b981",
+              padding: "1px 6px",
+              borderRadius: "9999px",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              fontSize: "0.65rem",
+              color: "var(--text-muted)",
+              fontWeight: 600,
             }}
           >
-            {node.children.length} 项
-          </Badge>
+            分类组
+          </span>
+        )}
+        {!isCategoryHeader && isGroup && (
+          <span
+            style={{
+              padding: "1px 6px",
+              borderRadius: "9999px",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              fontSize: "0.65rem",
+              color: "var(--text-muted)",
+            }}
+          >
+            Group
+          </span>
+        )}
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+          {(node as any).categoryName || node.tab.title || node.tab.url}
+        </span>
+        {node.children.length > 0 && (
+          <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", flexShrink: 0 }}>
+            ({node.children.length})
+          </span>
         )}
       </div>
 
-      {node.children && node.children.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+      {node.children.length > 0 && (
+        <div
+          style={{
+            paddingLeft: "1.25rem",
+            borderLeft: "1px solid var(--border-subtle)",
+            marginTop: "0.25rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.25rem",
+          }}
+        >
           {node.children.map((child) => (
-            <PreviewTreeNodeItem key={child.id} node={child} isAfterView={isAfterView} />
+            <DiffNodeItem key={child.id} node={child} isBefore={isBefore} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Git-style unified changes diff view (Consistent with DiffHopupModal)
+function AIGitDiffView({
+  newGroups,
+  afterTabsCount,
+}: {
+  newGroups: TabTreeNode[];
+  afterTabsCount: number;
+}) {
+  const hasChanges = newGroups.length > 0;
+
+  if (!hasChanges) {
+    return (
+      <div style={{ padding: "2rem", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
+        该面板在此操作下无新建分类分组 (标签总数: {afterTabsCount})
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+      <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--success, #10b981)", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+        <span>+ 新建 AI 分类分组与归类 ({newGroups.length} 个组)</span>
+      </div>
+
+      {newGroups.map((group) => {
+        const groupTitle = (group as any).categoryName || group.tab.title || "分类";
+        return (
+          <div
+            key={group.id}
+            style={{
+              borderRadius: "0.5rem",
+              backgroundColor: "rgba(16, 185, 129, 0.08)",
+              border: "1px solid rgba(16, 185, 129, 0.35)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                padding: "0.35rem 0.6rem",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                color: "var(--success, #10b981)",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+              }}
+            >
+              <span style={{ fontWeight: 700 }}>+</span>
+              <Folder size={14} />
+              <span style={{ flex: 1 }}>{groupTitle}</span>
+              <span style={{ fontSize: "0.7rem", opacity: 0.8 }}>({group.children.length} 标签)</span>
+            </div>
+
+            {group.children.length > 0 && (
+              <div style={{ padding: "0.3rem 0.6rem 0.4rem 1.4rem", display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                {group.children.map((child) => {
+                  const domain = extractDomain(child.tab.url);
+                  return (
+                    <div
+                      key={child.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.4rem",
+                        fontSize: "0.75rem",
+                        color: "var(--text-main)",
+                      }}
+                    >
+                      <span style={{ color: "var(--success, #10b981)", fontSize: "0.7rem" }}>↳</span>
+                      <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {child.tab.title || child.tab.url}
+                      </span>
+                      {domain && (
+                        <span style={{ fontSize: "0.68rem", opacity: 0.7, flexShrink: 0 }}>
+                          {domain}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -2,11 +2,6 @@ import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
 import { CategoryProportion } from "../src/types/ai";
 import { buildProcessedSnapshot } from "../src/store/useSnapshotStore";
 import { matchTabWithRule } from "../src/services/ruleEngine";
-
-import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
-import { CategoryProportion } from "../src/types/ai";
-import { buildProcessedSnapshot } from "../src/store/useSnapshotStore";
-import { matchTabWithRule } from "../src/services/ruleEngine";
 import {
   repairJSONString,
   extractAndParseJSON,
@@ -197,6 +192,20 @@ Based on your tabs, here is the distribution:
   };
   assert(matchTabWithRule(sampleTabs[0], devRule), "matchTabWithRule matches GitHub tab correctly");
   assert(!matchTabWithRule(sampleTabs[1], devRule), "matchTabWithRule rejects non-matching ChatGPT tab");
+
+  // --- Test Set 4: Custom Category Creation & Options ---
+  const customCat: CategoryProportion = {
+    id: "cat_custom_1",
+    name: "🎮 游戏娱乐",
+    color: "#10b981",
+    ratio: 25,
+    description: "游戏平台与资讯",
+    matchCount: 1,
+    keywords: ["steam", "game", "攻略"],
+    associatedRuleId: "rule_game",
+  };
+  assert(customCat.keywords?.includes("steam") === true, "Custom category preserves user-defined keyword tags");
+  assert(customCat.associatedRuleId === "rule_game", "Custom category preserves associated rule ID");
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

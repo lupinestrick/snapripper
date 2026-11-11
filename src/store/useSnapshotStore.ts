@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { SideberySnapshot, SideberyTab, TabTreeNode, CategorizationRule } from "@/types/sidebery";
-import { ProportionReport, AIProcessedCache } from "@/types/ai";
+import { ProportionReport, AIProcessedCache, CategoryProportion } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
 import { useConfigStore } from "./useConfigStore";
 import {
@@ -146,7 +146,16 @@ interface SnapshotStoreState {
   updateCategoryName: (categoryId: string, newName: string) => void;
   updateCategoryRatio: (categoryId: string, newRatio: number) => void;
   removeCategory: (categoryId: string) => void;
-  addCategory: (name: string) => void;
+  updateCategory: (categoryId: string, updates: Partial<CategoryProportion>) => void;
+  addCategory: (
+    name: string,
+    options?: {
+      color?: string;
+      description?: string;
+      keywords?: string[];
+      associatedRuleId?: string;
+    }
+  ) => void;
   setIsAnalyzing: (val: boolean, status?: string) => void;
   setIsClassifying: (val: boolean, progress?: { current: number; total: number }) => void;
 
@@ -499,16 +508,32 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     });
   },
 
-  addCategory: (name) => {
+  updateCategory: (categoryId, updates) => {
+    const { proportionReport } = get();
+    if (!proportionReport) return;
+    set({
+      proportionReport: {
+        ...proportionReport,
+        categories: proportionReport.categories.map((c) =>
+          c.id === categoryId ? { ...c, ...updates } : c
+        ),
+      },
+    });
+  },
+
+  addCategory: (name, options) => {
     const { proportionReport } = get();
     if (!proportionReport) return;
     const newCat = {
       id: `cat_${Date.now()}`,
       name,
-      color: "#38bdf8",
+      color: options?.color || "#38bdf8",
       ratio: 0,
-      description: "用户自定义分类",
+      targetRatio: 0,
+      description: options?.description || "用户自定义分类",
       matchCount: 0,
+      keywords: options?.keywords || [],
+      associatedRuleId: options?.associatedRuleId,
     };
     set({
       proportionReport: {

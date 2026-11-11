@@ -855,3 +855,82 @@ export async function classifyTabsWithRulesOrAI(
     matchedByAICount,
   };
 }
+
+/**
+ * 依据指定分类（名称、描述、关键词标签或关联规则），通过 AI 语义匹配找出相似标签并返回匹配标签 ID 列表
+ */
+export async function findSimilarTabsForCategory(
+  tabs: SideberyTab[],
+  category: CategoryProportion,
+  config: AIConfig,
+  associatedRule?: CategorizationRule,
+  onProgress?: (status: string, current: number, total: number) => void
+): Promise<string[]> {
+  const nonExemptTabs = tabs.filter((t) => !isExemptUrl(t.url, t.pinned));
+  const matchedIds = new Set<string>();
+
+  // 1. 若关联了规则，优先通过规则引擎进行秒级精确匹配
+  if (associatedRule) {
+    for (const tab of nonExemptTabs) {
+      if (matchTabWithRule(tab, associatedRule)) {
+        matchedIds.add(String(tab.id));
+      }
+    }
+  }
+
+  // 2. 将未被规则匹配的标签分批提交给 AI 进行语义相似度识别
+  const remainingTabs = nonExemptTabs.filter((t) => !matchedIds.has(String(t.id)));
+  if (remainingTabs.length === 0) {
+    return Array.from(matchedIds);
+  }
+
+  const chunkSize = 60;
+  const total = remainingTabs.length;
+
+  for (let i = 0; i < total; i += chunkSize) {
+    const chunk = remainingTabs.slice(i, i + chunkSize);
+    onProgress?.(`AI 正在语义检索相似标签 (${Math.min(i + chunkSize, total)}/${total})...`, i, total);
+
+    const chunkSummary = chunk.map((t) => ({
+      id: String(t.id),
+      domain: extractDomain(t.url),
+      title: (t.title || "").slice(0, 45),
+    }));
+
+    const systemPrompt = "你是一个高精度的浏览器标签页分类助手。请根据指定分类特征，从待选列表中筛选出语义高度相关的标签页。必须严格只返回纯 JSON 格式的字符串数组，包含匹配的标签 id，例如 [\"id1\", \"id2\"]。无匹配项请返回 []。";
+
+    const userPrompt = `目标分类信息：
+- 分类名称: "${category.name}"
+- 描述说明: "${category.description || "无"}"
+- 关联关键词/标签: "${(category.keywords || []).join(", ") || "无"}"
+${associatedRule ? `- 关联规则: 域名[${associatedRule.matchDomain}], 标题关键字[${associatedRule.matchKeyword}]` : ""}
+
+待判断标签页列表：
+${JSON.stringify(chunkSummary)}
+
+请仅返回属于该分类的标签 id 纯 JSON 数组：
+["id1", "id2"]`;
+
+    try {
+      const response = await sendAIChatRequest(config, systemPrompt, userPrompt);
+      const parsed = extractAndParseJSON<any>(response);
+      const ids: any[] = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.matchedIds)
+        ? parsed.matchedIds
+        : Array.isArray(parsed?.ids)
+        ? parsed.ids
+        : [];
+
+      for (const item of ids) {
+        if (item !== undefined && item !== null) {
+          matchedIds.add(String(item));
+        }
+      }
+    } catch {
+      // 容错继续下一个 chunk
+    }
+  }
+
+  return Array.from(matchedIds);
+}

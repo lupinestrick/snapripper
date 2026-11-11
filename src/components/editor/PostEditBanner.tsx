@@ -23,7 +23,7 @@ export function PostEditBanner() {
       <div
         style={{
           margin: "0.6rem 1.5rem 0",
-          padding: "0.65rem 1.25rem",
+          padding: "0.5rem 1.25rem",
           borderRadius: "0.75rem",
           backgroundColor: "var(--accent-subtle)",
           border: "1px solid var(--accent-solid)",
@@ -47,9 +47,6 @@ export function PostEditBanner() {
           >
             AI 处理后编辑 (Post Edit)
           </Badge>
-          <span style={{ fontSize: "0.82rem", color: "var(--text-main)", fontWeight: 500 }}>
-            当前页面显示已被 AI 分类处理的数据，可自由修改微调，点击 DIFF 可对比原始快照差异。
-          </span>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>

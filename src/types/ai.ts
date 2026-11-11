@@ -72,6 +72,7 @@ export interface CategoryProportion {
   description: string;
   matchCount: number;
   keywords?: string[];
+  associatedRuleId?: string;
 }
 
 export interface ProportionReport {
