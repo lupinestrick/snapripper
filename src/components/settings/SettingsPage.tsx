@@ -721,55 +721,9 @@ export function SettingsPage() {
           </div>
 
           <div style={{ gridColumn: "span 2" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "0.35rem",
-              }}
-            >
-              <label style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                API Key {aiConfig.provider === "custom" ? "(根据自定义服务选填)" : ""}
-              </label>
-              <span
-                style={{
-                  fontSize: "0.72rem",
-                  color: "var(--accent)",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
-                }}
-              >
-                <span
-                  style={{
-                    display: "inline-block",
-                    width: "6px",
-                    height: "6px",
-                    borderRadius: "50%",
-                    backgroundColor: "var(--accent)",
-                  }}
-                />
-                {(() => {
-                  const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
-                  switch (currentSlot) {
-                    case "deepseek":
-                      return "DeepSeek 独立密钥";
-                    case "claude":
-                      return "Claude 独立密钥";
-                    case "openai":
-                      return "OpenAI 独立密钥";
-                    case "gemini":
-                      return "Gemini 独立密钥";
-                    case "custom_anthropic":
-                      return "自定义 Anthropic 独立密钥";
-                    default:
-                      return "自定义 OpenAI 兼容独立密钥";
-                  }
-                })()}
-              </span>
-            </div>
+            <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+              API Key {aiConfig.provider === "custom" ? "(根据自定义服务选填)" : ""}
+            </label>
             <input
               type="password"
               placeholder={
