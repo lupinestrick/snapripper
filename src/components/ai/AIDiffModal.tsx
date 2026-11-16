@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
 import { Dialog } from "@/components/ui/dialog";
@@ -39,6 +39,8 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     updateProcessedTreeTarget,
     applySnapshotUpdate,
   } = useSnapshotStore();
+
+  const { uiSettings } = useConfigStore();
 
   const [activePanelId, setActivePanelId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"tree" | "git">("tree");
@@ -83,7 +85,26 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     panelList.push({ id: "main", name: "主面板" });
   }
 
-  const effectivePanelId = activePanelId || panelList[0]?.id || "main";
+  // Filter 0-tab panels if hideEmptyPanels is enabled
+  const displayedPanelList = useMemo(() => {
+    if (!uiSettings?.hideEmptyPanels) return panelList;
+    const filtered = panelList.filter((p) => {
+      const beforeCount = originalTabs.filter((t) => (t.panelId || "main") === p.id).length;
+      const afterCount = processedTabs.filter((t) => (t.panelId || "main") === p.id).length;
+      return beforeCount > 0 || afterCount > 0;
+    });
+    return filtered.length > 0 ? filtered : panelList;
+  }, [panelList, originalTabs, processedTabs, uiSettings?.hideEmptyPanels]);
+
+  useEffect(() => {
+    if (displayedPanelList.length > 0) {
+      if (!displayedPanelList.some((p) => p.id === activePanelId)) {
+        setActivePanelId(displayedPanelList[0].id);
+      }
+    }
+  }, [displayedPanelList, activePanelId]);
+
+  const effectivePanelId = activePanelId || displayedPanelList[0]?.id || "main";
 
   // Filter tabs for the active panel
   const beforePanelTabs = originalTabs.filter(
@@ -260,7 +281,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                 </Select>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", overflowX: "auto" }}>
-                  {panelList.map((p) => {
+                  {displayedPanelList.map((p) => {
                     const isActive = p.id === effectivePanelId;
                     const beforeCount = originalTabs.filter((t) => (t.panelId || "main") === p.id).length;
                     const afterCount = processedTabs.filter((t) => (t.panelId || "main") === p.id).length;

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useConfigStore } from "@/store/useConfigStore";
 import { PanelDiffResult, TabTreeNode, SideberyTab } from "@/types/sidebery";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -29,16 +30,28 @@ export function DiffHopupModal({
   totalGroupsCreated,
   onRecomputeDiff,
 }: DiffHopupModalProps) {
+  const { uiSettings } = useConfigStore();
   const [activePanelId, setActivePanelId] = useState<string>("");
   const [isNarrowScreen, setIsNarrowScreen] = useState(false);
   const [viewMode, setViewMode] = useState<"tree" | "git">("tree");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  // Filter 0-tab panels if hideEmptyPanels is enabled
+  const displayedPanelDiffs = useMemo(() => {
+    if (!uiSettings?.hideEmptyPanels) return panelDiffs;
+    const filtered = panelDiffs.filter(
+      (p) => p.beforeTabs.length > 0 || p.afterTabs.length > 0
+    );
+    return filtered.length > 0 ? filtered : panelDiffs;
+  }, [panelDiffs, uiSettings?.hideEmptyPanels]);
+
   useEffect(() => {
-    if (panelDiffs.length > 0 && !activePanelId) {
-      setActivePanelId(panelDiffs[0].panelId);
+    if (displayedPanelDiffs.length > 0) {
+      if (!displayedPanelDiffs.some((p) => p.panelId === activePanelId)) {
+        setActivePanelId(displayedPanelDiffs[0].panelId);
+      }
     }
-  }, [panelDiffs, activePanelId]);
+  }, [displayedPanelDiffs, activePanelId]);
 
   useEffect(() => {
     const checkWidth = () => {
@@ -159,7 +172,7 @@ export function DiffHopupModal({
                 </Select>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", overflowX: "auto" }}>
-                  {panelDiffs.map((p) => {
+                  {displayedPanelDiffs.map((p) => {
                     const isActive = p.panelId === activePanelId;
                     return (
                       <Button

@@ -22,11 +22,13 @@ export type ProcessScope = "current" | "all" | "selected";
 export interface UISettings {
   hideFileName: boolean;
   hideQuickTheme: boolean;
+  hideEmptyPanels: boolean;
 }
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
   hideFileName: false,
   hideQuickTheme: false,
+  hideEmptyPanels: false,
 };
 
 export interface AIThresholds {

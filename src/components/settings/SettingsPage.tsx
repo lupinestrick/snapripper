@@ -360,6 +360,35 @@ export function SettingsPage() {
               </div>
             </div>
           </label>
+
+          {/* Toggle: Hide 0-Tab Empty Panels */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "0.75rem",
+              cursor: "pointer",
+              padding: "0.75rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={uiSettings?.hideEmptyPanels || false}
+              onChange={(e) => setUISettings({ hideEmptyPanels: e.target.checked })}
+              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+            />
+            <div>
+              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                隐藏 0 标签页面板
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                在各个差分确认页面以及所有通过按钮样式显示的面板选项中，自动隐藏标签数量为 0 的面板（不包含下拉菜单）。
+              </div>
+            </div>
+          </label>
         </div>
       </div>
 

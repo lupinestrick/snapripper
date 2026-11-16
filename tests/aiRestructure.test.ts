@@ -207,6 +207,24 @@ Based on your tabs, here is the distribution:
   assert(customCat.keywords?.includes("steam") === true, "Custom category preserves user-defined keyword tags");
   assert(customCat.associatedRuleId === "rule_game", "Custom category preserves associated rule ID");
 
+  // --- Test Set 5: Hide 0-Tab Empty Panels Logic ---
+  const panelDiffsSample = [
+    { panelId: "main", panelName: "主面板", beforeTabs: [sampleTabs[0]], afterTabs: [sampleTabs[0]], beforeTree: [], afterTree: [], addedGroupsCount: 0, dedupedCount: 0 },
+    { panelId: "empty_panel", panelName: "空面板", beforeTabs: [], afterTabs: [], beforeTree: [], afterTree: [], addedGroupsCount: 0, dedupedCount: 0 },
+    { panelId: "new_panel", panelName: "新增面板", beforeTabs: [], afterTabs: [sampleTabs[1]], beforeTree: [], afterTree: [], addedGroupsCount: 1, dedupedCount: 0 },
+  ];
+
+  const filterNonEmpty = (diffs: typeof panelDiffsSample, hideEmpty: boolean) => {
+    if (!hideEmpty) return diffs;
+    const res = diffs.filter((p) => p.beforeTabs.length > 0 || p.afterTabs.length > 0);
+    return res.length > 0 ? res : diffs;
+  };
+
+  const filteredPanels = filterNonEmpty(panelDiffsSample, true);
+  assert(filteredPanels.length === 2, "hideEmptyPanels filters out 0-tab empty panel");
+  assert(!filteredPanels.some((p) => p.panelId === "empty_panel"), "Empty panel excluded from button list");
+  assert(filteredPanels.some((p) => p.panelId === "new_panel"), "Panel with tabs after process retained");
+
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };
 }
