@@ -90,7 +90,10 @@ export function AIPage() {
             }}
           >
             <span>接口:</span>
-            <strong style={{ color: "var(--accent)" }}>{currentProviderDef.name}</strong>
+            <strong style={{ color: "var(--accent)" }}>
+              {currentProviderDef.name}
+              {aiConfig.provider === "custom" ? ` (${aiConfig.type === "anthropic" ? "Anthropic" : "OpenAI"})` : ""}
+            </strong>
             <span style={{ color: "var(--text-muted)", opacity: 0.8 }}>({aiConfig.model || currentProviderDef.model})</span>
           </div>
 

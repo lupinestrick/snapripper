@@ -95,6 +95,8 @@ export const useConfigStore = create<ConfigState>()(
         temperature: 0.2,
         type: AI_PROVIDERS.deepseek.type,
         apiKeys: {},
+        baseURLs: {},
+        models: {},
       },
       rulesSettings: DEFAULT_RULES_SETTINGS,
       exemptPinned: true,
@@ -240,7 +242,41 @@ export const useConfigStore = create<ConfigState>()(
           mergedApiKeys[slot] = persistedAIConfig.apiKey;
         }
 
+        const mergedBaseURLs: Record<string, string> = {
+          ...(persistedAIConfig.baseURLs || {}),
+        };
+        // 彻底清除历史缓存中的假域名 api.custome.ai
+        for (const k of Object.keys(mergedBaseURLs)) {
+          if (mergedBaseURLs[k]?.includes("api.custome.ai")) {
+            delete mergedBaseURLs[k];
+          }
+        }
+        if (persistedAIConfig.baseURL && !persistedAIConfig.baseURL.includes("api.custome.ai") && !mergedBaseURLs[slot]) {
+          mergedBaseURLs[slot] = persistedAIConfig.baseURL;
+        }
+
+        const mergedModels: Record<string, string> = {
+          ...(persistedAIConfig.models || {}),
+        };
+        if (persistedAIConfig.model && !mergedModels[slot]) {
+          mergedModels[slot] = persistedAIConfig.model;
+        }
+
         const activeApiKey = mergedApiKeys[slot] ?? persistedAIConfig.apiKey ?? "";
+
+        let activeBaseURL = mergedBaseURLs[slot] || persistedAIConfig.baseURL || "";
+        if (!activeBaseURL || activeBaseURL.includes("api.custome.ai")) {
+          activeBaseURL = provider === "custom"
+            ? (type === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1")
+            : (AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]?.baseUrl || currentState.aiConfig.baseURL);
+        }
+
+        let activeModel = mergedModels[slot] || persistedAIConfig.model || "";
+        if (!activeModel || (provider === "custom" && activeModel === "deepseek-flash")) {
+          activeModel = provider === "custom"
+            ? (type === "anthropic" ? "claude-3-7-sonnet-20250219" : "gpt-4o-mini")
+            : (AI_PROVIDERS[provider as keyof typeof AI_PROVIDERS]?.model || currentState.aiConfig.model);
+        }
 
         return {
           ...currentState,
@@ -249,7 +285,11 @@ export const useConfigStore = create<ConfigState>()(
             ...currentState.aiConfig,
             ...persistedAIConfig,
             apiKey: activeApiKey,
+            baseURL: activeBaseURL,
+            model: activeModel,
             apiKeys: mergedApiKeys,
+            baseURLs: mergedBaseURLs,
+            models: mergedModels,
           },
           aiGenerateRulesFirst: persistedState?.aiGenerateRulesFirst ?? true,
           uiSettings: {

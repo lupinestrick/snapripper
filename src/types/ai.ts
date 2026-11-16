@@ -47,8 +47,8 @@ export const AI_PROVIDERS: Record<AIProviderKey, AIProviderPreset> = {
   },
   custom: {
     name: "自定义接口",
-    baseUrl: "https://api.custome.ai/v1",
-    model: "deepseek-flash",
+    baseUrl: "https://api.openai.com/v1",
+    model: "gpt-4o-mini",
     models: [],
     type: "openai",
   },
@@ -65,6 +65,14 @@ export interface AIConfig {
    * 各 API 选项独立的密钥映射池（如 deepseek, claude, openai, gemini, custom_openai, custom_anthropic）
    */
   apiKeys?: Record<string, string>;
+  /**
+   * 各 API 选项独立的 Base URL 映射池
+   */
+  baseURLs?: Record<string, string>;
+  /**
+   * 各 API 选项独立选中的模型映射池
+   */
+  models?: Record<string, string>;
 }
 
 export interface CategoryProportion {

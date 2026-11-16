@@ -78,6 +78,40 @@ export function resolveAPIKey(config: AIConfig): string {
 }
 
 /**
+ * 解析当前配置应使用的 API Base URL（优先读取各槽位独立地址，清除并防止回退至 api.custome.ai）
+ */
+export function resolveBaseURL(config: AIConfig): string {
+  const slot = getAPIKeySlot(config.provider, config.type);
+  if (config.baseURLs && config.baseURLs[slot] && !config.baseURLs[slot].includes("api.custome.ai")) {
+    return config.baseURLs[slot].trim();
+  }
+  if (config.provider === "custom") {
+    if (config.baseURL && !config.baseURL.includes("api.custome.ai")) {
+      return config.baseURL.trim();
+    }
+    return config.type === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1";
+  }
+  return (config.baseURL || AI_PROVIDERS[config.provider]?.baseUrl || "").trim();
+}
+
+/**
+ * 解析当前配置应使用的模型名称
+ */
+export function resolveModel(config: AIConfig): string {
+  const slot = getAPIKeySlot(config.provider, config.type);
+  if (config.models && config.models[slot]) {
+    return config.models[slot].trim();
+  }
+  if (config.provider === "custom") {
+    if (config.model && config.model !== "deepseek-flash") {
+      return config.model.trim();
+    }
+    return config.type === "anthropic" ? "claude-3-7-sonnet-20250219" : "gpt-4o-mini";
+  }
+  return (config.model || AI_PROVIDERS[config.provider]?.model || "").trim();
+}
+
+/**
  * 统一多协议模型通信驱动 (OpenAI, Anthropic Claude, Google Gemini)
  */
 export async function sendAIChatRequest(
@@ -88,18 +122,24 @@ export async function sendAIChatRequest(
   const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
   const protocol = config.type || providerDef.type || "openai";
   const apiKey = resolveAPIKey(config);
-  const model = config.model || providerDef.model;
-  const baseUrl = (config.baseURL || providerDef.baseUrl).trim();
+  const model = resolveModel(config);
+  const baseUrl = resolveBaseURL(config);
 
   // 1. Anthropic Claude Protocol
   if (protocol === "anthropic") {
     const endpoint = normalizeAnthropicMessagesUrl(baseUrl);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
       "dangerously-allow-browser": "true",
     };
+    if (apiKey) {
+      headers["x-api-key"] = apiKey;
+      // 若是第三方中转代理（非 api.anthropic.com），同时附带 Authorization 标头以防中转站只认 Bearer
+      if (!baseUrl.includes("anthropic.com")) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
+    }
 
     const res = await fetch(endpoint, {
       method: "POST",
@@ -226,6 +266,17 @@ export async function sendAIChatRequest(
     content = message.reasoning_content;
   }
 
+  // 针对某些三方代理网关或非标准响应，提取顶层 response / text / output
+  if (!content.trim()) {
+    if (typeof (data as any)?.response === "string") {
+      content = (data as any).response;
+    } else if (typeof (data as any)?.text === "string") {
+      content = (data as any).text;
+    } else if (typeof (data as any)?.output === "string") {
+      content = (data as any).output;
+    }
+  }
+
   return content;
 }
 
@@ -255,7 +306,7 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
   const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
   const protocol = config.type || providerDef.type || "openai";
   const apiKey = resolveAPIKey(config);
-  const rawBaseUrl = (config.baseURL || providerDef.baseUrl).trim().replace(/\/+$/, "");
+  const rawBaseUrl = resolveBaseURL(config);
 
   if (!rawBaseUrl) {
     throw new Error("请先填写有效的 API Base URL");
@@ -271,6 +322,9 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
     };
     if (apiKey) {
       headers["x-api-key"] = apiKey;
+      if (!rawBaseUrl.includes("anthropic.com")) {
+        headers["Authorization"] = `Bearer ${apiKey}`;
+      }
     }
 
     const res = await fetch(endpoint, {

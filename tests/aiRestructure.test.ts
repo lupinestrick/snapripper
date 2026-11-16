@@ -12,6 +12,8 @@ import {
   normalizeOpenAIModelsUrl,
   getAPIKeySlot,
   resolveAPIKey,
+  resolveBaseURL,
+  resolveModel,
 } from "../src/services/aiService";
 
 export function runAIRestructureTests(): { passed: number; failed: number } {
@@ -337,6 +339,46 @@ Based on your tabs, here is the distribution:
     apiKey: "sk-fallback-legacy",
   };
   assert(resolveAPIKey(emptyKeysConfig) === "sk-fallback-legacy", "resolveAPIKey falls back to legacy apiKey when apiKeys map is absent");
+
+  // --- Test Set 8: Base URL & Model Isolation & Custome.ai Sanitization ---
+  const customConfigWithStale: AIConfig = {
+    provider: "custom",
+    baseURL: "https://api.custome.ai/v1",
+    model: "deepseek-flash",
+    apiKey: "sk-test",
+    type: "openai",
+  };
+  assert(!resolveBaseURL(customConfigWithStale).includes("api.custome.ai"), "resolveBaseURL eliminates stale api.custome.ai URL");
+  assert(resolveBaseURL(customConfigWithStale) === "https://api.openai.com/v1", "resolveBaseURL defaults custom openai to standard endpoint");
+
+  const customAnthropicWithStale: AIConfig = {
+    ...customConfigWithStale,
+    type: "anthropic",
+  };
+  assert(resolveBaseURL(customAnthropicWithStale) === "https://api.anthropic.com/v1", "resolveBaseURL defaults custom anthropic to standard endpoint");
+  assert(resolveModel(customAnthropicWithStale) === "claude-3-7-sonnet-20250219", "resolveModel defaults custom anthropic to claude-3-7-sonnet");
+
+  const customWithUserValues: AIConfig = {
+    provider: "custom",
+    baseURL: "https://my-proxy.com/v1",
+    model: "my-custom-llm",
+    apiKey: "sk-my-key",
+    type: "openai",
+    baseURLs: {
+      custom_openai: "https://my-proxy.com/v1",
+      custom_anthropic: "https://my-anthropic-proxy.com/v1",
+    },
+    models: {
+      custom_openai: "my-custom-llm",
+      custom_anthropic: "claude-custom-proxy",
+    },
+  };
+  assert(resolveBaseURL(customWithUserValues) === "https://my-proxy.com/v1", "resolveBaseURL preserves user custom openai URL");
+  assert(resolveModel(customWithUserValues) === "my-custom-llm", "resolveModel preserves user custom openai model");
+
+  const switchedToAnthropic: AIConfig = { ...customWithUserValues, type: "anthropic" };
+  assert(resolveBaseURL(switchedToAnthropic) === "https://my-anthropic-proxy.com/v1", "resolveBaseURL switches to user custom anthropic URL");
+  assert(resolveModel(switchedToAnthropic) === "claude-custom-proxy", "resolveModel switches to user custom anthropic model");
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

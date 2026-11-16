@@ -69,10 +69,22 @@ export function SettingsPage() {
       ...(aiConfig.apiKeys || {}),
       [slot]: aiConfig.apiKey,
     };
+    const updatedBaseURLs = {
+      ...(aiConfig.baseURLs || {}),
+      [slot]: aiConfig.baseURL,
+    };
+    const updatedModels = {
+      ...(aiConfig.models || {}),
+      [slot]: aiConfig.model,
+    };
     setAIConfig({
       ...aiConfig,
       apiKey: aiConfig.apiKey,
+      baseURL: aiConfig.baseURL,
+      model: aiConfig.model,
       apiKeys: updatedApiKeys,
+      baseURLs: updatedBaseURLs,
+      models: updatedModels,
     });
     setSaveSuccess(true);
     setTimeout(() => {
@@ -126,19 +138,71 @@ export function SettingsPage() {
   };
 
   const handleSelectProvider = (key: AIProviderKey) => {
+    // 先把当前正在编辑的槽位配置沉淀至映射池，避免切换丢失
+    const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+    const apiKeysPool = {
+      ...(aiConfig.apiKeys || {}),
+      [currentSlot]: aiConfig.apiKey,
+    };
+    const baseURLsPool = {
+      ...(aiConfig.baseURLs || {}),
+      [currentSlot]: aiConfig.baseURL,
+    };
+    const modelsPool = {
+      ...(aiConfig.models || {}),
+      [currentSlot]: aiConfig.model,
+    };
+
     const preset = AI_PROVIDERS[key];
     const newType = key === "custom" ? (aiConfig.type === "anthropic" ? "anthropic" : "openai") : preset.type;
     const targetSlot = getAPIKeySlot(key, newType);
-    const targetKey = (aiConfig.apiKeys || {})[targetSlot] || "";
+    const targetKey = apiKeysPool[targetSlot] || "";
+
+    // 解析目标 Base URL：若是 custom，优先取已保存的自定义地址，无则按协议提供官方标准地址，彻底杜绝回退至 api.custome.ai
+    let targetBaseURL = preset.baseUrl;
+    if (key === "custom") {
+      const savedCustomUrl = baseURLsPool[targetSlot];
+      if (savedCustomUrl && !savedCustomUrl.includes("api.custome.ai")) {
+        targetBaseURL = savedCustomUrl;
+      } else if (aiConfig.provider === "custom" && aiConfig.baseURL && !aiConfig.baseURL.includes("api.custome.ai")) {
+        targetBaseURL = aiConfig.baseURL;
+      } else {
+        targetBaseURL = newType === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1";
+      }
+    } else if (baseURLsPool[targetSlot]) {
+      targetBaseURL = baseURLsPool[targetSlot];
+    }
+
+    // 解析目标 Model：若是 custom，优先取已保存的模型，无则按协议提供默认模型
+    let targetModel = preset.model;
+    if (key === "custom") {
+      const savedCustomModel = modelsPool[targetSlot];
+      if (savedCustomModel && savedCustomModel !== "deepseek-flash") {
+        targetModel = savedCustomModel;
+      } else if (aiConfig.provider === "custom" && aiConfig.model && aiConfig.model !== "deepseek-flash") {
+        targetModel = aiConfig.model;
+      } else {
+        targetModel = newType === "anthropic" ? "claude-3-7-sonnet-20250219" : "gpt-4o-mini";
+      }
+    } else if (modelsPool[targetSlot]) {
+      targetModel = modelsPool[targetSlot];
+    }
+
+    baseURLsPool[targetSlot] = targetBaseURL;
+    modelsPool[targetSlot] = targetModel;
+    apiKeysPool[targetSlot] = targetKey;
 
     setAIConfig({
       provider: key,
-      baseURL: preset.baseUrl,
-      model: preset.model,
+      baseURL: targetBaseURL,
+      model: targetModel,
       type: newType,
       apiKey: targetKey,
+      apiKeys: apiKeysPool,
+      baseURLs: baseURLsPool,
+      models: modelsPool,
     });
-    setAvailableModels(preset.models || []);
+    setAvailableModels(preset.models && preset.models.length > 0 ? preset.models : []);
     setTestResult(null);
     setFetchModelsStatus(null);
     setModelDropdownOpen(false);
@@ -469,11 +533,34 @@ export function SettingsPage() {
                     size="xs"
                     pill
                     onClick={() => {
+                      const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                      const apiKeysPool = { ...(aiConfig.apiKeys || {}), [currentSlot]: aiConfig.apiKey };
+                      const baseURLsPool = { ...(aiConfig.baseURLs || {}), [currentSlot]: aiConfig.baseURL };
+                      const modelsPool = { ...(aiConfig.models || {}), [currentSlot]: aiConfig.model };
+
                       const targetSlot = "custom_openai";
-                      const targetKey = (aiConfig.apiKeys || {})[targetSlot] || "";
+                      const targetKey = apiKeysPool[targetSlot] || "";
+                      let targetBaseURL = baseURLsPool[targetSlot] || "";
+                      if (!targetBaseURL || targetBaseURL.includes("api.custome.ai")) {
+                        targetBaseURL = "https://api.openai.com/v1";
+                      }
+                      let targetModel = modelsPool[targetSlot] || "";
+                      if (!targetModel || targetModel === "deepseek-flash") {
+                        targetModel = "gpt-4o-mini";
+                      }
+
+                      baseURLsPool[targetSlot] = targetBaseURL;
+                      modelsPool[targetSlot] = targetModel;
+                      apiKeysPool[targetSlot] = targetKey;
+
                       setAIConfig({
                         type: "openai",
                         apiKey: targetKey,
+                        baseURL: targetBaseURL,
+                        model: targetModel,
+                        apiKeys: apiKeysPool,
+                        baseURLs: baseURLsPool,
+                        models: modelsPool,
                       });
                     }}
                     title="切换为 OpenAI Compatible 协议 (/chat/completions)"
@@ -487,11 +574,34 @@ export function SettingsPage() {
                     size="xs"
                     pill
                     onClick={() => {
+                      const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                      const apiKeysPool = { ...(aiConfig.apiKeys || {}), [currentSlot]: aiConfig.apiKey };
+                      const baseURLsPool = { ...(aiConfig.baseURLs || {}), [currentSlot]: aiConfig.baseURL };
+                      const modelsPool = { ...(aiConfig.models || {}), [currentSlot]: aiConfig.model };
+
                       const targetSlot = "custom_anthropic";
-                      const targetKey = (aiConfig.apiKeys || {})[targetSlot] || "";
+                      const targetKey = apiKeysPool[targetSlot] || "";
+                      let targetBaseURL = baseURLsPool[targetSlot] || "";
+                      if (!targetBaseURL || targetBaseURL.includes("api.custome.ai")) {
+                        targetBaseURL = "https://api.anthropic.com/v1";
+                      }
+                      let targetModel = modelsPool[targetSlot] || "";
+                      if (!targetModel || targetModel === "deepseek-flash") {
+                        targetModel = "claude-3-7-sonnet-20250219";
+                      }
+
+                      baseURLsPool[targetSlot] = targetBaseURL;
+                      modelsPool[targetSlot] = targetModel;
+                      apiKeysPool[targetSlot] = targetKey;
+
                       setAIConfig({
                         type: "anthropic",
                         apiKey: targetKey,
+                        baseURL: targetBaseURL,
+                        model: targetModel,
+                        apiKeys: apiKeysPool,
+                        baseURLs: baseURLsPool,
+                        models: modelsPool,
                       });
                     }}
                     title="切换为 Anthropic 协议 (/messages)"
@@ -511,8 +621,18 @@ export function SettingsPage() {
                     : "例如 https://api.openai.com/v1"
                   : "API Base URL"
               }
-              value={aiConfig.baseURL}
-              onChange={(e) => setAIConfig({ baseURL: e.target.value })}
+              value={aiConfig.baseURL || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                setAIConfig({
+                  baseURL: val,
+                  baseURLs: {
+                    ...(aiConfig.baseURLs || {}),
+                    [slot]: val,
+                  },
+                });
+              }}
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",
@@ -567,8 +687,18 @@ export function SettingsPage() {
               <input
                 type="text"
                 placeholder="请输入或下拉选择模型标识符"
-                value={aiConfig.model}
-                onChange={(e) => setAIConfig({ model: e.target.value })}
+                value={aiConfig.model || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                  setAIConfig({
+                    model: val,
+                    models: {
+                      ...(aiConfig.models || {}),
+                      [slot]: val,
+                    },
+                  });
+                }}
                 style={{
                   width: "100%",
                   padding: "0.5rem 2.2rem 0.5rem 0.75rem",
@@ -675,7 +805,14 @@ export function SettingsPage() {
                             key={m}
                             type="button"
                             onClick={() => {
-                              setAIConfig({ model: m });
+                              const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                              setAIConfig({
+                                model: m,
+                                models: {
+                                  ...(aiConfig.models || {}),
+                                  [slot]: m,
+                                },
+                              });
                               setModelDropdownOpen(false);
                             }}
                             style={{
