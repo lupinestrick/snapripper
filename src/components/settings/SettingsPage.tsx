@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useConfigStore, AppTheme } from "@/store/useConfigStore";
-import { testAIConnection, fetchAvailableModels } from "@/services/aiService";
+import { testAIConnection, fetchAvailableModels, getAPIKeySlot } from "@/services/aiService";
 import { AI_PROVIDERS, AIProviderKey } from "@/types/ai";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,7 +64,16 @@ export function SettingsPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const handleSaveAIConfig = () => {
-    setAIConfig(aiConfig);
+    const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+    const updatedApiKeys = {
+      ...(aiConfig.apiKeys || {}),
+      [slot]: aiConfig.apiKey,
+    };
+    setAIConfig({
+      ...aiConfig,
+      apiKey: aiConfig.apiKey,
+      apiKeys: updatedApiKeys,
+    });
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -118,11 +127,16 @@ export function SettingsPage() {
 
   const handleSelectProvider = (key: AIProviderKey) => {
     const preset = AI_PROVIDERS[key];
+    const newType = key === "custom" ? (aiConfig.type === "anthropic" ? "anthropic" : "openai") : preset.type;
+    const targetSlot = getAPIKeySlot(key, newType);
+    const targetKey = (aiConfig.apiKeys || {})[targetSlot] || "";
+
     setAIConfig({
       provider: key,
       baseURL: preset.baseUrl,
       model: preset.model,
-      type: key === "custom" ? (aiConfig.type === "anthropic" ? "anthropic" : "openai") : preset.type,
+      type: newType,
+      apiKey: targetKey,
     });
     setAvailableModels(preset.models || []);
     setTestResult(null);
@@ -454,7 +468,14 @@ export function SettingsPage() {
                     variant={aiConfig.type === "anthropic" ? "outline" : "solid"}
                     size="xs"
                     pill
-                    onClick={() => setAIConfig({ type: "openai" })}
+                    onClick={() => {
+                      const targetSlot = "custom_openai";
+                      const targetKey = (aiConfig.apiKeys || {})[targetSlot] || "";
+                      setAIConfig({
+                        type: "openai",
+                        apiKey: targetKey,
+                      });
+                    }}
                     title="切换为 OpenAI Compatible 协议 (/chat/completions)"
                     style={{ fontSize: "0.72rem", padding: "0.15rem 0.55rem" }}
                   >
@@ -465,7 +486,14 @@ export function SettingsPage() {
                     variant={aiConfig.type === "anthropic" ? "solid" : "outline"}
                     size="xs"
                     pill
-                    onClick={() => setAIConfig({ type: "anthropic" })}
+                    onClick={() => {
+                      const targetSlot = "custom_anthropic";
+                      const targetKey = (aiConfig.apiKeys || {})[targetSlot] || "";
+                      setAIConfig({
+                        type: "anthropic",
+                        apiKey: targetKey,
+                      });
+                    }}
                     title="切换为 Anthropic 协议 (/messages)"
                     style={{ fontSize: "0.72rem", padding: "0.15rem 0.55rem" }}
                   >
@@ -693,9 +721,55 @@ export function SettingsPage() {
           </div>
 
           <div style={{ gridColumn: "span 2" }}>
-            <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
-              API Key {aiConfig.provider === "custom" ? "(根据自定义服务选填)" : ""}
-            </label>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.35rem",
+              }}
+            >
+              <label style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                API Key {aiConfig.provider === "custom" ? "(根据自定义服务选填)" : ""}
+              </label>
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  color: "var(--accent)",
+                  fontWeight: 500,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "6px",
+                    height: "6px",
+                    borderRadius: "50%",
+                    backgroundColor: "var(--accent)",
+                  }}
+                />
+                {(() => {
+                  const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                  switch (currentSlot) {
+                    case "deepseek":
+                      return "DeepSeek 独立密钥";
+                    case "claude":
+                      return "Claude 独立密钥";
+                    case "openai":
+                      return "OpenAI 独立密钥";
+                    case "gemini":
+                      return "Gemini 独立密钥";
+                    case "custom_anthropic":
+                      return "自定义 Anthropic 独立密钥";
+                    default:
+                      return "自定义 OpenAI 兼容独立密钥";
+                  }
+                })()}
+              </span>
+            </div>
             <input
               type="password"
               placeholder={
@@ -703,8 +777,18 @@ export function SettingsPage() {
                   ? "sk-ant-..."
                   : "sk-..."
               }
-              value={aiConfig.apiKey}
-              onChange={(e) => setAIConfig({ apiKey: e.target.value })}
+              value={aiConfig.apiKey || ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                setAIConfig({
+                  apiKey: val,
+                  apiKeys: {
+                    ...(aiConfig.apiKeys || {}),
+                    [slot]: val,
+                  },
+                });
+              }}
               style={{
                 width: "100%",
                 padding: "0.5rem 0.75rem",

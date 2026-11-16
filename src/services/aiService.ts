@@ -1,4 +1,11 @@
-import { AIConfig, CategoryProportion, ProportionReport, AI_PROVIDERS, AIProviderKey } from "@/types/ai";
+import {
+  AIConfig,
+  CategoryProportion,
+  ProportionReport,
+  AI_PROVIDERS,
+  AIProviderKey,
+  AIProtocolType,
+} from "@/types/ai";
 import { SideberyTab, CategorizationRule } from "@/types/sidebery";
 import { cleanUrlForAI, extractDomain, isExemptUrl } from "@/utils/urlHelper";
 import { DEFAULT_PROPORTION_ANALYSIS_PROMPT, DEFAULT_RULES_GENERATOR_PROMPT } from "@/constants/aiPrompts";
@@ -50,6 +57,27 @@ export function normalizeOpenAIModelsUrl(baseUrl: string): string {
 }
 
 /**
+ * 获取特定 API 选项对应的独立密钥槽位键名
+ */
+export function getAPIKeySlot(provider: AIProviderKey, type?: AIProtocolType): string {
+  if (provider === "custom") {
+    return type === "anthropic" ? "custom_anthropic" : "custom_openai";
+  }
+  return provider;
+}
+
+/**
+ * 解析当前配置应使用的 API Key（优先使用槽位独立密钥，若无则平滑回退至 config.apiKey）
+ */
+export function resolveAPIKey(config: AIConfig): string {
+  const slot = getAPIKeySlot(config.provider, config.type);
+  if (config.apiKeys && typeof config.apiKeys[slot] === "string") {
+    return config.apiKeys[slot].trim();
+  }
+  return (config.apiKey || "").trim();
+}
+
+/**
  * 统一多协议模型通信驱动 (OpenAI, Anthropic Claude, Google Gemini)
  */
 export async function sendAIChatRequest(
@@ -59,7 +87,7 @@ export async function sendAIChatRequest(
 ): Promise<string> {
   const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
   const protocol = config.type || providerDef.type || "openai";
-  const apiKey = (config.apiKey || "").trim();
+  const apiKey = resolveAPIKey(config);
   const model = config.model || providerDef.model;
   const baseUrl = (config.baseURL || providerDef.baseUrl).trim();
 
@@ -226,7 +254,7 @@ export const pingAIEndpoint = testAIConnection;
 export async function fetchAvailableModels(config: AIConfig): Promise<string[]> {
   const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
   const protocol = config.type || providerDef.type || "openai";
-  const apiKey = (config.apiKey || "").trim();
+  const apiKey = resolveAPIKey(config);
   const rawBaseUrl = (config.baseURL || providerDef.baseUrl).trim().replace(/\/+$/, "");
 
   if (!rawBaseUrl) {

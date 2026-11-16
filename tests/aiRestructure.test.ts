@@ -1,5 +1,5 @@
 import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
-import { CategoryProportion } from "../src/types/ai";
+import { CategoryProportion, AIConfig } from "../src/types/ai";
 import { buildProcessedSnapshot } from "../src/store/useSnapshotStore";
 import { matchTabWithRule } from "../src/services/ruleEngine";
 import {
@@ -10,6 +10,8 @@ import {
   normalizeAnthropicModelsUrl,
   normalizeOpenAIChatUrl,
   normalizeOpenAIModelsUrl,
+  getAPIKeySlot,
+  resolveAPIKey,
 } from "../src/services/aiService";
 
 export function runAIRestructureTests(): { passed: number; failed: number } {
@@ -285,6 +287,56 @@ Based on your tabs, here is the distribution:
     normalizeOpenAIModelsUrl("https://proxy.example.com/v1/chat/completions") === "https://proxy.example.com/v1/models",
     "normalizeOpenAIModelsUrl converts /v1/chat/completions to /v1/models"
   );
+
+  // --- Test Set 7: Independent API Key Isolation Across Options ---
+  assert(getAPIKeySlot("deepseek") === "deepseek", "getAPIKeySlot resolves deepseek");
+  assert(getAPIKeySlot("claude") === "claude", "getAPIKeySlot resolves claude");
+  assert(getAPIKeySlot("openai") === "openai", "getAPIKeySlot resolves openai");
+  assert(getAPIKeySlot("gemini") === "gemini", "getAPIKeySlot resolves gemini");
+  assert(getAPIKeySlot("custom", "openai") === "custom_openai", "getAPIKeySlot resolves custom_openai");
+  assert(getAPIKeySlot("custom", "anthropic") === "custom_anthropic", "getAPIKeySlot resolves custom_anthropic");
+  assert(getAPIKeySlot("custom") === "custom_openai", "getAPIKeySlot defaults custom without type to custom_openai");
+
+  const multiKeyConfig: AIConfig = {
+    provider: "deepseek",
+    baseURL: "https://api.deepseek.com/v1",
+    model: "deepseek-flash",
+    apiKey: "legacy-fallback-key",
+    apiKeys: {
+      deepseek: "sk-deepseek-12345",
+      claude: "sk-ant-claude-67890",
+      openai: "sk-openai-abcde",
+      gemini: "AIza-gemini-fghij",
+      custom_openai: "sk-custom-openai-999",
+      custom_anthropic: "sk-custom-anthropic-888",
+    },
+  };
+
+  assert(resolveAPIKey(multiKeyConfig) === "sk-deepseek-12345", "resolveAPIKey returns DeepSeek key when provider is deepseek");
+
+  const claudeConfig: AIConfig = { ...multiKeyConfig, provider: "claude", type: "anthropic" };
+  assert(resolveAPIKey(claudeConfig) === "sk-ant-claude-67890", "resolveAPIKey returns Claude key independently");
+
+  const openaiConfig: AIConfig = { ...multiKeyConfig, provider: "openai", type: "openai" };
+  assert(resolveAPIKey(openaiConfig) === "sk-openai-abcde", "resolveAPIKey returns OpenAI key independently");
+
+  const geminiConfig: AIConfig = { ...multiKeyConfig, provider: "gemini", type: "gemini" };
+  assert(resolveAPIKey(geminiConfig) === "AIza-gemini-fghij", "resolveAPIKey returns Gemini key independently");
+
+  const customOpenAIConfig: AIConfig = { ...multiKeyConfig, provider: "custom", type: "openai" };
+  assert(resolveAPIKey(customOpenAIConfig) === "sk-custom-openai-999", "resolveAPIKey returns Custom OpenAI key independently");
+
+  const customAnthropicConfig: AIConfig = { ...multiKeyConfig, provider: "custom", type: "anthropic" };
+  assert(resolveAPIKey(customAnthropicConfig) === "sk-custom-anthropic-888", "resolveAPIKey returns Custom Anthropic key independently");
+
+  // Fallback test
+  const emptyKeysConfig: AIConfig = {
+    provider: "claude",
+    baseURL: "https://api.anthropic.com/v1",
+    model: "claude-fable-5-1",
+    apiKey: "sk-fallback-legacy",
+  };
+  assert(resolveAPIKey(emptyKeysConfig) === "sk-fallback-legacy", "resolveAPIKey falls back to legacy apiKey when apiKeys map is absent");
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

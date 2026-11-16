@@ -61,6 +61,10 @@ export interface AIConfig {
   model: string;
   temperature?: number;
   type?: AIProtocolType;
+  /**
+   * 各 API 选项独立的密钥映射池（如 deepseek, claude, openai, gemini, custom_openai, custom_anthropic）
+   */
+  apiKeys?: Record<string, string>;
 }
 
 export interface CategoryProportion {

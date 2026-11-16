@@ -94,6 +94,7 @@ export const useConfigStore = create<ConfigState>()(
         model: AI_PROVIDERS.deepseek.model,
         temperature: 0.2,
         type: AI_PROVIDERS.deepseek.type,
+        apiKeys: {},
       },
       rulesSettings: DEFAULT_RULES_SETTINGS,
       exemptPinned: true,
@@ -223,23 +224,48 @@ export const useConfigStore = create<ConfigState>()(
     }),
     {
       name: "snapripper_config_storage_v9",
-      merge: (persistedState: any, currentState: any) => ({
-        ...currentState,
-        ...persistedState,
-        aiGenerateRulesFirst: persistedState?.aiGenerateRulesFirst ?? true,
-        uiSettings: {
-          ...DEFAULT_UI_SETTINGS,
-          ...(persistedState?.uiSettings || {}),
-        },
-        aiPrompts: {
-          proportionAnalysisPrompt:
-            persistedState?.aiPrompts?.proportionAnalysisPrompt ||
-            DEFAULT_AI_PROMPTS.proportionAnalysisPrompt,
-          rulesGeneratorPrompt:
-            persistedState?.aiPrompts?.rulesGeneratorPrompt ||
-            DEFAULT_AI_PROMPTS.rulesGeneratorPrompt,
-        },
-      }),
+      merge: (persistedState: any, currentState: any) => {
+        const persistedAIConfig = persistedState?.aiConfig || {};
+        const provider = persistedAIConfig.provider || currentState.aiConfig.provider;
+        const type = persistedAIConfig.type || currentState.aiConfig.type;
+        const slot = provider === "custom"
+          ? (type === "anthropic" ? "custom_anthropic" : "custom_openai")
+          : provider;
+
+        const mergedApiKeys: Record<string, string> = {
+          ...(persistedAIConfig.apiKeys || {}),
+        };
+        // 若旧存储中有全局 apiKey 但尚未记录进具体槽位，则进行平滑同步
+        if (persistedAIConfig.apiKey && !mergedApiKeys[slot]) {
+          mergedApiKeys[slot] = persistedAIConfig.apiKey;
+        }
+
+        const activeApiKey = mergedApiKeys[slot] ?? persistedAIConfig.apiKey ?? "";
+
+        return {
+          ...currentState,
+          ...persistedState,
+          aiConfig: {
+            ...currentState.aiConfig,
+            ...persistedAIConfig,
+            apiKey: activeApiKey,
+            apiKeys: mergedApiKeys,
+          },
+          aiGenerateRulesFirst: persistedState?.aiGenerateRulesFirst ?? true,
+          uiSettings: {
+            ...DEFAULT_UI_SETTINGS,
+            ...(persistedState?.uiSettings || {}),
+          },
+          aiPrompts: {
+            proportionAnalysisPrompt:
+              persistedState?.aiPrompts?.proportionAnalysisPrompt ||
+              DEFAULT_AI_PROMPTS.proportionAnalysisPrompt,
+            rulesGeneratorPrompt:
+              persistedState?.aiPrompts?.rulesGeneratorPrompt ||
+              DEFAULT_AI_PROMPTS.rulesGeneratorPrompt,
+          },
+        };
+      },
     }
   )
 );
