@@ -10,16 +10,16 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
     const classes = badge({ variant, size });
 
     let bg = "var(--accent-subtle)";
-    let border = "1px solid var(--accent-border)";
+    let borderColor = "var(--accent-border)";
     let color = "var(--accent-text)";
 
     if (variant === "solid") {
       bg = "var(--accent-solid)";
-      border = "1px solid var(--accent-solid)";
+      borderColor = "var(--accent-solid)";
       color = "var(--accent-fg, #ffffff)";
     } else if (variant === "outline") {
       bg = "transparent";
-      border = "1px solid var(--border-subtle)";
+      borderColor = "var(--border-subtle)";
       color = "var(--text-muted)";
     }
 
@@ -37,6 +37,14 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
         ? "0.85rem"
         : "0.75rem";
 
+    const borderStyleProps = style?.border
+      ? {}
+      : {
+          borderWidth: "1px",
+          borderStyle: "solid",
+          borderColor,
+        };
+
     return (
       <span
         ref={ref}
@@ -48,7 +56,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
           gap: "0.25rem",
           fontWeight: 600,
           backgroundColor: bg,
-          border,
+          ...borderStyleProps,
           color,
           padding,
           fontSize,

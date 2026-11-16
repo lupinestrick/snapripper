@@ -27,25 +27,25 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     // Theme-driven button styles:
     let bg = "var(--btn-outline-bg)";
-    let border = "1px solid var(--btn-outline-border)";
+    let borderColor = "var(--btn-outline-border)";
     let color = "var(--text-muted)";
 
     if (variant === "solid") {
       bg = isHovered && !props.disabled ? "var(--accent-hover)" : "var(--accent-solid)";
-      border = "1px solid var(--accent-solid)";
+      borderColor = "var(--accent-solid)";
       color = "var(--accent-fg, #ffffff)";
     } else if (variant === "subtle") {
       bg = isHovered && !props.disabled ? "var(--accent-subtle-hover)" : "var(--accent-subtle)";
-      border = "1px solid var(--accent-border)";
+      borderColor = "var(--accent-border)";
       color = "var(--accent-text)";
     } else if (variant === "ghost") {
       bg = isHovered && !props.disabled ? "var(--btn-ghost-hover)" : "transparent";
-      border = "1px solid transparent";
+      borderColor = "transparent";
       color = isHovered && !props.disabled ? "var(--text-main)" : "var(--text-muted)";
     } else {
       // "outline" - standard Park-UI / Workbench button style
       bg = isHovered && !props.disabled ? "var(--btn-outline-hover-bg)" : "var(--btn-outline-bg)";
-      border = isHovered && !props.disabled ? "1px solid var(--btn-outline-hover-border)" : "1px solid var(--btn-outline-border)";
+      borderColor = isHovered && !props.disabled ? "var(--btn-outline-hover-border)" : "var(--btn-outline-border)";
       color = isHovered && !props.disabled ? "var(--text-main)" : "var(--text-muted)";
     }
 
@@ -67,6 +67,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ? "0.9rem"
         : "0.85rem";
 
+    // Avoid React 19 warning about mixing shorthand (border) and non-shorthand (borderColor)
+    const borderStyleProps = style?.border
+      ? {}
+      : {
+          borderWidth: "1px",
+          borderStyle: "solid",
+          borderColor,
+        };
+
     return (
       <button
         ref={ref}
@@ -77,7 +86,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           fontSize,
           fontWeight: 500,
           backgroundColor: bg,
-          border,
+          ...borderStyleProps,
           color,
           boxShadow: "none",
           outline: "none",
