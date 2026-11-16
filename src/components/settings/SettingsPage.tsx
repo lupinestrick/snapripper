@@ -122,7 +122,7 @@ export function SettingsPage() {
       provider: key,
       baseURL: preset.baseUrl,
       model: preset.model,
-      type: preset.type,
+      type: key === "custom" ? (aiConfig.type === "anthropic" ? "anthropic" : "openai") : preset.type,
     });
     setAvailableModels(preset.models || []);
     setTestResult(null);
@@ -434,11 +434,55 @@ export function SettingsPage() {
         {/* Form Inputs */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
-              API Base URL
-            </label>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "0.35rem",
+                minHeight: "24px",
+              }}
+            >
+              <label style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                API Base URL
+              </label>
+
+              {aiConfig.provider === "custom" && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <Button
+                    type="button"
+                    variant={aiConfig.type === "anthropic" ? "outline" : "solid"}
+                    size="xs"
+                    pill
+                    onClick={() => setAIConfig({ type: "openai" })}
+                    title="切换为 OpenAI Compatible 协议 (/chat/completions)"
+                    style={{ fontSize: "0.72rem", padding: "0.15rem 0.55rem" }}
+                  >
+                    OpenAI
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={aiConfig.type === "anthropic" ? "solid" : "outline"}
+                    size="xs"
+                    pill
+                    onClick={() => setAIConfig({ type: "anthropic" })}
+                    title="切换为 Anthropic 协议 (/messages)"
+                    style={{ fontSize: "0.72rem", padding: "0.15rem 0.55rem" }}
+                  >
+                    Anthropic
+                  </Button>
+                </div>
+              )}
+            </div>
             <input
               type="text"
+              placeholder={
+                aiConfig.provider === "custom"
+                  ? aiConfig.type === "anthropic"
+                    ? "例如 https://api.anthropic.com/v1"
+                    : "例如 https://api.openai.com/v1"
+                  : "API Base URL"
+              }
               value={aiConfig.baseURL}
               onChange={(e) => setAIConfig({ baseURL: e.target.value })}
               style={{
@@ -654,7 +698,11 @@ export function SettingsPage() {
             </label>
             <input
               type="password"
-              placeholder={aiConfig.provider === "claude" ? "sk-ant-..." : "sk-..."}
+              placeholder={
+                aiConfig.provider === "claude" || (aiConfig.provider === "custom" && aiConfig.type === "anthropic")
+                  ? "sk-ant-..."
+                  : "sk-..."
+              }
               value={aiConfig.apiKey}
               onChange={(e) => setAIConfig({ apiKey: e.target.value })}
               style={{

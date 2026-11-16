@@ -6,6 +6,10 @@ import {
   repairJSONString,
   extractAndParseJSON,
   generateTabsSummary,
+  normalizeAnthropicMessagesUrl,
+  normalizeAnthropicModelsUrl,
+  normalizeOpenAIChatUrl,
+  normalizeOpenAIModelsUrl,
 } from "../src/services/aiService";
 
 export function runAIRestructureTests(): { passed: number; failed: number } {
@@ -224,6 +228,63 @@ Based on your tabs, here is the distribution:
   assert(filteredPanels.length === 2, "hideEmptyPanels filters out 0-tab empty panel");
   assert(!filteredPanels.some((p) => p.panelId === "empty_panel"), "Empty panel excluded from button list");
   assert(filteredPanels.some((p) => p.panelId === "new_panel"), "Panel with tabs after process retained");
+
+  // --- Test Set 6: Custom Provider Protocol Endpoint Normalization ---
+  // Anthropic messages endpoint
+  assert(
+    normalizeAnthropicMessagesUrl("https://api.anthropic.com") === "https://api.anthropic.com/v1/messages",
+    "normalizeAnthropicMessagesUrl appends /v1/messages to bare host"
+  );
+  assert(
+    normalizeAnthropicMessagesUrl("https://api.anthropic.com/v1") === "https://api.anthropic.com/v1/messages",
+    "normalizeAnthropicMessagesUrl appends /messages to /v1 host"
+  );
+  assert(
+    normalizeAnthropicMessagesUrl("https://proxy.example.com/v1/messages") === "https://proxy.example.com/v1/messages",
+    "normalizeAnthropicMessagesUrl preserves already complete /messages endpoint"
+  );
+
+  // Anthropic models endpoint
+  assert(
+    normalizeAnthropicModelsUrl("https://api.anthropic.com") === "https://api.anthropic.com/v1/models",
+    "normalizeAnthropicModelsUrl appends /v1/models to bare host"
+  );
+  assert(
+    normalizeAnthropicModelsUrl("https://api.anthropic.com/v1") === "https://api.anthropic.com/v1/models",
+    "normalizeAnthropicModelsUrl appends /models to /v1 host"
+  );
+  assert(
+    normalizeAnthropicModelsUrl("https://proxy.example.com/v1/messages") === "https://proxy.example.com/v1/models",
+    "normalizeAnthropicModelsUrl converts /v1/messages to /v1/models"
+  );
+
+  // OpenAI chat endpoint
+  assert(
+    normalizeOpenAIChatUrl("https://api.openai.com") === "https://api.openai.com/v1/chat/completions",
+    "normalizeOpenAIChatUrl appends /v1/chat/completions to bare host"
+  );
+  assert(
+    normalizeOpenAIChatUrl("https://api.openai.com/v1") === "https://api.openai.com/v1/chat/completions",
+    "normalizeOpenAIChatUrl appends /chat/completions to /v1 host"
+  );
+  assert(
+    normalizeOpenAIChatUrl("https://proxy.example.com/v1/chat/completions") === "https://proxy.example.com/v1/chat/completions",
+    "normalizeOpenAIChatUrl preserves already complete /chat/completions endpoint"
+  );
+
+  // OpenAI models endpoint
+  assert(
+    normalizeOpenAIModelsUrl("https://api.openai.com") === "https://api.openai.com/v1/models",
+    "normalizeOpenAIModelsUrl appends /v1/models to bare host"
+  );
+  assert(
+    normalizeOpenAIModelsUrl("https://api.openai.com/v1") === "https://api.openai.com/v1/models",
+    "normalizeOpenAIModelsUrl appends /models to /v1 host"
+  );
+  assert(
+    normalizeOpenAIModelsUrl("https://proxy.example.com/v1/chat/completions") === "https://proxy.example.com/v1/models",
+    "normalizeOpenAIModelsUrl converts /v1/chat/completions to /v1/models"
+  );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

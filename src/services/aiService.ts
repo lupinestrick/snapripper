@@ -17,6 +17,39 @@ const PRESET_COLORS = [
 ];
 
 /**
+ * URL 端点规范化工具函数：兼容 OpenAI 与 Anthropic 两类接口端点
+ */
+export function normalizeAnthropicMessagesUrl(baseUrl: string): string {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  if (clean.endsWith("/messages")) return clean;
+  if (clean.endsWith("/v1")) return `${clean}/messages`;
+  return `${clean}/v1/messages`;
+}
+
+export function normalizeAnthropicModelsUrl(baseUrl: string): string {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  if (clean.endsWith("/models")) return clean;
+  if (clean.endsWith("/messages")) return clean.replace(/\/messages$/, "/models");
+  if (clean.endsWith("/v1")) return `${clean}/models`;
+  return `${clean}/v1/models`;
+}
+
+export function normalizeOpenAIChatUrl(baseUrl: string): string {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  if (clean.endsWith("/chat/completions")) return clean;
+  if (clean.endsWith("/v1")) return `${clean}/chat/completions`;
+  return `${clean}/v1/chat/completions`;
+}
+
+export function normalizeOpenAIModelsUrl(baseUrl: string): string {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  if (clean.endsWith("/models")) return clean;
+  if (clean.endsWith("/chat/completions")) return clean.replace(/\/chat\/completions$/, "/models");
+  if (clean.endsWith("/v1")) return `${clean}/models`;
+  return `${clean}/v1/models`;
+}
+
+/**
  * 统一多协议模型通信驱动 (OpenAI, Anthropic Claude, Google Gemini)
  */
 export async function sendAIChatRequest(
@@ -28,19 +61,21 @@ export async function sendAIChatRequest(
   const protocol = config.type || providerDef.type || "openai";
   const apiKey = (config.apiKey || "").trim();
   const model = config.model || providerDef.model;
-  const baseUrl = (config.baseURL || providerDef.baseUrl).trim().replace(/\/+$/, "");
+  const baseUrl = (config.baseURL || providerDef.baseUrl).trim();
 
   // 1. Anthropic Claude Protocol
   if (protocol === "anthropic") {
-    const endpoint = baseUrl.endsWith("/messages") ? baseUrl : `${baseUrl}/messages`;
+    const endpoint = normalizeAnthropicMessagesUrl(baseUrl);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "dangerously-allow-browser": "true",
+    };
+
     const res = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "dangerously-allow-browser": "true",
-      },
+      headers,
       body: JSON.stringify({
         model,
         max_tokens: 4096,
@@ -52,7 +87,7 @@ export async function sendAIChatRequest(
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      throw new Error(`Claude API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+      throw new Error(`Claude/Anthropic API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
     }
 
     const data = await res.json();
@@ -66,6 +101,12 @@ export async function sendAIChatRequest(
       }
       return data.content[0]?.text || data.content[0]?.thinking || "";
     }
+    if (typeof data.text === "string") {
+      return data.text;
+    }
+    if (typeof data.completion === "string") {
+      return data.completion;
+    }
     return "";
   }
 
@@ -73,7 +114,7 @@ export async function sendAIChatRequest(
   if (protocol === "gemini") {
     const isNativeGemini = baseUrl.includes("generativelanguage.googleapis.com");
     if (isNativeGemini) {
-      const endpoint = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`;
+      const endpoint = `${baseUrl.replace(/\/+$/, "")}/models/${model}:generateContent?key=${apiKey}`;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,10 +145,7 @@ export async function sendAIChatRequest(
   }
 
   // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, SiliconFlow, Groq, etc.)
-  let endpoint = baseUrl;
-  if (!endpoint.endsWith("/chat/completions")) {
-    endpoint = endpoint.endsWith("/v1") ? `${endpoint}/chat/completions` : `${endpoint}/v1/chat/completions`;
-  }
+  const endpoint = normalizeOpenAIChatUrl(baseUrl);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -197,32 +235,31 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
 
   // 1. Anthropic Claude Protocol
   if (protocol === "anthropic") {
-    let endpoint = rawBaseUrl;
-    if (endpoint.endsWith("/messages")) {
-      endpoint = endpoint.replace(/\/messages$/, "/models");
-    } else if (!endpoint.endsWith("/models")) {
-      endpoint = `${endpoint}/models`;
+    const endpoint = normalizeAnthropicModelsUrl(rawBaseUrl);
+
+    const headers: Record<string, string> = {
+      "anthropic-version": "2023-06-01",
+      "dangerously-allow-browser": "true",
+    };
+    if (apiKey) {
+      headers["x-api-key"] = apiKey;
     }
 
     const res = await fetch(endpoint, {
       method: "GET",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "dangerously-allow-browser": "true",
-      },
+      headers,
     });
 
     if (!res.ok) {
       const err = await res.text().catch(() => "");
-      throw new Error(`获取 Claude 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+      throw new Error(`获取 Claude/Anthropic 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
     }
 
     const data = await res.json();
     const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
     const models: string[] = list.map((m: any) => String(m.id || m.name || m || "")).filter(Boolean);
     if (models.length > 0) return Array.from(new Set(models)).sort();
-    throw new Error("未解析到有效的 Claude 模型列表");
+    throw new Error("未解析到有效的 Claude/Anthropic 模型列表");
   }
 
   // 2. Google Gemini Protocol
@@ -246,12 +283,7 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
   }
 
   // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, OneAPI, vLLM, etc.)
-  let endpoint = rawBaseUrl;
-  if (endpoint.endsWith("/chat/completions")) {
-    endpoint = endpoint.replace(/\/chat\/completions$/, "/models");
-  } else if (!endpoint.endsWith("/models")) {
-    endpoint = `${endpoint}/models`;
-  }
+  let endpoint = normalizeOpenAIModelsUrl(rawBaseUrl);
 
   const headers: Record<string, string> = {};
   if (apiKey) {
