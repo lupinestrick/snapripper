@@ -63,27 +63,32 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
   }, []);
 
   useEffect(() => {
-    if (aiProcessedCache && !activePanelId) {
-      const panelKeys = Object.keys(aiProcessedCache.originalSnapshot.panels || {});
-      setActivePanelId(panelKeys[0] || "main");
+    if (aiProcessedCache) {
+      if (aiProcessedCache.targetMode) setSelectedMode(aiProcessedCache.targetMode);
+      if (aiProcessedCache.targetPanelId) setSelectedPanelId(aiProcessedCache.targetPanelId);
     }
-  }, [aiProcessedCache, activePanelId]);
+  }, [aiProcessedCache]);
 
-  if (!isOpen || !aiProcessedCache) return null;
+  const originalTabs = useMemo(() => {
+    return aiProcessedCache?.originalSnapshot.windows[activeWindowId]?.tabs || [];
+  }, [aiProcessedCache, activeWindowId]);
 
-  const originalTabs = aiProcessedCache.originalSnapshot.windows[activeWindowId]?.tabs || [];
-  const processedTabs = isPostEditMode
-    ? flattenTabTree(rootNodes)
-    : aiProcessedCache.processedSnapshot.windows[activeWindowId]?.tabs || [];
+  const processedTabs = useMemo(() => {
+    if (!aiProcessedCache) return [];
+    return isPostEditMode
+      ? flattenTabTree(rootNodes)
+      : aiProcessedCache.processedSnapshot.windows[activeWindowId]?.tabs || [];
+  }, [aiProcessedCache, isPostEditMode, rootNodes, activeWindowId]);
 
-  const panels = aiProcessedCache.originalSnapshot.panels || {};
-  const panelList = Object.entries(panels).map(([id, p]) => ({
-    id,
-    name: p.name || (id === "main" ? "主面板" : id),
-  }));
-  if (panelList.length === 0) {
-    panelList.push({ id: "main", name: "主面板" });
-  }
+  const panelList = useMemo(() => {
+    if (!aiProcessedCache) return [{ id: "main", name: "主面板" }];
+    const panels = aiProcessedCache.originalSnapshot.panels || {};
+    const list = Object.entries(panels).map(([id, p]) => ({
+      id,
+      name: p.name || (id === "main" ? "主面板" : id),
+    }));
+    return list.length > 0 ? list : [{ id: "main", name: "主面板" }];
+  }, [aiProcessedCache]);
 
   // Filter 0-tab panels if hideEmptyPanels is enabled
   const displayedPanelList = useMemo(() => {
@@ -103,6 +108,8 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
       }
     }
   }, [displayedPanelList, activePanelId]);
+
+  if (!isOpen || !aiProcessedCache) return null;
 
   const effectivePanelId = activePanelId || displayedPanelList[0]?.id || "main";
 
