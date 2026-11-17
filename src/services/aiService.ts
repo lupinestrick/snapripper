@@ -99,16 +99,19 @@ export function resolveBaseURL(config: AIConfig): string {
  */
 export function resolveModel(config: AIConfig): string {
   const slot = getAPIKeySlot(config.provider, config.type);
-  if (config.models && config.models[slot]) {
+  if (config.models && config.models[slot] && config.models[slot].trim()) {
     return config.models[slot].trim();
   }
   if (config.provider === "custom") {
-    if (config.model && config.model !== "deepseek-flash") {
+    if (config.model && config.model.trim() && config.model.trim() !== "deepseek-flash") {
       return config.model.trim();
     }
     return config.type === "anthropic" ? "claude-3-7-sonnet-20250219" : "gpt-4o-mini";
   }
-  return (config.model || AI_PROVIDERS[config.provider]?.model || "").trim();
+  if (config.model && config.model.trim()) {
+    return config.model.trim();
+  }
+  return (AI_PROVIDERS[config.provider]?.model || "gpt-4o-mini").trim();
 }
 
 /**
@@ -125,159 +128,202 @@ export async function sendAIChatRequest(
   const model = resolveModel(config);
   const baseUrl = resolveBaseURL(config);
 
-  // 1. Anthropic Claude Protocol
-  if (protocol === "anthropic") {
-    const endpoint = normalizeAnthropicMessagesUrl(baseUrl);
+  const controller = new AbortController();
+  const timeoutMs = 90000; // 90 秒超时控制，避免网络死等
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  let currentEndpoint = "";
+
+  try {
+    // 1. Anthropic Claude Protocol
+    if (protocol === "anthropic") {
+      const endpoint = normalizeAnthropicMessagesUrl(baseUrl);
+      currentEndpoint = endpoint;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+        "dangerously-allow-browser": "true",
+      };
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+        // 若是第三方中转代理（非 api.anthropic.com），同时附带 Authorization 标头以防中转站只认 Bearer
+        if (!baseUrl.includes("anthropic.com")) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+      }
+
+      const isThinking = model.includes("3-7") || model.includes("thinking");
+      const requestBody: Record<string, any> = {
+        model,
+        max_tokens: 8192,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      };
+      if (!isThinking && config.temperature !== undefined) {
+        requestBody.temperature = config.temperature;
+      }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Claude/Anthropic API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+      }
+
+      const data = await res.json();
+      // 兼容 Claude 3.7 / 思考模式等多 Block 响应结构，聚合所有 text 块
+      if (Array.isArray(data.content)) {
+        const textBlocks = data.content
+          .filter((b: any) => b.type === "text" || (typeof b.text === "string" && b.type !== "thinking"))
+          .map((b: any) => b.text || "");
+        if (textBlocks.length > 0) {
+          return textBlocks.join("");
+        }
+        return data.content[0]?.text || data.content[0]?.thinking || "";
+      }
+      if (typeof data.text === "string") {
+        return data.text;
+      }
+      if (typeof data.completion === "string") {
+        return data.completion;
+      }
+      return "";
+    }
+
+    // 2. Google Gemini Protocol
+    if (protocol === "gemini") {
+      const isNativeGemini = baseUrl.includes("generativelanguage.googleapis.com");
+      if (isNativeGemini) {
+        const endpoint = `${baseUrl.replace(/\/+$/, "")}/models/${model}:generateContent?key=${apiKey}`;
+        currentEndpoint = endpoint;
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+            generationConfig: {
+              temperature: config.temperature ?? 0.2,
+            },
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          throw new Error(`Gemini API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+        }
+
+        const data = await res.json();
+        const parts = data.candidates?.[0]?.content?.parts || [];
+        const textParts = parts
+          .filter((p: any) => typeof p.text === "string" && !p.thought)
+          .map((p: any) => p.text);
+        if (textParts.length > 0) {
+          return textParts.join("");
+        }
+        return parts.map((p: any) => p.text || "").join("");
+      }
+    }
+
+    // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, SiliconFlow, Groq, etc.)
+    const endpoint = normalizeOpenAIChatUrl(baseUrl);
+    currentEndpoint = endpoint;
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "anthropic-version": "2023-06-01",
-      "dangerously-allow-browser": "true",
     };
     if (apiKey) {
-      headers["x-api-key"] = apiKey;
-      // 若是第三方中转代理（非 api.anthropic.com），同时附带 Authorization 标头以防中转站只认 Bearer
-      if (!baseUrl.includes("anthropic.com")) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    const isReasoningModel =
+      model.includes("reasoner") ||
+      model.includes("r1") ||
+      model.startsWith("o1") ||
+      model.startsWith("o3") ||
+      model.includes("qwq");
+
+    const requestBody: Record<string, any> = {
+      model,
+      messages: model.startsWith("o1-mini") || model.startsWith("o1-preview")
+        ? [{ role: "user", content: `${systemPrompt}\n\n${userPrompt}` }]
+        : [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+    };
+
+    if (model.startsWith("o1") || model.startsWith("o3")) {
+      requestBody.max_completion_tokens = 8192;
+    } else {
+      requestBody.max_tokens = 8192;
+      // 推理模型（如 deepseek-reasoner）禁止传递 temperature，否则返回 400
+      if (!isReasoningModel) {
+        requestBody.temperature = config.temperature ?? 0.2;
       }
     }
 
     const res = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-        temperature: config.temperature ?? 0.2,
-      }),
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
     });
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      throw new Error(`Claude/Anthropic API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+      throw new Error(`AI 服务响应错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
     }
 
     const data = await res.json();
-    // 兼容 Claude 3.7 / 思考模式等多 Block 响应结构，聚合所有 text 块
-    if (Array.isArray(data.content)) {
-      const textBlocks = data.content
-        .filter((b: any) => b.type === "text" || (typeof b.text === "string" && b.type !== "thinking"))
-        .map((b: any) => b.text || "");
-      if (textBlocks.length > 0) {
-        return textBlocks.join("");
+    const choice = data.choices?.[0];
+    const message = choice?.message;
+
+    let content = "";
+    if (typeof message?.content === "string") {
+      content = message.content;
+    } else if (Array.isArray(message?.content)) {
+      content = message.content.map((p: any) => p.text || p.content || "").join("");
+    } else if (typeof choice?.text === "string") {
+      content = choice.text;
+    }
+
+    // 针对 DeepSeek-R1 / QwQ 等推理模型，若 content 为空则提取 reasoning_content
+    if (!content.trim() && typeof message?.reasoning_content === "string") {
+      content = message.reasoning_content;
+    }
+
+    // 针对某些三方代理网关或非标准响应，提取顶层 response / text / output
+    if (!content.trim()) {
+      if (typeof (data as any)?.response === "string") {
+        content = (data as any).response;
+      } else if (typeof (data as any)?.text === "string") {
+        content = (data as any).text;
+      } else if (typeof (data as any)?.output === "string") {
+        content = (data as any).output;
       }
-      return data.content[0]?.text || data.content[0]?.thinking || "";
     }
-    if (typeof data.text === "string") {
-      return data.text;
+
+    return content;
+  } catch (err: any) {
+    if (err.name === "AbortError" || controller.signal.aborted) {
+      throw new Error(`AI 请求超时 (${timeoutMs / 1000} 秒未收到响应)，请检查网络连接、接口地址或更换响应更快的模型`);
     }
-    if (typeof data.completion === "string") {
-      return data.completion;
+    if (err instanceof TypeError && err.message.includes("fetch")) {
+      throw new Error(`无法连接到 AI 服务端点 (${currentEndpoint || baseUrl})，请检查网络连接、Base URL 是否填写正确或接口服务是否支持跨域 (CORS)`);
     }
-    return "";
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  // 2. Google Gemini Protocol
-  if (protocol === "gemini") {
-    const isNativeGemini = baseUrl.includes("generativelanguage.googleapis.com");
-    if (isNativeGemini) {
-      const endpoint = `${baseUrl.replace(/\/+$/, "")}/models/${model}:generateContent?key=${apiKey}`;
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-          generationConfig: {
-            temperature: config.temperature ?? 0.2,
-          },
-        }),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`Gemini API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
-      }
-
-      const data = await res.json();
-      const parts = data.candidates?.[0]?.content?.parts || [];
-      const textParts = parts
-        .filter((p: any) => typeof p.text === "string" && !p.thought)
-        .map((p: any) => p.text);
-      if (textParts.length > 0) {
-        return textParts.join("");
-      }
-      return parts.map((p: any) => p.text || "").join("");
-    }
-  }
-
-  // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, SiliconFlow, Groq, etc.)
-  const endpoint = normalizeOpenAIChatUrl(baseUrl);
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  const requestBody: Record<string, any> = {
-    model,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-  };
-
-  if (model.startsWith("o1") || model.startsWith("o3")) {
-    requestBody.max_completion_tokens = 4096;
-  } else {
-    requestBody.max_tokens = 4096;
-    requestBody.temperature = config.temperature ?? 0.2;
-  }
-
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => "");
-    throw new Error(`AI 服务响应错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const choice = data.choices?.[0];
-  const message = choice?.message;
-
-  let content = "";
-  if (typeof message?.content === "string") {
-    content = message.content;
-  } else if (Array.isArray(message?.content)) {
-    content = message.content.map((p: any) => p.text || p.content || "").join("");
-  } else if (typeof choice?.text === "string") {
-    content = choice.text;
-  }
-
-  // 针对 DeepSeek-R1 / QwQ 等推理模型，若 content 为空则提取 reasoning_content
-  if (!content.trim() && typeof message?.reasoning_content === "string") {
-    content = message.reasoning_content;
-  }
-
-  // 针对某些三方代理网关或非标准响应，提取顶层 response / text / output
-  if (!content.trim()) {
-    if (typeof (data as any)?.response === "string") {
-      content = (data as any).response;
-    } else if (typeof (data as any)?.text === "string") {
-      content = (data as any).text;
-    } else if (typeof (data as any)?.output === "string") {
-      content = (data as any).output;
-    }
-  }
-
-  return content;
 }
 
 export async function testAIConnection(config: AIConfig): Promise<{ success: boolean; message: string }> {
@@ -312,114 +358,127 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
     throw new Error("请先填写有效的 API Base URL");
   }
 
-  // 1. Anthropic Claude Protocol
-  if (protocol === "anthropic") {
-    const endpoint = normalizeAnthropicModelsUrl(rawBaseUrl);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const headers: Record<string, string> = {
-      "anthropic-version": "2023-06-01",
-      "dangerously-allow-browser": "true",
-    };
-    if (apiKey) {
-      headers["x-api-key"] = apiKey;
-      if (!rawBaseUrl.includes("anthropic.com")) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
+  try {
+    // 1. Anthropic Claude Protocol
+    if (protocol === "anthropic") {
+      const endpoint = normalizeAnthropicModelsUrl(rawBaseUrl);
+
+      const headers: Record<string, string> = {
+        "anthropic-version": "2023-06-01",
+        "dangerously-allow-browser": "true",
+      };
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+        if (!rawBaseUrl.includes("anthropic.com")) {
+          headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+      }
+
+      const res = await fetch(endpoint, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const err = await res.text().catch(() => "");
+        throw new Error(`获取 Claude/Anthropic 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+      }
+
+      const data = await res.json();
+      const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+      const models: string[] = list.map((m: any) => String(m.id || m.name || m || "")).filter(Boolean);
+      if (models.length > 0) return Array.from(new Set(models)).sort();
+      throw new Error("未解析到有效的 Claude/Anthropic 模型列表");
+    }
+
+    // 2. Google Gemini Protocol
+    if (protocol === "gemini") {
+      const isNativeGemini = rawBaseUrl.includes("generativelanguage.googleapis.com");
+      if (isNativeGemini) {
+        const endpoint = `${rawBaseUrl}/models?key=${apiKey}`;
+        const res = await fetch(endpoint, { method: "GET", signal: controller.signal });
+        if (!res.ok) {
+          const err = await res.text().catch(() => "");
+          throw new Error(`获取 Gemini 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+        }
+        const data = await res.json();
+        const list = Array.isArray(data.models) ? data.models : [];
+        const models: string[] = list
+          .map((m: any) => String(m.name ? m.name.replace(/^models\//, "") : m.id || m || ""))
+          .filter(Boolean);
+        if (models.length > 0) return Array.from(new Set(models)).sort();
+        throw new Error("未解析到有效的 Gemini 模型列表");
       }
     }
 
-    const res = await fetch(endpoint, {
-      method: "GET",
-      headers,
-    });
+    // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, OneAPI, vLLM, etc.)
+    let endpoint = normalizeOpenAIModelsUrl(rawBaseUrl);
+
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    let res = await fetch(endpoint, { method: "GET", headers, signal: controller.signal });
+
+    // If 404, try ${rawBaseUrl}/v1/models if endpoint wasn't /v1/models
+    if (!res.ok && res.status === 404 && !endpoint.includes("/v1/models")) {
+      const fallbackEndpoint = `${rawBaseUrl}/v1/models`;
+      const fallbackRes = await fetch(fallbackEndpoint, { method: "GET", headers, signal: controller.signal }).catch(() => null);
+      if (fallbackRes && fallbackRes.ok) {
+        res = fallbackRes;
+      }
+    }
+
+    // If Ollama native port 11434, fallback to /api/tags
+    if (!res.ok && (rawBaseUrl.includes("11434") || rawBaseUrl.includes("localhost"))) {
+      const ollamaEndpoint = `${rawBaseUrl.replace(/\/v1$/, "")}/api/tags`;
+      const ollamaRes = await fetch(ollamaEndpoint, { method: "GET", signal: controller.signal }).catch(() => null);
+      if (ollamaRes && ollamaRes.ok) {
+        const ollamaData = await ollamaRes.json();
+        if (Array.isArray(ollamaData.models)) {
+          const models: string[] = ollamaData.models.map((m: any) => String(m.name || m.model || m || "")).filter(Boolean);
+          if (models.length > 0) return Array.from(new Set(models)).sort();
+        }
+      }
+    }
 
     if (!res.ok) {
       const err = await res.text().catch(() => "");
-      throw new Error(`获取 Claude/Anthropic 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+      throw new Error(`获取模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
     }
 
     const data = await res.json();
-    const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
-    const models: string[] = list.map((m: any) => String(m.id || m.name || m || "")).filter(Boolean);
-    if (models.length > 0) return Array.from(new Set(models)).sort();
-    throw new Error("未解析到有效的 Claude/Anthropic 模型列表");
-  }
-
-  // 2. Google Gemini Protocol
-  if (protocol === "gemini") {
-    const isNativeGemini = rawBaseUrl.includes("generativelanguage.googleapis.com");
-    if (isNativeGemini) {
-      const endpoint = `${rawBaseUrl}/models?key=${apiKey}`;
-      const res = await fetch(endpoint, { method: "GET" });
-      if (!res.ok) {
-        const err = await res.text().catch(() => "");
-        throw new Error(`获取 Gemini 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
-      }
-      const data = await res.json();
-      const list = Array.isArray(data.models) ? data.models : [];
-      const models: string[] = list
-        .map((m: any) => String(m.name ? m.name.replace(/^models\//, "") : m.id || m || ""))
-        .filter(Boolean);
-      if (models.length > 0) return Array.from(new Set(models)).sort();
-      throw new Error("未解析到有效的 Gemini 模型列表");
+    let list: any[] = [];
+    if (Array.isArray(data.data)) {
+      list = data.data;
+    } else if (Array.isArray(data.models)) {
+      list = data.models;
+    } else if (Array.isArray(data)) {
+      list = data;
     }
-  }
 
-  // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, OneAPI, vLLM, etc.)
-  let endpoint = normalizeOpenAIModelsUrl(rawBaseUrl);
+    const models: string[] = list
+      .map((m: any) => String(m.id || m.name || m || ""))
+      .filter(Boolean);
 
-  const headers: Record<string, string> = {};
-  if (apiKey) {
-    headers["Authorization"] = `Bearer ${apiKey}`;
-  }
-
-  let res = await fetch(endpoint, { method: "GET", headers });
-
-  // If 404, try ${rawBaseUrl}/v1/models if endpoint wasn't /v1/models
-  if (!res.ok && res.status === 404 && !endpoint.includes("/v1/models")) {
-    const fallbackEndpoint = `${rawBaseUrl}/v1/models`;
-    const fallbackRes = await fetch(fallbackEndpoint, { method: "GET", headers }).catch(() => null);
-    if (fallbackRes && fallbackRes.ok) {
-      res = fallbackRes;
+    if (models.length === 0) {
+      throw new Error("接口返回的数据中未包含模型标识 (id/name)");
     }
-  }
 
-  // If Ollama native port 11434, fallback to /api/tags
-  if (!res.ok && (rawBaseUrl.includes("11434") || rawBaseUrl.includes("localhost"))) {
-    const ollamaEndpoint = `${rawBaseUrl.replace(/\/v1$/, "")}/api/tags`;
-    const ollamaRes = await fetch(ollamaEndpoint, { method: "GET" }).catch(() => null);
-    if (ollamaRes && ollamaRes.ok) {
-      const ollamaData = await ollamaRes.json();
-      if (Array.isArray(ollamaData.models)) {
-        const models: string[] = ollamaData.models.map((m: any) => String(m.name || m.model || m || "")).filter(Boolean);
-        if (models.length > 0) return Array.from(new Set(models)).sort();
-      }
+    return Array.from(new Set(models)).sort((a, b) => a.localeCompare(b));
+  } catch (err: any) {
+    if (err.name === "AbortError" || controller.signal.aborted) {
+      throw new Error("获取模型列表超时 (超过 15 秒未响应)，请检查网络连接或接口地址");
     }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  if (!res.ok) {
-    const err = await res.text().catch(() => "");
-    throw new Error(`获取模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
-  }
-
-  const data = await res.json();
-  let list: any[] = [];
-  if (Array.isArray(data.data)) {
-    list = data.data;
-  } else if (Array.isArray(data.models)) {
-    list = data.models;
-  } else if (Array.isArray(data)) {
-    list = data;
-  }
-
-  const models: string[] = list
-    .map((m: any) => String(m.id || m.name || m || ""))
-    .filter(Boolean);
-
-  if (models.length === 0) {
-    throw new Error("接口返回的数据中未包含模型标识 (id/name)");
-  }
-
-  return Array.from(new Set(models)).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -610,15 +669,44 @@ export function generateTabsSummary(tabs: SideberyTab[]): string {
 
   const sortedDomains = Array.from(domainMap.entries()).sort((a, b) => b[1].count - a[1].count);
 
-  const domainSummary = sortedDomains.map(([domain, data]) => {
-    const samples = Array.from(data.sampleTitles);
-    return {
+  // 针对超过 50 个独立域名的特大规模快照（如上千个标签），聚合长尾零散站点，大幅精简 Prompt 并杜绝模型超时
+  const MAX_DETAILED_DOMAINS = 50;
+  let domainSummary: Array<{ domain: string; tabCount: number; percentage: string; sampleTitles?: string[] }>;
+
+  if (sortedDomains.length <= MAX_DETAILED_DOMAINS) {
+    domainSummary = sortedDomains.map(([domain, data]) => ({
       domain,
       tabCount: data.count,
       percentage: `${((data.count / nonExempt.length) * 100).toFixed(1)}%`,
-      sampleTitles: samples.length > 0 ? samples : undefined,
-    };
-  });
+      sampleTitles: Array.from(data.sampleTitles),
+    }));
+  } else {
+    const topDomains = sortedDomains.slice(0, MAX_DETAILED_DOMAINS);
+    const tailDomains = sortedDomains.slice(MAX_DETAILED_DOMAINS);
+
+    domainSummary = topDomains.map(([domain, data]) => ({
+      domain,
+      tabCount: data.count,
+      percentage: `${((data.count / nonExempt.length) * 100).toFixed(1)}%`,
+      sampleTitles: Array.from(data.sampleTitles),
+    }));
+
+    let tailCount = 0;
+    const tailSamples: string[] = [];
+    for (const [, data] of tailDomains) {
+      tailCount += data.count;
+      for (const st of data.sampleTitles) {
+        if (tailSamples.length < 5) tailSamples.push(st);
+      }
+    }
+
+    domainSummary.push({
+      domain: `其他长尾零散站点 (共 ${tailDomains.length} 个独立网站)`,
+      tabCount: tailCount,
+      percentage: `${((tailCount / nonExempt.length) * 100).toFixed(1)}%`,
+      sampleTitles: tailSamples.length > 0 ? tailSamples : undefined,
+    });
+  }
 
   return JSON.stringify(
     {
@@ -645,7 +733,7 @@ export async function analyzeTabProportions(
     throw new Error("没有可分析的有效标签页（所有标签均已被豁免保护或为空）。");
   }
 
-  onProgress?.(`正在生成 ${nonExemptTabs.length} 个标签特征摘要至 AI 分析比例...`);
+  onProgress?.(`正在智能压缩与提炼 ${nonExemptTabs.length} 个标签特征指纹...`);
 
   const systemPrompt = "你是一个专业的浏览器标签页管理专家。必须严格返回合法的 JSON 格式，不要包含任何闲聊文本。";
   const promptTemplate = (customPrompt && customPrompt.trim()) ? customPrompt.trim() : DEFAULT_PROPORTION_ANALYSIS_PROMPT;
@@ -654,7 +742,12 @@ export async function analyzeTabProportions(
     ? promptTemplate.replace("{{tabsSummary}}", tabsJson)
     : `${promptTemplate}\n\n${tabsJson}`;
 
+  const resolvedModelName = resolveModel(config);
+  onProgress?.(`已生成特征摘要，正在连接 AI 模型 (${resolvedModelName}) 分析归纳比例...`);
+
   const rawContent = await sendAIChatRequest(config, systemPrompt, userPrompt);
+
+  onProgress?.("AI 响应完成，正在解析并校验分类结构...");
 
   let parsed: any;
   try {

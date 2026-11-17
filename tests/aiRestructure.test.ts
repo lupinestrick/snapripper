@@ -122,6 +122,29 @@ Based on your tabs, here is the distribution:
   assert(parsedLarge.domainDistribution[0].domain === "github.com", "generateTabsSummary orders top domain first");
   assert(parsedLarge.domainDistribution[0].tabCount === 90, "generateTabsSummary counts tabs accurately per domain");
 
+  // Test large snapshot with 70 domains (> 50 limit) to verify tail domain aggregation
+  const hugeTabList: SideberyTab[] = [];
+  for (let i = 0; i < 70; i++) {
+    const domain = `site-${i}.com`;
+    const count = i === 0 ? 100 : 10;
+    for (let j = 0; j < count; j++) {
+      hugeTabList.push({
+        id: i * 1000 + j,
+        panelId: "main",
+        parentId: -1,
+        lvl: 0,
+        title: `Site ${i} Page ${j}`,
+        url: `https://${domain}/page/${j}`,
+      });
+    }
+  }
+  const hugeSummary = generateTabsSummary(hugeTabList);
+  const parsedHuge = JSON.parse(hugeSummary);
+  assert(parsedHuge.totalTabs === 790, "generateTabsSummary counts totalTabs accurately for 790 tabs");
+  assert(parsedHuge.domainDistribution?.length === 51, "generateTabsSummary caps at 50 domains + 1 aggregated tail domain");
+  assert(parsedHuge.domainDistribution[50].domain.includes("其他长尾零散站点"), "generateTabsSummary aggregates tail domains into a single entry");
+  assert(parsedHuge.domainDistribution[50].tabCount === 200, "generateTabsSummary tail entry sums remaining 20 domains correctly (20 * 10 = 200)");
+
   // --- Test Set 3: Snapshot Restructure & Filtering ---
 
   const sampleTabs: SideberyTab[] = [
