@@ -61,8 +61,8 @@
   --btn-ghost-hover: rgba(0, 0, 0, 0.05);
 
   /* Scrollbar */
-  --scrollbar-thumb: #d9d9d9;
-  --scrollbar-hover: #bbbbbb;
+  --scrollbar-thumb: #c8c8c8;
+  --scrollbar-hover: #9e9e9e;
 }
 
 [data-theme="park-dark"] {
@@ -386,8 +386,8 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -396,7 +396,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 3px;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
