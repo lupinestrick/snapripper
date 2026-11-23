@@ -140,6 +140,8 @@ export const RULE_PRESETS: Record<string, { name: string; description: string; r
 export const DEFAULT_RULES_SETTINGS: RulesSettings = {
   treatExistingGroupsAsUnit: true,
   defaultMinThreshold: 2,
+  crossPanelMerge: true,
+  createGroupTabs: true,
   rules: DEFAULT_RULES,
 };
 

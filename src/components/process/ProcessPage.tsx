@@ -26,6 +26,8 @@ export function ProcessPage() {
     exemptPinned,
     exemptInternalPages,
     preserveSubtrees,
+    crossPanelMerge,
+    createGroupTabs,
   } = useConfigStore();
 
   const [diffModalOpen, setDiffModalOpen] = useState(false);
@@ -94,6 +96,8 @@ export function ProcessPage() {
         exemptPinned,
         exemptInternalPages,
         preserveSubtrees,
+        crossPanelMerge,
+        createGroupTabs,
       },
       rulesSettings
     );
@@ -117,6 +121,8 @@ export function ProcessPage() {
         exemptPinned: useConfigStore.getState().exemptPinned,
         exemptInternalPages: useConfigStore.getState().exemptInternalPages,
         preserveSubtrees: useConfigStore.getState().preserveSubtrees,
+        crossPanelMerge: useConfigStore.getState().crossPanelMerge,
+        createGroupTabs: useConfigStore.getState().createGroupTabs,
       },
       useConfigStore.getState().rulesSettings
     );

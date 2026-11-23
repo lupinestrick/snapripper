@@ -40,11 +40,20 @@ export function buildProcessedSnapshot(
   classificationMap: Map<string, string>,
   categories: { id: string; name: string }[],
   targetMode: "tree" | "panel",
-  targetPanelId?: string
+  targetPanelId?: string,
+  options?: {
+    crossPanelMerge?: boolean;
+    createGroupTab?: boolean;
+    createGroupTabs?: boolean;
+  }
 ): { processedSnapshot: SideberySnapshot; processedTree: TabTreeNode[] } {
   const primaryWinId = Object.keys(originalSnapshot.windows)[0] || "1";
   const tabs = originalSnapshot.windows[primaryWinId]?.tabs || [];
   const categoryNames = categories.map((c) => c.name);
+  const extensionBaseUrl = originalSnapshot.extensionBaseUrl || "moz-extension://sidebery-placeholder";
+
+  const crossPanelMerge = options?.crossPanelMerge ?? true;
+  const createGroupTab = options?.createGroupTabs ?? options?.createGroupTab ?? true;
 
   if (targetMode === "panel") {
     const { tabs: updatedTabs, panels: updatedPanels } = reorganizeTabsIntoPanels(
@@ -65,22 +74,12 @@ export function buildProcessedSnapshot(
     return { processedSnapshot, processedTree };
   } else {
     const originalTree = buildTabTree(tabs);
-    let processedTree = reorganizeTreeIntoCategories(originalTree, classificationMap, categoryNames);
-    if (targetPanelId) {
-      processedTree = processedTree.map((node) => {
-        if (node.isCategoryHeader) {
-          return {
-            ...node,
-            tab: { ...node.tab, panelId: targetPanelId },
-            children: node.children.map((c) => ({
-              ...c,
-              tab: { ...c.tab, panelId: targetPanelId },
-            })),
-          };
-        }
-        return node;
-      });
-    }
+    const processedTree = reorganizeTreeIntoCategories(originalTree, classificationMap, categoryNames, {
+      crossPanelMerge,
+      createGroupTab,
+      extensionBaseUrl,
+      targetPanelId,
+    });
     const updatedTabs = flattenTabTree(processedTree);
     const processedSnapshot: SideberySnapshot = {
       ...originalSnapshot,
@@ -674,12 +673,14 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     const classificationMap = new Map<string, string>(Object.entries(aiProcessedCache.classificationMap));
     const categories = aiProcessedCache.categoryNames.map((name, i) => ({ id: `cat_${i}`, name }));
 
+    const { crossPanelMerge, createGroupTabs } = useConfigStore.getState();
     const { processedSnapshot, processedTree } = buildProcessedSnapshot(
       aiProcessedCache.originalSnapshot,
       classificationMap,
       categories,
       targetMode,
-      targetPanelId
+      targetPanelId,
+      { crossPanelMerge, createGroupTabs }
     );
 
     const updatedCache: AIProcessedCache = {

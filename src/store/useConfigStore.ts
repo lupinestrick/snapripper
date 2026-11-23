@@ -47,6 +47,8 @@ interface ConfigState {
   cascadeSelectChildren: boolean;
   aiThresholds: AIThresholds;
   aiGenerateRulesFirst: boolean;
+  crossPanelMerge: boolean;
+  createGroupTabs: boolean;
 
   // Process & Diff Scope Settings
   processScope: ProcessScope;
@@ -73,6 +75,8 @@ interface ConfigState {
   setCascadeSelectChildren: (val: boolean) => void;
   setAiThresholds: (thresholds: Partial<AIThresholds>) => void;
   setAiGenerateRulesFirst: (val: boolean) => void;
+  setCrossPanelMerge: (val: boolean) => void;
+  setCreateGroupTabs: (val: boolean) => void;
 
   setProcessScope: (scope: ProcessScope) => void;
   setSelectedProcessPanelIds: (panelIds: string[]) => void;
@@ -108,6 +112,8 @@ export const useConfigStore = create<ConfigState>()(
         maxCategories: 6,
       },
       aiGenerateRulesFirst: true,
+      crossPanelMerge: true,
+      createGroupTabs: true,
       processScope: "all",
       selectedProcessPanelIds: [],
       domainMergeConfig: DEFAULT_DOMAIN_MERGE_CONFIG,
@@ -198,6 +204,8 @@ export const useConfigStore = create<ConfigState>()(
           aiThresholds: { ...state.aiThresholds, ...thresholds },
         })),
       setAiGenerateRulesFirst: (val) => set({ aiGenerateRulesFirst: val }),
+      setCrossPanelMerge: (val) => set({ crossPanelMerge: val }),
+      setCreateGroupTabs: (val) => set({ createGroupTabs: val }),
 
       setProcessScope: (processScope) => set({ processScope }),
       setSelectedProcessPanelIds: (selectedProcessPanelIds) => set({ selectedProcessPanelIds }),

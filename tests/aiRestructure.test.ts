@@ -1,7 +1,10 @@
 import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
 import { CategoryProportion, AIConfig } from "../src/types/ai";
 import { buildProcessedSnapshot } from "../src/store/useSnapshotStore";
-import { matchTabWithRule } from "../src/services/ruleEngine";
+import { matchTabWithRule, DEFAULT_RULES_SETTINGS } from "../src/services/ruleEngine";
+import { determineTargetPanelForCategory } from "../src/services/treeOperations";
+import { isGroupTab, getGroupTitle } from "../src/services/snapshotParser";
+import { computeSnapshotDiff } from "../src/services/diffEngine";
 import {
   repairJSONString,
   extractAndParseJSON,
@@ -402,6 +405,156 @@ Based on your tabs, here is the distribution:
   const switchedToAnthropic: AIConfig = { ...customWithUserValues, type: "anthropic" };
   assert(resolveBaseURL(switchedToAnthropic) === "https://my-anthropic-proxy.com/v1", "resolveBaseURL switches to user custom anthropic URL");
   assert(resolveModel(switchedToAnthropic) === "claude-custom-proxy", "resolveModel switches to user custom anthropic model");
+
+  // --- Test Set 9: Cross-Panel Category Merge & Group Parsing/Generation ---
+  const multiPanelTabs: SideberyTab[] = [
+    { id: 101, panelId: "panel_dev", parentId: -1, lvl: 0, title: "React Docs", url: "https://react.dev" },
+    { id: 102, panelId: "panel_dev", parentId: -1, lvl: 0, title: "Next.js", url: "https://nextjs.org" },
+    { id: 103, panelId: "panel_dev", parentId: -1, lvl: 0, title: "TypeScript", url: "https://www.typescriptlang.org" },
+    { id: 104, panelId: "main", parentId: -1, lvl: 0, title: "GitHub Repo", url: "https://github.com/facebook/react" },
+    { id: 105, panelId: "panel_work", parentId: -1, lvl: 0, title: "Work Calendar", url: "https://calendar.google.com" },
+  ];
+
+  // 1. determineTargetPanelForCategory
+  const devCategoryTabs = multiPanelTabs.slice(0, 4); // 3 in panel_dev, 1 in main
+  assert(
+    determineTargetPanelForCategory(devCategoryTabs, "main") === "panel_dev",
+    "determineTargetPanelForCategory selects panel_dev as it has the most tabs (3 vs 1)"
+  );
+
+  // 2. buildProcessedSnapshot with crossPanelMerge: true
+  const multiPanelSnapshot: SideberySnapshot = {
+    id: "snap_multi",
+    time: Date.now(),
+    windows: { "1": { tabs: multiPanelTabs } },
+    panels: {
+      main: { id: "main", name: "主面板" },
+      panel_dev: { id: "panel_dev", name: "开发" },
+      panel_work: { id: "panel_work", name: "工作" },
+    },
+    extensionBaseUrl: "moz-extension://uuid-1234",
+  };
+
+  const multiClassificationMap = new Map<string, string>([
+    ["101", "💻 开发与技术"],
+    ["102", "💻 开发与技术"],
+    ["103", "💻 开发与技术"],
+    ["104", "💻 开发与技术"],
+    ["105", "💼 办公协作与文档"],
+  ]);
+
+  const crossMergedResult = buildProcessedSnapshot(
+    multiPanelSnapshot,
+    multiClassificationMap,
+    [
+      { id: "cat_dev", name: "💻 开发与技术" },
+      { id: "cat_work", name: "💼 办公协作与文档" },
+    ],
+    "tree",
+    undefined,
+    { crossPanelMerge: true, createGroupTab: true }
+  );
+
+  const crossTabs = crossMergedResult.processedSnapshot.windows["1"].tabs;
+  const mergedGithubTab = crossTabs.find((t) => t.id === 104);
+  assert(
+    mergedGithubTab?.panelId === "panel_dev",
+    "crossPanelMerge: true moves tab 104 from main to panel_dev (majority panel)"
+  );
+
+  const devGroupTab = crossTabs.find((t) => t.isGroup && t.title === "💻 开发与技术");
+  assert(
+    devGroupTab?.panelId === "panel_dev",
+    "crossPanelMerge: true places group header tab in panel_dev"
+  );
+  assert(
+    devGroupTab?.url.includes("uuid-1234/sidebery/group.html#"),
+    "createGroupTab: true generates native Sidebery group URL with extensionBaseUrl"
+  );
+
+  // 3. buildProcessedSnapshot with crossPanelMerge: false
+  const unmergedResult = buildProcessedSnapshot(
+    multiPanelSnapshot,
+    multiClassificationMap,
+    [
+      { id: "cat_dev", name: "💻 开发与技术" },
+      { id: "cat_work", name: "💼 办公协作与文档" },
+    ],
+    "tree",
+    undefined,
+    { crossPanelMerge: false, createGroupTab: false }
+  );
+
+  const unmergedTabs = unmergedResult.processedSnapshot.windows["1"].tabs;
+  const unmergedGithubTab = unmergedTabs.find((t) => t.id === 104);
+  assert(
+    unmergedGithubTab?.panelId === "main",
+    "crossPanelMerge: false keeps tab 104 in its original panel (main)"
+  );
+
+  const standardHeader = unmergedTabs.find((t) => t.url?.startsWith("about:blank#category="));
+  assert(
+    !!standardHeader,
+    "createGroupTab: false produces standard about:blank#category= header"
+  );
+
+  // 4. Group Tab parsing
+  assert(
+    isGroupTab({ url: "moz-extension://abc/sidebery/group.html#%E5%BC%80%E5%8F%91" }),
+    "isGroupTab recognizes /sidebery/group.html"
+  );
+  assert(
+    isGroupTab({ url: "group:DevTools" }),
+    "isGroupTab recognizes group: schema"
+  );
+  assert(
+    isGroupTab({ isGroup: true }),
+    "isGroupTab recognizes tab with isGroup: true"
+  );
+  assert(
+    getGroupTitle({ url: "moz-extension://abc/sidebery/group.html#%E5%BC%80%E5%8F%91" }) === "开发",
+    "getGroupTitle extracts and decodes group name from URL hash"
+  );
+  assert(
+    getGroupTitle({ customTitle: "我的自定义分组" }) === "我的自定义分组",
+    "getGroupTitle prioritizes customTitle"
+  );
+
+  // 5. diffEngine cross-panel rule merge
+  const diffTestTabs: SideberyTab[] = [
+    { id: 201, panelId: "panel_dev", parentId: -1, lvl: 0, title: "GitHub 1", url: "https://github.com/repo1" },
+    { id: 202, panelId: "panel_dev", parentId: -1, lvl: 0, title: "GitHub 2", url: "https://github.com/repo2" },
+    { id: 203, panelId: "main", parentId: -1, lvl: 0, title: "GitHub 3", url: "https://github.com/repo3" },
+  ];
+  const diffSnapshot: SideberySnapshot = {
+    id: "diff_snap",
+    time: Date.now(),
+    windows: { "1": { tabs: diffTestTabs } },
+    panels: {
+      main: { id: "main", name: "主面板" },
+      panel_dev: { id: "panel_dev", name: "开发" },
+    },
+    extensionBaseUrl: "moz-extension://test",
+  };
+
+  const diffResult = computeSnapshotDiff(
+    diffSnapshot,
+    {
+      enableDedup: false,
+      enableRules: true,
+      enableAICategorize: false,
+      scope: "all",
+      crossPanelMerge: true,
+    },
+    DEFAULT_RULES_SETTINGS
+  );
+
+  const finalDiffTabs = diffResult.newSnapshot.windows["1"].tabs;
+  const migratedTab = finalDiffTabs.find((t) => t.id === 203);
+  assert(
+    migratedTab?.panelId === "panel_dev",
+    "diffEngine with crossPanelMerge: true merges tab 203 into panel_dev where most GitHub tabs reside"
+  );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

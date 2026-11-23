@@ -78,6 +78,8 @@ export interface CategorizationRule {
 export interface RulesSettings {
   treatExistingGroupsAsUnit: boolean; // 本来就是 group 的当成一个整体
   defaultMinThreshold: number;        // 默认最小成组阈值
+  crossPanelMerge?: boolean;          // 跨面板合并分类（默认合并到此类标签最多的面板）
+  createGroupTabs?: boolean;          // 将同类标签组织为 Sidebery Group 组
   rules: CategorizationRule[];
 }
 

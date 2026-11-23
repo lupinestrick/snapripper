@@ -1,8 +1,9 @@
 import { SideberySnapshot, SideberyTab, TabTreeNode, PanelDiffResult, RulesSettings } from "@/types/sidebery";
 import { buildTabTree, flattenTabTree } from "./snapshotParser";
-import { applyRulesToTreeNodes, deduplicateTreeNodes } from "./ruleEngine";
+import { applyRulesToTreeNodes, deduplicateTreeNodes, matchTabWithRule } from "./ruleEngine";
 import { applyDomainMergeToTreeNodes, DomainMergeConfig } from "./domainMergeEngine";
-import { reorganizeTreeIntoCategories } from "./treeOperations";
+import { reorganizeTreeIntoCategories, determineTargetPanelForCategory } from "./treeOperations";
+import { isExemptUrl } from "@/utils/urlHelper";
 
 export type ProcessScope = "current" | "all" | "selected";
 
@@ -24,6 +25,8 @@ export interface ProcessingOptions {
   exemptPinned?: boolean;
   exemptInternalPages?: boolean;
   preserveSubtrees?: boolean;
+  crossPanelMerge?: boolean;
+  createGroupTabs?: boolean;
 }
 
 export function computeSnapshotDiff(
@@ -42,7 +45,60 @@ export function computeSnapshotDiff(
 
   const panels = snapshot.panels || {};
   const primaryWinId = Object.keys(snapshot.windows)[0] || "1";
-  const allTabs = snapshot.windows[primaryWinId]?.tabs || [];
+  const allTabs = (snapshot.windows[primaryWinId]?.tabs || []).map((t) => ({ ...t }));
+
+  // Determine effective panels based on scope
+  let effectivePanelIds: Set<string> | null = null;
+  if (options.scope === "current" && options.currentActivePanelId) {
+    effectivePanelIds = new Set([options.currentActivePanelId]);
+  } else if (options.scope === "selected" && options.targetPanelIds && options.targetPanelIds.length > 0) {
+    effectivePanelIds = new Set(options.targetPanelIds);
+  }
+
+  const shouldCrossPanelMerge = options.crossPanelMerge ?? rulesSettings.crossPanelMerge ?? true;
+
+  // 跨面板合并预处理：将属于同一规则或 AI 类别的标签合并到此类标签最多的面板
+  if (shouldCrossPanelMerge) {
+    // 1. 规则跨面板聚合
+    if (options.enableRules) {
+      const activeRules = rulesSettings.rules.filter((r) => r.enabled);
+      for (const rule of activeRules) {
+        const threshold = rule.minThreshold || rulesSettings.defaultMinThreshold || 2;
+        const matchedTabs = allTabs.filter((t) => {
+          const pId = t.panelId || "main";
+          if (effectivePanelIds && !effectivePanelIds.has(pId)) return false;
+          if (t.pinned || isExemptUrl(t.url, t.pinned)) return false;
+          return matchTabWithRule(t, rule);
+        });
+
+        if (matchedTabs.length >= threshold) {
+          const targetPanel = determineTargetPanelForCategory(matchedTabs, matchedTabs[0]?.panelId || "main");
+          for (const tab of matchedTabs) {
+            tab.panelId = targetPanel;
+          }
+        }
+      }
+    }
+
+    // 2. AI 类别跨面板聚合
+    if (options.enableAICategorize && options.aiClassificationMap && options.aiCategoryNames) {
+      for (const catName of options.aiCategoryNames) {
+        const matchedTabs = allTabs.filter((t) => {
+          const pId = t.panelId || "main";
+          if (effectivePanelIds && !effectivePanelIds.has(pId)) return false;
+          if (t.pinned || isExemptUrl(t.url, t.pinned)) return false;
+          return options.aiClassificationMap!.get(String(t.id)) === catName;
+        });
+
+        if (matchedTabs.length > 0) {
+          const targetPanel = determineTargetPanelForCategory(matchedTabs, matchedTabs[0]?.panelId || "main");
+          for (const tab of matchedTabs) {
+            tab.panelId = targetPanel;
+          }
+        }
+      }
+    }
+  }
 
   // Group tabs by panelId
   const panelTabsMap = new Map<string, SideberyTab[]>();
@@ -59,14 +115,6 @@ export function computeSnapshotDiff(
     if (!panelTabsMap.has(pId)) {
       panelTabsMap.set(pId, []);
     }
-  }
-
-  // Determine effective panels based on scope
-  let effectivePanelIds: Set<string> | null = null;
-  if (options.scope === "current" && options.currentActivePanelId) {
-    effectivePanelIds = new Set([options.currentActivePanelId]);
-  } else if (options.scope === "selected" && options.targetPanelIds && options.targetPanelIds.length > 0) {
-    effectivePanelIds = new Set(options.targetPanelIds);
   }
 
   const newTabsByWindow: SideberyTab[] = [];
@@ -127,7 +175,12 @@ export function computeSnapshotDiff(
         currentTree = reorganizeTreeIntoCategories(
           currentTree,
           options.aiClassificationMap,
-          options.aiCategoryNames
+          options.aiCategoryNames,
+          {
+            crossPanelMerge: false, // 已经在预处理阶段根据整体分布精准迁移过 panelId
+            createGroupTab: options.createGroupTabs ?? rulesSettings.createGroupTabs ?? true,
+            extensionBaseUrl: snapshot.extensionBaseUrl,
+          }
         );
       }
     }

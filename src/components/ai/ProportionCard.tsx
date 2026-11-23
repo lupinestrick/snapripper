@@ -189,7 +189,7 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
   return (
     <Card.Root
       style={{
-        margin: "1rem 1.5rem",
+        margin: "0 0 2rem 0",
         backgroundColor: "var(--bg-card)",
         border: "1px solid var(--accent-solid)",
       }}

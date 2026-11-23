@@ -19,10 +19,32 @@ export function validateSnapshotData(data: any): boolean {
 }
 
 export function isGroupTab(tab: Partial<SideberyTab>): boolean {
+  if (tab.isGroup) return true;
   if (!tab.url) return false;
-  if (tab.url.includes("/sidebery/group.html")) return true;
-  if (tab.url.startsWith("about:blank#group")) return true;
+  const lower = tab.url.toLowerCase();
+  if (lower.includes("/sidebery/group.html")) return true;
+  if (lower.startsWith("about:blank#group")) return true;
+  if (lower.startsWith("group:")) return true;
+  if (lower.includes("group.html")) return true;
   return false;
+}
+
+export function getGroupTitle(tab: Partial<SideberyTab>): string {
+  if (tab.customTitle && tab.customTitle.trim()) return tab.customTitle.trim();
+  if (tab.title && tab.title !== "Untitled" && !tab.title.startsWith("moz-extension://")) {
+    return tab.title.trim();
+  }
+  if (tab.url && tab.url.includes("#")) {
+    const hash = tab.url.split("#")[1];
+    if (hash) {
+      try {
+        return decodeURIComponent(hash).trim();
+      } catch {
+        return hash.trim();
+      }
+    }
+  }
+  return tab.title || "Group";
 }
 
 export function parseSnapshot(jsonString: string): ParsedSnapshotResult {
@@ -110,7 +132,7 @@ export function parseSnapshot(jsonString: string): ParsedSnapshotResult {
                 panelId: t.panelId || "main",
                 parentId,
                 lvl: depth,
-                title: t.title || t.url || "Untitled",
+                title: isGroup ? getGroupTitle(t) : (t.title || t.url || "Untitled"),
                 url: t.url || "",
                 pinned: !!t.pinned,
                 containerId: t.containerId,
@@ -144,19 +166,20 @@ export function parseSnapshot(jsonString: string): ParsedSnapshotResult {
             if (match) extensionBaseUrl = match[1];
           }
 
+          const isGroup = isGroupTab(t);
           winTabs.push({
             id: currentId,
             panelId: t.panelId || "main",
             parentId: t.parentId != null ? t.parentId : -1,
             lvl: t.lvl ?? 0,
-            title: t.title || t.url || "Untitled",
+            title: isGroup ? getGroupTitle(t) : (t.title || t.url || "Untitled"),
             url: t.url || "",
             pinned: !!t.pinned,
             containerId: t.containerId,
             customTitle: t.customTitle ?? null,
             customColor: t.customColor ?? null,
             folded: !!t.folded,
-            isGroup: isGroupTab(t),
+            isGroup,
           });
         }
       }

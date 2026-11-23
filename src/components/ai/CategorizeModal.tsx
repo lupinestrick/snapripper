@@ -28,9 +28,20 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
     setIsAIDiffModalOpen,
   } = useSnapshotStore();
 
-  const { aiConfig, aiGenerateRulesFirst, setAiGenerateRulesFirst, aiPrompts } = useConfigStore();
+  const {
+    aiConfig,
+    aiGenerateRulesFirst,
+    setAiGenerateRulesFirst,
+    aiPrompts,
+    crossPanelMerge,
+    setCrossPanelMerge,
+    createGroupTabs,
+    setCreateGroupTabs,
+  } = useConfigStore();
   const [restructureMode, setRestructureMode] = useState<"tree" | "panel">("tree");
   const [generateRulesFirst, setLocalGenerateRulesFirst] = useState<boolean>(aiGenerateRulesFirst);
+  const [localCrossPanelMerge, setLocalCrossPanelMerge] = useState<boolean>(crossPanelMerge);
+  const [localCreateGroupTabs, setLocalCreateGroupTabs] = useState<boolean>(createGroupTabs);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen || !proportionReport) return null;
@@ -70,7 +81,12 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
         rawSnapshot,
         classificationMap,
         proportionReport.categories.map((c) => ({ id: c.id, name: c.name })),
-        restructureMode
+        restructureMode,
+        undefined,
+        {
+          crossPanelMerge: localCrossPanelMerge,
+          createGroupTab: localCreateGroupTabs,
+        }
       );
 
       const cache: AIProcessedCache = {
@@ -150,7 +166,7 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
             </Button>
           </div>
 
-          {/* AI rules first option checkbox */}
+          {/* Options Card */}
           <div
             style={{
               padding: "0.85rem 1rem",
@@ -158,6 +174,9 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
               backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
               marginBottom: "1rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
             }}
           >
             <label style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", cursor: "pointer" }}>
@@ -176,6 +195,50 @@ export function CategorizeModal({ isOpen, onClose }: CategorizeModalProps) {
                 </div>
                 <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.15rem", lineHeight: 1.4 }}>
                   开启后将先依据各主题提取域名与关键词生成高精度匹配规则，快速匹配主流网站，再对剩余未匹配标签调用大模型归纳。
+                </div>
+              </div>
+            </label>
+
+            <div style={{ height: "1px", backgroundColor: "var(--border-subtle)", opacity: 0.6 }} />
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={localCrossPanelMerge}
+                onChange={(e) => {
+                  setLocalCrossPanelMerge(e.target.checked);
+                  setCrossPanelMerge(e.target.checked);
+                }}
+                style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+              />
+              <div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  跨面板合并分类
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.15rem", lineHeight: 1.4 }}>
+                  默认将属于同一类别的标签合并到此类标签页数量最多的面板中，避免同类标签分散在多个面板。
+                </div>
+              </div>
+            </label>
+
+            <div style={{ height: "1px", backgroundColor: "var(--border-subtle)", opacity: 0.6 }} />
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={localCreateGroupTabs}
+                onChange={(e) => {
+                  setLocalCreateGroupTabs(e.target.checked);
+                  setCreateGroupTabs(e.target.checked);
+                }}
+                style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
+              />
+              <div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  生成 Sidebery 原生 Group 组标签
+                </div>
+                <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: "0.15rem", lineHeight: 1.4 }}>
+                  把同类标签放入可折叠的原生 group 组内，在 Sidebery 中拥有原生分组图标与折叠体验。
                 </div>
               </div>
             </label>

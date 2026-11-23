@@ -39,6 +39,10 @@ export function DiffSettingsModal({
     setCascadeSelectChildren,
     rulesSettings,
     setRulesSettings,
+    crossPanelMerge,
+    setCrossPanelMerge,
+    createGroupTabs,
+    setCreateGroupTabs,
   } = useConfigStore();
 
   // Local draft states
@@ -57,6 +61,12 @@ export function DiffSettingsModal({
   const [localCascade, setLocalCascade] = useState(cascadeSelectChildren);
   const [localTreatGroupAsUnit, setLocalTreatGroupAsUnit] = useState(
     rulesSettings.treatExistingGroupsAsUnit ?? true
+  );
+  const [localCrossPanelMerge, setLocalCrossPanelMerge] = useState(
+    rulesSettings.crossPanelMerge ?? crossPanelMerge ?? true
+  );
+  const [localCreateGroupTabs, setLocalCreateGroupTabs] = useState(
+    rulesSettings.createGroupTabs ?? createGroupTabs ?? true
   );
 
   const handleTogglePanelSelect = (pId: string) => {
@@ -81,7 +91,11 @@ export function DiffSettingsModal({
     setCascadeSelectChildren(localCascade);
     setRulesSettings({
       treatExistingGroupsAsUnit: localTreatGroupAsUnit,
+      crossPanelMerge: localCrossPanelMerge,
+      createGroupTabs: localCreateGroupTabs,
     });
+    setCrossPanelMerge(localCrossPanelMerge);
+    setCreateGroupTabs(localCreateGroupTabs);
 
     onSave?.();
     onClose();
@@ -321,6 +335,46 @@ export function DiffSettingsModal({
                     style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                   />
                   <span>勾选标签时默认级联包含子标签</span>
+                </label>
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.45rem",
+                    fontSize: "0.78rem",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    gridColumn: "span 2",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={localCrossPanelMerge}
+                    onChange={(e) => setLocalCrossPanelMerge(e.target.checked)}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
+                  />
+                  <span>跨面板合并分类（默认合并到此类标签最多的面板）</span>
+                </label>
+
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.45rem",
+                    fontSize: "0.78rem",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    gridColumn: "span 2",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={localCreateGroupTabs}
+                    onChange={(e) => setLocalCreateGroupTabs(e.target.checked)}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
+                  />
+                  <span>生成 Sidebery 原生 Group 组标签（放入可折叠分组）</span>
                 </label>
               </div>
             </div>

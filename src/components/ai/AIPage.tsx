@@ -23,6 +23,10 @@ export function AIPage() {
     setPreserveSubtrees,
     cascadeSelectChildren,
     setCascadeSelectChildren,
+    crossPanelMerge,
+    setCrossPanelMerge,
+    createGroupTabs,
+    setCreateGroupTabs,
   } = useConfigStore();
 
   const {
@@ -123,7 +127,7 @@ export function AIPage() {
           <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>分类阈值与聚合控制</h2>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", marginBottom: "1.5rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1.25rem", marginBottom: "1.5rem" }}>
           {/* Min Tabs Threshold */}
           <div
             style={{
@@ -186,7 +190,7 @@ export function AIPage() {
         </div>
 
         {/* Interaction checkboxes */}
-        <div style={{ paddingTop: "0.5rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", paddingTop: "0.5rem" }}>
           <label
             style={{
               display: "inline-flex",
@@ -204,6 +208,44 @@ export function AIPage() {
               style={{ accentColor: "var(--accent-solid)", width: 16, height: 16, cursor: "pointer" }}
             />
             <span>保持子树完整性（子标签跟随父节点整体归类）</span>
+          </label>
+
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.6rem",
+              cursor: "pointer",
+              fontSize: "0.825rem",
+              color: "var(--text-main)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={crossPanelMerge}
+              onChange={(e) => setCrossPanelMerge(e.target.checked)}
+              style={{ accentColor: "var(--accent-solid)", width: 16, height: 16, cursor: "pointer" }}
+            />
+            <span>跨面板合并分类（将同类标签合并到此类标签最多的面板）</span>
+          </label>
+
+          <label
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.6rem",
+              cursor: "pointer",
+              fontSize: "0.825rem",
+              color: "var(--text-main)",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={createGroupTabs}
+              onChange={(e) => setCreateGroupTabs(e.target.checked)}
+              style={{ accentColor: "var(--accent-solid)", width: 16, height: 16, cursor: "pointer" }}
+            />
+            <span>解析并生成 Group 组（把同类标签放入 Sidebery 原生可折叠 group 中）</span>
           </label>
         </div>
 
