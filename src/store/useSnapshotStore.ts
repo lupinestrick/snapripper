@@ -1,8 +1,10 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { SideberySnapshot, SideberyTab, TabTreeNode, CategorizationRule } from "@/types/sidebery";
 import { ProportionReport, AIProcessedCache, CategoryProportion } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
 import { useConfigStore } from "./useConfigStore";
+import { syncSnapshotCookie, clearSnapshotCookies } from "@/utils/cookieHelper";
 import {
   batchDeleteNodes,
   batchUpdatePanel,
@@ -168,9 +170,12 @@ interface SnapshotStoreState {
   enterPostEditMode: () => void;
   exitPostEditMode: (apply: boolean) => void;
   updateProcessedTreeTarget: (targetMode: "tree" | "panel", targetPanelId?: string) => void;
+  clearAllCache: () => void;
 }
 
-export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
+export const useSnapshotStore = create<SnapshotStoreState>()(
+  persist(
+    (set, get) => ({
   rawSnapshot: null,
   fileName: "",
   rawFileSize: 0,
@@ -208,6 +213,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     const duplicates = getDuplicateUrlSet(tabs);
 
     const initialExpanded = new Set<string>(tree.map((n) => n.id));
+    syncSnapshotCookie(fileName, tabs.length);
 
     set({
       rawSnapshot: parsed.snapshot,
@@ -348,6 +354,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
     const tree = buildTabTree(tabs);
     const duplicates = getDuplicateUrlSet(tabs);
 
+    syncSnapshotCookie(get().fileName, tabs.length);
+
     set({
       undoStack: [...undoStack, rawSnapshot],
       redoStack: [],
@@ -372,6 +380,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
         [activeWindowId]: { tabs: updatedTabs },
       },
     };
+
+    syncSnapshotCookie(get().fileName, updatedTabs.length);
 
     set({
       undoStack: [...undoStack, rawSnapshot],
@@ -398,6 +408,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
       },
     };
 
+    syncSnapshotCookie(get().fileName, updatedTabs.length);
+
     set({
       undoStack: [...undoStack, rawSnapshot],
       redoStack: [],
@@ -420,6 +432,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
         [activeWindowId]: { tabs: updatedTabs },
       },
     };
+
+    syncSnapshotCookie(get().fileName, updatedTabs.length);
 
     set({
       undoStack: [...undoStack, rawSnapshot],
@@ -561,6 +575,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
       },
     };
 
+    syncSnapshotCookie(get().fileName, updatedTabs.length);
+
     set({
       undoStack: [...undoStack, rawSnapshot],
       redoStack: [],
@@ -591,6 +607,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
         [activeWindowId]: { tabs: updatedTabs },
       },
     };
+
+    syncSnapshotCookie(get().fileName, updatedTabs.length);
 
     set({
       undoStack: [...undoStack, rawSnapshot],
@@ -695,4 +713,77 @@ export const useSnapshotStore = create<SnapshotStoreState>()((set, get) => ({
       ...(isPostEditMode ? { rootNodes: processedTree } : {}),
     });
   },
-}));
+
+  clearAllCache: () => {
+    clearSnapshotCookies();
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.removeItem("snapripper-snapshot-storage");
+      } catch {}
+    }
+    set({
+      rawSnapshot: null,
+      fileName: "",
+      rawFileSize: 0,
+      activeWindowId: "1",
+      activePanelId: null,
+      panelFilter: null,
+      containerFilter: null,
+      rootNodes: [],
+      selectedIds: new Set<string>(),
+      expandedIds: new Set<string>(),
+      searchQuery: "",
+      onlyDuplicates: false,
+      duplicateUrls: new Set<string>(),
+      proportionReport: null,
+      isAnalyzing: false,
+      isClassifying: false,
+      progressStatus: "",
+      classificationProgress: { current: 0, total: 0 },
+      aiProcessedCache: null,
+      isPostEditMode: false,
+      isAIDiffModalOpen: false,
+      isOverviewHopupOpen: false,
+      undoStack: [],
+      redoStack: [],
+    });
+  },
+}),
+    {
+      name: "snapripper-snapshot-storage",
+      partialize: (state) => ({
+        rawSnapshot: state.rawSnapshot,
+        fileName: state.fileName,
+        rawFileSize: state.rawFileSize,
+        activeWindowId: state.activeWindowId,
+        activePanelId: state.activePanelId,
+        rootNodes: state.rootNodes,
+        proportionReport: state.proportionReport,
+        aiProcessedCache: state.aiProcessedCache,
+        isPostEditMode: state.isPostEditMode,
+        undoStack: state.undoStack.slice(-5),
+        redoStack: state.redoStack.slice(-5),
+      }),
+      merge: (persistedState: any, currentState: SnapshotStoreState) => {
+        if (!persistedState) return currentState;
+        const rootNodes = persistedState.rootNodes || [];
+        const tabs = persistedState.rawSnapshot?.windows?.[persistedState.activeWindowId || "1"]?.tabs || [];
+        const duplicates = getDuplicateUrlSet(tabs);
+        const initialExpanded = new Set<string>(rootNodes.map((n: any) => n.id));
+        return {
+          ...currentState,
+          ...persistedState,
+          duplicateUrls: duplicates,
+          expandedIds: initialExpanded,
+          selectedIds: new Set<string>(),
+        };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state && state.rawSnapshot && typeof document !== "undefined") {
+          const tabs = state.rawSnapshot.windows?.[state.activeWindowId || "1"]?.tabs || [];
+          syncSnapshotCookie(state.fileName, tabs.length);
+        }
+      },
+    }
+  )
+);

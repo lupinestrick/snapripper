@@ -1,10 +1,18 @@
 import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
 import { CategoryProportion, AIConfig } from "../src/types/ai";
-import { buildProcessedSnapshot } from "../src/store/useSnapshotStore";
+import { buildProcessedSnapshot, useSnapshotStore } from "../src/store/useSnapshotStore";
 import { matchTabWithRule, DEFAULT_RULES_SETTINGS } from "../src/services/ruleEngine";
 import { determineTargetPanelForCategory } from "../src/services/treeOperations";
 import { isGroupTab, getGroupTitle } from "../src/services/snapshotParser";
 import { computeSnapshotDiff } from "../src/services/diffEngine";
+import {
+  setCookie,
+  getCookie,
+  deleteCookie,
+  syncSnapshotCookie,
+  getSnapshotCookieInfo,
+  clearSnapshotCookies,
+} from "../src/utils/cookieHelper";
 import {
   repairJSONString,
   extractAndParseJSON,
@@ -555,6 +563,49 @@ Based on your tabs, here is the distribution:
     migratedTab?.panelId === "panel_dev",
     "diffEngine with crossPanelMerge: true merges tab 203 into panel_dev where most GitHub tabs reside"
   );
+
+  // --- Test Set 10: Cookie Persistence & Cache Clearing ---
+  let mockCookieStorage = "";
+  (global as any).document = {
+    get cookie() {
+      return mockCookieStorage;
+    },
+    set cookie(val: string) {
+      const parts = val.split(";")[0].split("=");
+      const key = parts[0].trim();
+      const value = parts.slice(1).join("=");
+      const cookies = mockCookieStorage ? mockCookieStorage.split("; ") : [];
+      const filtered = cookies.filter((c) => !c.startsWith(`${key}=`));
+      if (val.includes("expires=Thu, 01 Jan 1970")) {
+        mockCookieStorage = filtered.join("; ");
+      } else {
+        filtered.push(`${key}=${value}`);
+        mockCookieStorage = filtered.join("; ");
+      }
+    },
+  };
+
+  setCookie("test_key", "test_val");
+  assert(getCookie("test_key") === "test_val", "setCookie stores and getCookie retrieves cookie");
+
+  deleteCookie("test_key");
+  assert(getCookie("test_key") === null, "deleteCookie removes cookie");
+
+  syncSnapshotCookie("sidebery-backup-2026.json", 1153);
+  const cookieInfo = getSnapshotCookieInfo();
+  assert(cookieInfo !== null, "getSnapshotCookieInfo returns valid object when cache exists");
+  assert(cookieInfo?.fileName === "sidebery-backup-2026.json", "syncSnapshotCookie persists correct file name");
+  assert(cookieInfo?.tabCount === 1153, "syncSnapshotCookie persists correct tab count");
+
+  clearSnapshotCookies();
+  assert(getSnapshotCookieInfo() === null, "clearSnapshotCookies removes all snapshot cookie credentials");
+
+  // Verify clearAllCache
+  syncSnapshotCookie("test-session.json", 50);
+  useSnapshotStore.getState().clearAllCache();
+  assert(useSnapshotStore.getState().rawSnapshot === null, "clearAllCache resets rawSnapshot to null");
+  assert(useSnapshotStore.getState().rootNodes.length === 0, "clearAllCache resets rootNodes to empty array");
+  assert(getSnapshotCookieInfo() === null, "clearAllCache clears cookies");
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

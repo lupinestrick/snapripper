@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useConfigStore, AppTheme } from "@/store/useConfigStore";
+import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { testAIConnection, fetchAvailableModels, getAPIKeySlot } from "@/services/aiService";
 import { AI_PROVIDERS, AIProviderKey } from "@/types/ai";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
   LayoutGrid,
   ChevronDown,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 import {
   DEFAULT_PROPORTION_ANALYSIS_PROMPT,
@@ -58,6 +60,8 @@ export function SettingsPage() {
     exportRulesJSON,
     importRulesJSON,
   } = useConfigStore();
+
+  const { fileName, clearAllCache } = useSnapshotStore();
 
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
@@ -246,6 +250,13 @@ export function SettingsPage() {
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleClearCache = () => {
+    if (window.confirm("确定要清除导入的标签和编辑记录吗？此操作将重置当前工作台数据并清除本地 Cookie 缓存。")) {
+      clearAllCache();
+      alert("已成功清除缓存！");
+    }
   };
 
   const THEME_CONFIGS: {
@@ -1273,7 +1284,60 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* Section 4: Backup & Restore */}
+      {/* Section 4: Local Storage & Cache Persistence */}
+      <div
+        style={{
+          marginBottom: "1.25rem",
+          padding: "1.5rem",
+          borderRadius: "var(--radius-btn, 8px)",
+          backgroundColor: "var(--bg-card)",
+          border: "1px solid var(--border-card)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>数据持久化与缓存</h2>
+              {fileName && (
+                <span
+                  style={{
+                    fontSize: "0.72rem",
+                    padding: "2px 8px",
+                    borderRadius: "9999px",
+                    backgroundColor: "rgba(16, 185, 129, 0.12)",
+                    color: "var(--success, #10b981)",
+                    border: "1px solid rgba(16, 185, 129, 0.25)",
+                    fontWeight: 500,
+                  }}
+                >
+                  已持久化: {fileName}
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
+              已启用 Cookie 状态凭据与本地离线持久化，自动实时保存导入的标签数据与编辑记录，防止刷新页面时丢失数据。
+            </p>
+          </div>
+
+          <div>
+            <Button
+              onClick={handleClearCache}
+              variant="outline"
+              size="xs"
+              style={{
+                color: "#ef4444",
+                borderColor: "rgba(239, 68, 68, 0.35)",
+              }}
+              title="清除已导入的标签快照、编辑记录及本地 Cookie 缓存"
+            >
+              <Trash2 size={13} />
+              <span>清除缓存</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 5: Backup & Restore */}
       <div
         style={{
           padding: "1.5rem",
