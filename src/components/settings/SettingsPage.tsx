@@ -32,6 +32,7 @@ import {
 import {
   DEFAULT_PROPORTION_ANALYSIS_PROMPT,
   DEFAULT_RULES_GENERATOR_PROMPT,
+  DEFAULT_AI_ARCHITECT_PROMPT,
 } from "@/constants/aiPrompts";
 
 export function SettingsPage() {
@@ -1074,6 +1075,62 @@ export function SettingsPage() {
               value={aiPrompts?.rulesGeneratorPrompt || DEFAULT_RULES_GENERATOR_PROMPT}
               onChange={(e) => setAIPrompt("rulesGeneratorPrompt", e.target.value)}
               placeholder="请输入规则生成助手的系统提示词..."
+              style={{
+                width: "100%",
+                padding: "0.65rem 0.85rem",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border-subtle)",
+                color: "var(--text-main)",
+                fontSize: "0.8rem",
+                lineHeight: "1.5",
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                outline: "none",
+                resize: "vertical",
+              }}
+            />
+          </div>
+
+          {/* Prompt 3: AI Architect Reorganization Prompt */}
+          <div
+            style={{
+              padding: "1.1rem",
+              borderRadius: "var(--radius-btn, 6px)",
+              backgroundColor: "var(--bg-subtle)",
+              border: "1px solid var(--border-subtle)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  3. AI 智能架构师提示词 (System Prompt - GTD 消费生命周期)
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem", lineHeight: 1.4 }}>
+                  用于在「AI 架构师」对话工作台中，指导大模型以 GTD 生命周期流转视角进行全库诊断并生成可执行的重构方案卡片。
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                pill
+                onClick={() => resetAIPrompt("architectPrompt")}
+                title="重置为官方预设提示词"
+              >
+                <RotateCcw size={12} />
+                <span>恢复默认</span>
+              </Button>
+            </div>
+
+            <textarea
+              rows={8}
+              value={aiPrompts?.architectPrompt || DEFAULT_AI_ARCHITECT_PROMPT}
+              onChange={(e) => setAIPrompt("architectPrompt", e.target.value)}
+              placeholder="请输入 AI 架构师的系统提示词..."
               style={{
                 width: "100%",
                 padding: "0.65rem 0.85rem",

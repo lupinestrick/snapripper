@@ -661,10 +661,10 @@ Based on your tabs, here is the distribution:
 
   assert(appliedCache !== null, "applySchemeToSnapshot returns valid AIProcessedCache");
   assert(appliedCache.summary.total === 6, "applySchemeToSnapshot preserves total tab count");
-  assert(appliedCache.classificationMap["t1"] === "💻 折腾开发", "applySchemeToSnapshot matches GitHub tab to '💻 折腾开发'");
-  assert(appliedCache.classificationMap["t2"] === "🎧 同人音声与二次元", "applySchemeToSnapshot matches DLsite tab to '🎧 同人音声与二次元'");
-  assert(appliedCache.classificationMap["t3"] === "🎮 游艺与模组空间", "applySchemeToSnapshot matches ErogameScape tab to '🎮 游艺与模组空间'");
-  assert(appliedCache.classificationMap["t4"] === "🥽 虚拟工坊 (VRChat & 3D)", "applySchemeToSnapshot matches Booth tab to '🥽 虚拟工坊'");
+  assert(appliedCache.classificationMap["t1"] === "🔨 活跃工程与开发", "applySchemeToSnapshot matches GitHub tab to '🔨 活跃工程与开发'");
+  assert(appliedCache.classificationMap["t2"] === "💾 待下载转存·同人与资源", "applySchemeToSnapshot matches DLsite tab to '💾 待下载转存·同人与资源'");
+  assert(appliedCache.classificationMap["t3"] === "📚 常驻参考·游戏与模组", "applySchemeToSnapshot matches ErogameScape tab to '📚 常驻参考·游戏与模组'");
+  assert(appliedCache.classificationMap["t4"] === "🥽 虚拟工坊·3D资产与空间", "applySchemeToSnapshot matches Booth tab to '🥽 虚拟工坊·3D资产与空间'");
 
   // 11.4 Chat state management in useSnapshotStore
   useSnapshotStore.getState().clearAiChatMessages();

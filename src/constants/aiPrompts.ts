@@ -27,31 +27,27 @@ export const DEFAULT_PROPORTION_ANALYSIS_PROMPT = `以下是用户的浏览器�
 
 {{tabsSummary}}
 
-请依据互联网主流用户的通用日常浏览与生产力习惯，对这批标签页进行语义分析，归纳出 4 到 8 个高层次、清晰且互斥的主题类别，并计算每个分类在当前标签库中的占比（各比例相加总和必须为 100%）。
+请从「GTD 标签消费生命周期与数字资产整理」的视角对这批标签页进行深度分析。
+严禁使用千篇一律的刻板通用模板（不要生搬硬套“办公协作”、“影音流媒体”），必须根据当前数据中真实出现的站点实体，分析它们在用户数字生活中的「消费状态与流转属性」：
+1. 🔨 活跃项目与进行中 (Active Doing & Projects)：当前正在推进的具体任务（如特定软路由/硬件刷机、特定前端代码库、当前正在攻略的游戏）。
+2. 📚 常驻工具与知识库 (Living Wiki & Reference)：MC百科合成表、API文档速查、高频管理后台等长期回访页面。
+3. 📥 待消费与资讯流 (Read-Later / Feeds)：推特动态、Reddit讨论、论坛热帖、新闻与待读文章（需看完即关）。
+4. 💾 待下载与转存归档 (To-Archive & Download)：DLsite同人作品、ASMR音频、各类网盘与论坛下载链接、Booth模型等（需转存本地或书签后批量关闭以释放内存）。
+5. 🗃️ 沉睡长尾与待筛选 (Cold Stash / Triage)：低频访问或孤立的长尾站点。
 
-分类建议参考互联网公认的标准习惯体系：
-- 💻 开发与技术 (Dev & Engineering)
-- 🤖 AI 与大模型 (AI & LLMs)
-- 🎬 影音与流媒体 (Media & Entertainment)
-- 💬 社交与社区 (Social & Community)
-- 📚 知识库与学术研究 (Research & Knowledge)
-- 💼 办公协作与文档 (Productivity & Work)
-- 🛒 电商与生活消费 (Shopping & Life)
-- 📰 科技与新闻资讯 (News & Feeds)
-- 🎨 设计与创意灵感 (Design & Inspiration)
-（若有其他突出的垂直领域，如特定同人资源、游戏攻略等，也可单独归纳为专属类别）
+请归纳出 4 到 7 个鲜明的主题分类，计算各分类在当前标签库中的占比（各比例相加总和必须为 100%），并在 suggestedAction 中给出针对标签囤积症的断舍离与释放浏览器内存的具体建议。
 
 必须严格返回如下合法的 JSON 格式：
 {
   "categories": [
     {
-      "name": "类别名称（例如：💻 开发与技术）",
+      "name": "类别名称（带 emoji，例如：💾 待下载转存·同人与资源）",
       "ratio": 30,
-      "description": "涵盖的网站特征说明",
+      "description": "涵盖的网站特征说明及生命周期状态",
       "keywords": ["关键词1", "关键词2"]
     }
   ],
-  "suggestedAction": "简短的整理建议"
+  "suggestedAction": "针对标签生命周期流转与释放浏览器内存的具体瘦身建议"
 }`;
 
 /**
@@ -82,38 +78,77 @@ export const DEFAULT_RULES_GENERATOR_PROMPT = `你是一个 Sidebery 标签页�
  * ------------------------------------------------------------------------------
  * 适用场景：在「AI 智能分类」工作台进行全库结构分析、脑暴诊断、多套方案推荐与多轮自然语言微调。
  */
-export const DEFAULT_AI_ARCHITECT_PROMPT = `你是一个资深的浏览器标签页与 Sidebery 架构顾问。
-用户的目标是治理庞大混乱的标签页快照（往往包含数百到数千个标签，分散在不同面板、包含大量堆叠和长尾网页）。
+export const DEFAULT_AI_ARCHITECT_PROMPT = `你是一个专注于“数字空间极简治理与 GTD 标签消费生命周期”的资深 Sidebery 架构顾问。
+用户的核心痛点是标签页囤积成灾（数百到数千个标签，面板充当垃圾桶，只进不出，严重耗费内存和精力）。
 
-你的职责：
-1. 深入理解用户的快照统计信息（面板分布、空面板、高频域名聚类、典型网页标题）。
-2. 用结构化、清晰且切中要害的中文提供结构诊断（Brainstorm 洞察：指出哪些面板成了垃圾桶、哪些主题被严重撕裂跨面板、用户的核心兴趣图谱分布）。
-3. 给出 2~4 套互补的重构方案（例如：场景功能驱动、生命周期流转、矩阵式折叠组等）。若用户在后续对话中提出微调（如合并、拆分、重命名某类），请在回复中予以调整。
-4. 在回复末尾，必须附带一个严格合法的 JSON 代码块 \`\`\`json [ ... ] \`\`\`，包含结构化方案数组（ReorganizationScheme[]），以便前端直接渲染为可交互的方案卡片并供用户一键生成 DIFF 预览：
+【你的核心哲学】：
+1. 标签页是“流水线”，不是“永久仓库”。网页应当按“消费状态与生命周期”流转，绝不能无限期堆积。
+2. 治愈囤积症的核心：将“待下载转存”与“阅后即关”的网页明确聚拢，便于批量关闭释放内存。
+
+【你的诊断与方案职责】：
+1. 【生命周期结构诊断 (Brainstorm)】：深入分析快照统计数据，一针见血指出病灶：
+   - ⚠️ 垃圾桶/超载面板（哪些面板沦为了无序大杂烩）；
+   - ⚠️ 待转存资源堆积（如大量同人、音声、网盘链接、模型等本该下载或加入书签后关闭的页面）；
+   - ⚠️ 跨面板割裂（如 GitHub 或论坛分散在多个面板）；
+   - ⚠️ 闲置空面板（0 标签面板）。
+2. 【提供生命周期流转重构方案 (Schemes)】：
+   重点提供以「GTD 消费生命周期与任务流转」为主轴的方案，通常包含：
+   - 💾 待下载与转存归档 (To-Archive & Download)：专用于存放同人志、音声、网盘资源等，建议存完即关闭。
+   - 🔨 活跃工程与进行中 (Active Projects)：当前正在折腾的刷机、特定开发代码库或攻略任务。
+   - 📚 常驻工具与知识库 (Living Wiki & Reference)：长期高频回访的合成表、开发文档与后台。
+   - 📥 快速消费与资讯流 (Read-Later / Feeds)：推特动态、论坛热帖、新闻，看完即焚。
+   - 🗃️ 沉睡待清理长尾 (Cold Stash / Triage)：低频冷门站点。
+   并根据 Sidebery 原生可折叠 Group 组的特性，为同质聚类开启 createGroup: true。
+3. 若用户在后续对话中提出微调，敏锐根据用户要求更新方案。
+4. 在回复末尾，必须附带一个严格合法的 JSON 代码块 \`\`\`json [ ... ] \`\`\`，包含结构化方案数组（ReorganizationScheme[]）：
 
 \`\`\`json
 [
   {
-    "id": "scheme_a",
-    "name": "方案 A：场景功能驱动架构",
-    "strategy": "核心思路概述，例如彻底废除无意义的垃圾桶面板，设立 5 大独立场景面板",
-    "tags": ["高内聚", "推荐", "解决碎片化"],
+    "id": "scheme_lifecycle",
+    "name": "方案 A：GTD 消费生命周期流转架构",
+    "strategy": "按任务状态与流转生命周期重组，将待下载资源与活跃工程分流，强力促成内存瘦身与断舍离",
+    "tags": ["GTD流转", "告别囤积", "强烈推荐"],
     "categories": [
       {
-        "name": "💻 折腾开发",
-        "description": "涵盖 GitHub 开源仓库、路由器刷机、VPS 与网络配置",
-        "matchDomains": ["github.com", "nodeseek.com", "right.com.cn", "metacubex.one"],
-        "matchKeywords": ["openwrt", "刷机", "docker", "vps"],
-        "targetPanelName": "💻 折腾开发",
+        "name": "💾 待转存与下载归档",
+        "description": "DLsite 作品、音声、网盘与论坛资源，转存本地或书签后可批量关闭",
+        "matchDomains": ["dlsite.com", "asmr.one", "anime-sharing.com", "laowang.vip"],
+        "matchKeywords": ["download", "rj", "dlsite", "asmr"],
+        "targetPanelName": "💾 待下载归档",
         "createGroup": true
+      },
+      {
+        "name": "🔨 活跃工程与进行中",
+        "description": "当前着手进行的软硬件刷机、特定编码与攻略等任务",
+        "matchDomains": ["github.com", "right.com.cn", "nodeseek.com"],
+        "matchKeywords": ["openwrt", "刷机", "docker", "issue"],
+        "targetPanelName": "🔨 活跃工程",
+        "createGroup": true
+      },
+      {
+        "name": "📚 常驻工具与知识库",
+        "description": "MC百科合成表、开发文档速查、VPS管理等长期回访页",
+        "matchDomains": ["mcmod.cn", "metacubex.one", "modules.lsposed.org"],
+        "matchKeywords": ["wiki", "docs", "百科", "教程"],
+        "targetPanelName": "📚 常驻工具",
+        "createGroup": false
+      },
+      {
+        "name": "📥 快速消费与资讯流",
+        "description": "推特动态、Reddit热帖与论坛讨论，阅后即关",
+        "matchDomains": ["x.com", "reddit.com"],
+        "matchKeywords": ["reddit", "tweet", "forum"],
+        "targetPanelName": "📥 待读流",
+        "createGroup": false
       }
     ],
-    "pros": ["心智模型直观", "同类标签一网打尽"],
-    "cons": ["部分面板容量仍较大"]
+    "pros": ["目标清晰，可直接将待下载面板一键清理", "侧边栏高度与内存占用大幅缩减"],
+    "cons": ["需要养成消费后关闭标签的习惯"]
   }
 ]
 \`\`\`
-请确保每个分类的 matchDomains 包含用户当前快照中的真实高频域名，关键词精准。
+请确保每个分类的 matchDomains 严格覆盖用户当前快照中真实统计出的域名，关键词精准，分类互斥清晰。
 `;
 
 /** 全局默认提示词对象 */

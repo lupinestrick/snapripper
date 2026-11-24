@@ -39,27 +39,27 @@ interface SuggestionCard {
 const DEFAULT_SUGGESTIONS: SuggestionCard[] = [
   {
     icon: "🧠",
-    title: "全库结构诊断",
-    desc: "分析当前快照痛点并生成脑暴方案",
-    prompt: "请对当前快照进行深度结构分析与头脑风暴，并给出推荐的重构方案。",
+    title: "生命周期流转诊断",
+    desc: "排查垃圾桶面板与标签囤积瓶颈",
+    prompt: "请从 GTD 标签消费生命周期与治理囤积症的视角，对当前快照进行深度诊断并推荐重构方案。",
   },
   {
-    icon: "📂",
-    title: "场景功能重构",
-    desc: "按开发、游戏、同人与社群独立分流",
-    prompt: "请为我推荐一套按生活与工作高频场景划分独立面板的分类方案。",
+    icon: "💾",
+    title: "识别待下载与转存",
+    desc: "归集同人、音频与资源，准备批量关闭",
+    prompt: "请帮我把快照中所有的同人、音频、网盘与资源类标签单独归集到待下载归档区，以便批量转存后关闭释放内存。",
+  },
+  {
+    icon: "🔨",
+    title: "活跃工程与进行中",
+    desc: "将散落在各处的刷机与开发项目聚合",
+    prompt: "请为我梳理出当前活跃的软硬件刷机、开发与攻略等进行中项目，并独立分组。",
   },
   {
     icon: "🗂️",
-    title: "原生折叠组架构",
-    desc: "利用 Sidebery Group 组收拢 80% 高度",
-    prompt: "请规划一套以 Sidebery 原生可折叠 Group 组为主的矩阵式分类方案。",
-  },
-  {
-    icon: "🧹",
-    title: "识别长尾与待归档",
-    desc: "甄别低频与待下载网页并准备清理",
-    prompt: "请帮我分析快照中的长尾站点和资源类标签，给出归档或精简建议。",
+    title: "常驻参考与折叠组",
+    desc: "高频百科、文档速查与后台建立折叠组",
+    prompt: "请规划一套常驻工具与参考知识库，并使用 Sidebery 原生折叠组收拢 80% 高度。",
   },
 ];
 
@@ -693,11 +693,6 @@ export function AIPage() {
           </div>
 
           {/* Disclaimer */}
-          <div style={{ textAlign: "center", marginTop: "2px" }}>
-            <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", opacity: 0.8 }}>
-              AI 生成方案仅供参考，应用前请在 DIFF 对比窗口核对变更
-            </span>
-          </div>
         </div>
       </div>
     </div>
