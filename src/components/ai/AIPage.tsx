@@ -14,30 +14,53 @@ import { AI_PROVIDERS, ReorganizationScheme, AIChatMessage } from "@/types/ai";
 import { SchemeCard } from "./SchemeCard";
 import { MarkdownView } from "./MarkdownView";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Bot,
   User,
   Sparkles,
-  Send,
+  ArrowUp,
   Loader2,
   Settings,
-  RotateCcw,
-  Layers,
-  FolderTree,
-  Sliders,
+  Plus,
+  Trash2,
   Check,
-  AlertCircle,
-  HelpCircle,
-  Maximize2,
+  FolderTree,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 
-const QUICK_PROMPTS = [
-  "🧠 一键全库结构诊断与方案脑暴",
-  "按生活与工作场景划分为独立面板 (推荐)",
-  "将散落各处的 GitHub/开发项目一网打尽",
-  "利用 Sidebery 原生可折叠 Group 组收拢 80% 视觉高度",
-  "把游戏与二次元同人分开独立管理",
+interface SuggestionCard {
+  title: string;
+  desc: string;
+  prompt: string;
+  icon: string;
+}
+
+const DEFAULT_SUGGESTIONS: SuggestionCard[] = [
+  {
+    icon: "🧠",
+    title: "全库结构诊断",
+    desc: "分析当前快照痛点并生成脑暴方案",
+    prompt: "请对当前快照进行深度结构分析与头脑风暴，并给出推荐的重构方案。",
+  },
+  {
+    icon: "📂",
+    title: "场景功能重构",
+    desc: "按开发、游戏、同人与社群独立分流",
+    prompt: "请为我推荐一套按生活与工作高频场景划分独立面板的分类方案。",
+  },
+  {
+    icon: "🗂️",
+    title: "原生折叠组架构",
+    desc: "利用 Sidebery Group 组收拢 80% 高度",
+    prompt: "请规划一套以 Sidebery 原生可折叠 Group 组为主的矩阵式分类方案。",
+  },
+  {
+    icon: "🧹",
+    title: "识别长尾与待归档",
+    desc: "甄别低频与待下载网页并准备清理",
+    prompt: "请帮我分析快照中的长尾站点和资源类标签，给出归档或精简建议。",
+  },
 ];
 
 export function AIPage() {
@@ -67,7 +90,7 @@ export function AIPage() {
   const [applyingSchemeId, setApplyingSchemeId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const currentProviderDef = AI_PROVIDERS[aiConfig.provider] || AI_PROVIDERS.custom;
 
@@ -76,10 +99,17 @@ export function AIPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [aiChatMessages, isGenerating]);
 
+  // Auto-adjust textarea height
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 150)}px`;
+    }
+  }, [inputPrompt]);
+
   const allTabs = rawSnapshot ? flattenTabTree(rootNodes) : [];
   const panelCount = rawSnapshot?.panels ? Object.keys(rawSnapshot.panels).length : 0;
 
-  // Send message or trigger automatic diagnostic
   const handleSendMessage = async (textToSend?: string) => {
     const prompt = (textToSend || inputPrompt).trim();
     if (!prompt && !textToSend) return;
@@ -100,12 +130,16 @@ export function AIPage() {
 
     addAiChatMessage(userMsg);
     setInputPrompt("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+
     setIsGenerating(true);
-    setStatusText("正在提取快照拓扑并进行深度诊断...");
+    setStatusText("正在分析快照拓扑...");
 
     try {
       const diagnosticSummary = generateSnapshotDiagnosticSummary(allTabs, rawSnapshot.panels);
-      setStatusText(`正在连接 AI 模型 (${aiConfig.model || currentProviderDef.model}) 构思重构方案...`);
+      setStatusText(`正在连接 AI 模型 (${aiConfig.model || currentProviderDef.model})...`);
 
       const history = [...aiChatMessages, userMsg].map((m) => ({
         role: m.sender as "user" | "assistant" | "system",
@@ -130,13 +164,12 @@ export function AIPage() {
       addAiChatMessage(aiMsg);
     } catch (err: any) {
       console.warn("AI generation failed, fallback to smart offline schemes:", err);
-      // Even if AI API encounters an error (e.g. invalid key or timeout), give user instant smart schemes
       const fallbackSchemes = getFallbackSchemes(allTabs);
       const errorReply: AIChatMessage = {
         id: `ai_${Date.now()}`,
         sender: "assistant",
         timestamp: Date.now(),
-        text: `⚠️ **AI 端点响应异常** (${err.message || "请求超时或密钥无效"})。\n\n别担心！我已基于当前快照中提取的高频域名（如 GitHub、DLsite、ErogameScape、Booth、MC百科 等），为你自动生成了以下 **推荐重构方案**。你可以直接点击应用并预览 DIFF：`,
+        text: `⚠️ **AI 服务响应异常** (${err.message || "请求超时或密钥无效"})\n\n已根据当前快照的真实高频站点为你自动生成了 **推荐重构方案**，可直接点击卡片应用并预览 DIFF：`,
         schemes: fallbackSchemes,
       };
       addAiChatMessage(errorReply);
@@ -146,7 +179,6 @@ export function AIPage() {
     }
   };
 
-  // Apply a specific scheme and open the AIDiffModal
   const handleApplyScheme = (scheme: ReorganizationScheme) => {
     if (!rawSnapshot) {
       alert("当前没有可操作的快照数据");
@@ -164,12 +196,11 @@ export function AIPage() {
       setAiProcessedCache(processedCache);
       setIsAIDiffModalOpen(true);
 
-      // Add a system notice message in chat
       addAiChatMessage({
         id: `sys_${Date.now()}`,
         sender: "system",
         timestamp: Date.now(),
-        text: `✨ 已成功基于【${scheme.name}】生成快照重组 DIFF 差分！请在弹出的对比窗口中预览变更；若满意可一键应用，若需要微调可随时在此继续告诉我。`,
+        text: `✨ 已生成【${scheme.name}】的差分对比。请在弹出的对比窗口中确认变更，如需调整可继续在此输入。`,
         appliedSchemeId: scheme.id,
       });
     } catch (err: any) {
@@ -179,11 +210,10 @@ export function AIPage() {
     }
   };
 
-  // Tweak prompt preparation
   const handleTweakScheme = (scheme: ReorganizationScheme) => {
-    const tweakText = `我想基于【${scheme.name}】做进一步微调：`;
+    const tweakText = `我想基于【${scheme.name}】微调：`;
     setInputPrompt(tweakText);
-    inputRef.current?.focus();
+    textareaRef.current?.focus();
   };
 
   return (
@@ -191,508 +221,483 @@ export function AIPage() {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "calc(100vh - 120px)",
-        maxWidth: "1080px",
-        margin: "0 auto",
-        padding: "1rem 1.5rem",
+        height: "100%",
+        width: "100%",
+        overflow: "hidden",
+        backgroundColor: "var(--bg-canvas)",
         color: "var(--text-main)",
+        position: "relative",
       }}
     >
-      {/* Top Header */}
-      <div
+      {/* ChatGPT Style Minimal Top Bar */}
+      <header
         style={{
+          height: "48px",
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "1rem",
-          paddingBottom: "0.85rem",
+          justifyContent: "space-between",
+          padding: "0 1.25rem",
           borderBottom: "1px solid var(--border-subtle)",
+          backgroundColor: "var(--bg-surface)",
           flexShrink: 0,
+          zIndex: 10,
         }}
       >
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <div
-              style={{
-                padding: "0.4rem",
-                borderRadius: "8px",
-                backgroundColor: "var(--accent-subtle)",
-                color: "var(--accent)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Bot size={20} />
-            </div>
-            <h1 style={{ fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.01em" }}>
-              AI 智能架构师 (AI Architect)
-            </h1>
-            <Badge variant="subtle" size="sm" style={{ color: "var(--accent-text)" }}>
-              Brainstorm & Reorganize
-            </Badge>
-          </div>
-          <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.2rem" }}>
-            全库结构诊断、多套重构方案推荐、自然语言多轮微调与 DIFF 实时确认
-          </p>
-        </div>
-
-        {/* Engine status & actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-          <div
+        {/* Model selector pill */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <button
+            type="button"
+            onClick={() => setActivePage("settings")}
             style={{
-              padding: "0.3rem 0.75rem",
-              borderRadius: "9999px",
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-subtle)",
-              fontSize: "0.75rem",
-              color: "var(--text-muted)",
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
               gap: "0.35rem",
+              padding: "0.25rem 0.65rem",
+              borderRadius: "8px",
+              backgroundColor: "transparent",
+              border: "none",
+              color: "var(--text-main)",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              cursor: "pointer",
             }}
+            title="点击前往系统设置配置接口"
           >
-            <span>接口:</span>
-            <strong style={{ color: "var(--accent)" }}>{currentProviderDef.name}</strong>
-            <span style={{ opacity: 0.8 }}>({aiConfig.model || currentProviderDef.model})</span>
-          </div>
+            <span>{currentProviderDef.name}</span>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 400 }}>
+              ({aiConfig.model || currentProviderDef.model})
+            </span>
+            <ChevronDown size={14} style={{ color: "var(--text-muted)" }} />
+          </button>
+        </div>
+
+        {/* Action icons */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <Button
+            variant="ghost"
+            size="xs"
+            pill
+            onClick={clearAiChatMessages}
+            title="开始新对话"
+            style={{ color: "var(--text-muted)", padding: "0.35rem 0.65rem" }}
+          >
+            <Plus size={14} />
+            <span style={{ fontSize: "0.75rem" }}>新对话</span>
+          </Button>
 
           <Button
-            variant="outline"
+            variant="ghost"
             size="xs"
             pill
             onClick={() => setActivePage("settings")}
-            title="配置 AI 接口端点与密钥"
+            title="设置"
+            style={{ color: "var(--text-muted)", padding: "0.35rem" }}
           >
-            <Settings size={13} />
-            <span>配置接口</span>
+            <Settings size={15} />
           </Button>
-
-          {aiChatMessages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="xs"
-              pill
-              onClick={clearAiChatMessages}
-              style={{ color: "var(--text-muted)" }}
-              title="清空对话历史"
-            >
-              <RotateCcw size={13} />
-              <span>清空记录</span>
-            </Button>
-          )}
         </div>
-      </div>
+      </header>
 
-      {/* Main Chat Scroll Container */}
+      {/* Messages Thread (Scrollable Center Area) */}
       <div
         style={{
           flex: 1,
           overflowY: "auto",
-          paddingRight: "0.5rem",
           display: "flex",
           flexDirection: "column",
-          gap: "1.25rem",
+          padding: "1rem 1rem 100px 1rem",
         }}
       >
-        {/* Welcome Hero State (when empty) */}
-        {aiChatMessages.length === 0 && (
-          <div
-            style={{
-              padding: "2rem",
-              borderRadius: "1rem",
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-card)",
-              boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.05)",
-              textAlign: "center",
-              margin: "auto 0",
-            }}
-          >
+        <div
+          style={{
+            maxWidth: "768px",
+            width: "100%",
+            margin: "0 auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "1.25rem",
+          }}
+        >
+          {/* ChatGPT Style Empty State */}
+          {aiChatMessages.length === 0 && (
             <div
               style={{
-                width: "56px",
-                height: "56px",
-                borderRadius: "50%",
-                backgroundColor: "var(--accent-subtle)",
-                color: "var(--accent)",
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                margin: "0 auto 1.25rem auto",
+                minHeight: "55vh",
+                textAlign: "center",
               }}
             >
-              <Sparkles size={28} />
-            </div>
-
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-              欢迎来到 Sidebery AI 架构工作台
-            </h2>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-muted)", maxWidth: "560px", margin: "0 auto 1.5rem auto", lineHeight: 1.6 }}>
-              与传统机械分类不同，AI 架构师会像资深整理专家一样，先进行<strong>全库结构诊断与痛点洞察 (Brainstorm)</strong>，并为你输出多套鲜明的重构方案供你挑选与多轮微调。
-            </p>
-
-            {/* Snapshot Snapshot Badge */}
-            {rawSnapshot ? (
               <div
                 style={{
-                  display: "inline-flex",
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "50%",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-card)",
+                  color: "var(--accent)",
+                  display: "flex",
                   alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.6rem 1.25rem",
-                  borderRadius: "9999px",
-                  backgroundColor: "var(--bg-subtle)",
-                  border: "1px solid var(--border-subtle)",
-                  fontSize: "0.85rem",
-                  marginBottom: "1.5rem",
+                  justifyContent: "center",
+                  marginBottom: "1rem",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                 }}
               >
-                <Layers size={15} style={{ color: "var(--accent)" }} />
-                <span>当前已加载快照:</span>
-                <strong style={{ color: "var(--text-main)" }}>{allTabs.length} 个标签页</strong>
-                <span style={{ color: "var(--text-muted)" }}>/</span>
-                <strong style={{ color: "var(--text-main)" }}>{panelCount} 个面板</strong>
+                <Sparkles size={22} />
               </div>
-            ) : (
+
+              <h2
+                style={{
+                  fontSize: "1.35rem",
+                  fontWeight: 700,
+                  marginBottom: "0.4rem",
+                  color: "var(--text-main)",
+                }}
+              >
+                今天想如何整理你的标签页？
+              </h2>
+
+              {rawSnapshot ? (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontSize: "0.78rem",
+                    color: "var(--text-muted)",
+                    marginBottom: "1.75rem",
+                  }}
+                >
+                  <Layers size={13} style={{ color: "var(--accent)" }} />
+                  <span>已载入：{allTabs.length} 标签 · {panelCount} 面板</span>
+                </div>
+              ) : (
+                <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.75rem" }}>
+                  请在工作台导入 Sidebery 快照 JSON
+                </p>
+              )}
+
+              {/* 2x2 Suggestion Cards */}
               <div
                 style={{
-                  display: "inline-block",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "8px",
-                  backgroundColor: "var(--bg-subtle)",
-                  color: "var(--text-muted)",
-                  fontSize: "0.85rem",
-                  marginBottom: "1.5rem",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                  gap: "0.75rem",
+                  width: "100%",
                 }}
               >
-                💡 尚未加载快照，请先在左侧「工作台」拖入 Sidebery JSON 快照文件
+                {DEFAULT_SUGGESTIONS.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendMessage(s.prompt)}
+                    disabled={isGenerating || !rawSnapshot}
+                    style={{
+                      padding: "0.85rem 1rem",
+                      borderRadius: "0.875rem",
+                      backgroundColor: "var(--bg-surface)",
+                      border: "1px solid var(--border-subtle)",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = "var(--accent-border)";
+                      e.currentTarget.style.backgroundColor = "var(--bg-card)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = "var(--border-subtle)";
+                      e.currentTarget.style.backgroundColor = "var(--bg-surface)";
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                      <span style={{ fontSize: "0.95rem" }}>{s.icon}</span>
+                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
+                        {s.title}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                      {s.desc}
+                    </span>
+                  </button>
+                ))}
               </div>
-            )}
-
-            <div>
-              <Button
-                variant="solid"
-                size="md"
-                pill
-                onClick={() => handleSendMessage("请对当前快照进行深度结构分析与头脑风暴，并给出推荐的重构方案。")}
-                disabled={isGenerating || !rawSnapshot}
-                style={{
-                  backgroundColor: "var(--accent-solid)",
-                  color: "#fff",
-                  fontWeight: 700,
-                  padding: "0.75rem 1.75rem",
-                  fontSize: "0.95rem",
-                  boxShadow: "0 4px 14px rgba(233, 61, 130, 0.3)",
-                }}
-              >
-                {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                <span>🧠 开始全库结构诊断与方案脑暴 (Brainstorm)</span>
-              </Button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Message Stream */}
-        {aiChatMessages.map((msg) => {
-          const isUser = msg.sender === "user";
-          const isSystem = msg.sender === "system";
+          {/* Messages Stream */}
+          {aiChatMessages.map((msg) => {
+            const isUser = msg.sender === "user";
+            const isSystem = msg.sender === "system";
 
-          if (isSystem) {
+            if (isSystem) {
+              return (
+                <div key={msg.id} style={{ display: "flex", justifyContent: "center", margin: "0.25rem 0" }}>
+                  <div
+                    style={{
+                      padding: "0.35rem 0.85rem",
+                      borderRadius: "9999px",
+                      backgroundColor: "var(--accent-subtle)",
+                      color: "var(--accent-text)",
+                      fontSize: "0.72rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.4rem",
+                    }}
+                  >
+                    <Sparkles size={12} />
+                    <span>{msg.text}</span>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div
                 key={msg.id}
                 style={{
                   display: "flex",
-                  justifyContent: "center",
-                  margin: "0.5rem 0",
+                  flexDirection: isUser ? "row-reverse" : "row",
+                  gap: "0.75rem",
+                  alignItems: "flex-start",
                 }}
               >
+                {/* Avatar */}
                 <div
                   style={{
-                    padding: "0.45rem 1rem",
-                    borderRadius: "9999px",
-                    backgroundColor: "var(--accent-subtle)",
-                    border: "1px solid var(--accent-border)",
-                    color: "var(--accent-text)",
-                    fontSize: "0.75rem",
+                    width: "28px",
+                    height: "28px",
+                    borderRadius: "50%",
+                    backgroundColor: isUser ? "var(--accent-solid)" : "var(--bg-card)",
+                    color: isUser ? "#fff" : "var(--accent)",
+                    border: isUser ? "none" : "1px solid var(--border-card)",
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.5rem",
-                    maxWidth: "85%",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                    marginTop: "2px",
                   }}
                 >
-                  <Sparkles size={13} />
-                  <span>{msg.text}</span>
+                  {isUser ? <User size={14} /> : <Bot size={15} />}
+                </div>
+
+                {/* Message Body */}
+                <div
+                  style={{
+                    maxWidth: isUser ? "80%" : "100%",
+                    flex: isUser ? "none" : 1,
+                    backgroundColor: isUser ? "var(--bg-card)" : "transparent",
+                    border: isUser ? "1px solid var(--border-card)" : "none",
+                    borderRadius: isUser ? "1.25rem" : "0",
+                    padding: isUser ? "0.65rem 1rem" : "0",
+                  }}
+                >
+                  <MarkdownView content={msg.text} />
+
+                  {/* Schemes Cards */}
+                  {msg.schemes && msg.schemes.length > 0 && (
+                    <div style={{ marginTop: "0.75rem" }}>
+                      {msg.schemes.map((scheme) => (
+                        <SchemeCard
+                          key={scheme.id}
+                          scheme={scheme}
+                          isApplying={applyingSchemeId === scheme.id}
+                          onApply={handleApplyScheme}
+                          onTweak={handleTweakScheme}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );
-          }
+          })}
 
-          return (
-            <div
-              key={msg.id}
-              style={{
-                display: "flex",
-                flexDirection: isUser ? "row-reverse" : "row",
-                gap: "0.85rem",
-                alignItems: "flex-start",
-              }}
-            >
-              {/* Avatar */}
+          {/* Generating Indicator */}
+          {isGenerating && (
+            <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
               <div
                 style={{
-                  width: "34px",
-                  height: "34px",
+                  width: "28px",
+                  height: "28px",
                   borderRadius: "50%",
-                  backgroundColor: isUser ? "var(--accent-solid)" : "var(--bg-card)",
-                  color: isUser ? "#fff" : "var(--accent)",
-                  border: isUser ? "none" : "1px solid var(--border-card)",
+                  backgroundColor: "var(--bg-card)",
+                  color: "var(--accent)",
+                  border: "1px solid var(--border-card)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
-                  boxShadow: "0 2px 6px rgba(0, 0, 0, 0.05)",
                 }}
               >
-                {isUser ? <User size={16} /> : <Bot size={18} />}
+                <Loader2 size={14} className="animate-spin" />
               </div>
 
-              {/* Message Bubble */}
               <div
                 style={{
-                  maxWidth: isUser ? "75%" : "92%",
-                  backgroundColor: isUser ? "var(--bg-card)" : "var(--bg-card)",
-                  border: isUser ? "1px solid var(--accent-border)" : "1px solid var(--border-card)",
-                  borderRadius: "0.875rem",
-                  padding: "0.85rem 1.15rem",
-                  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.03)",
+                  padding: "0.5rem 0.85rem",
+                  borderRadius: "1rem",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
+                  fontSize: "0.8rem",
+                  color: "var(--text-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
                 }}
               >
-                {/* Header info */}
-                <div
-                  style={{
-                    fontSize: "0.7rem",
-                    color: "var(--text-muted)",
-                    marginBottom: "0.4rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  {isUser ? "你" : "AI 架构师"}
-                </div>
-
-                {/* Text Content */}
-                <MarkdownView content={msg.text} />
-
-                {/* Schemes Cards (if assistant returned schemes) */}
-                {msg.schemes && msg.schemes.length > 0 && (
-                  <div style={{ marginTop: "1rem" }}>
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        fontWeight: 700,
-                        color: "var(--accent-text)",
-                        marginBottom: "0.5rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                      }}
-                    >
-                      <Sparkles size={14} />
-                      <span>为你量身推荐的重构方案 (点击即可一键生成 DIFF 预览)：</span>
-                    </div>
-
-                    {msg.schemes.map((scheme) => (
-                      <SchemeCard
-                        key={scheme.id}
-                        scheme={scheme}
-                        isApplying={applyingSchemeId === scheme.id}
-                        onApply={handleApplyScheme}
-                        onTweak={handleTweakScheme}
-                      />
-                    ))}
-                  </div>
-                )}
+                <Loader2 size={13} className="animate-spin" />
+                <span>{statusText || "思考中..."}</span>
               </div>
             </div>
-          );
-        })}
+          )}
 
-        {/* Generating Indicator */}
-        {isGenerating && (
-          <div style={{ display: "flex", gap: "0.85rem", alignItems: "flex-start" }}>
-            <div
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+
+      {/* ChatGPT Style Pinned Bottom Bar */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: "0.75rem 1rem 1rem 1rem",
+          background: "linear-gradient(to top, var(--bg-canvas) 80%, rgba(0,0,0,0) 100%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          zIndex: 20,
+        }}
+      >
+        <div style={{ maxWidth: "768px", width: "100%", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+          {/* Quick Option Pills */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 0.5rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => setCrossPanelMerge(!crossPanelMerge)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                  padding: "2px 8px",
+                  borderRadius: "9999px",
+                  fontSize: "0.7rem",
+                  border: "1px solid",
+                  borderColor: crossPanelMerge ? "var(--accent-border)" : "var(--border-subtle)",
+                  backgroundColor: crossPanelMerge ? "var(--accent-subtle)" : "var(--bg-surface)",
+                  color: crossPanelMerge ? "var(--accent-text)" : "var(--text-muted)",
+                  cursor: "pointer",
+                }}
+              >
+                <Check size={11} style={{ opacity: crossPanelMerge ? 1 : 0.3 }} />
+                <span>跨面板合并</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCreateGroupTabs(!createGroupTabs)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                  padding: "2px 8px",
+                  borderRadius: "9999px",
+                  fontSize: "0.7rem",
+                  border: "1px solid",
+                  borderColor: createGroupTabs ? "var(--accent-border)" : "var(--border-subtle)",
+                  backgroundColor: createGroupTabs ? "var(--accent-subtle)" : "var(--bg-surface)",
+                  color: createGroupTabs ? "var(--accent-text)" : "var(--text-muted)",
+                  cursor: "pointer",
+                }}
+              >
+                <Check size={11} style={{ opacity: createGroupTabs ? 1 : 0.3 }} />
+                <span>Sidebery 折叠组</span>
+              </button>
+            </div>
+
+            <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
+              Shift + Enter 换行
+            </span>
+          </div>
+
+          {/* Capsule Input Box */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              gap: "0.5rem",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-card)",
+              borderRadius: "1.5rem",
+              padding: "0.5rem 0.65rem 0.5rem 1.15rem",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.05)",
+            }}
+          >
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={inputPrompt}
+              onChange={(e) => setInputPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              placeholder="给 AI 架构师发送消息 (例如：把游戏和动漫分开，为开发项目建折叠组)..."
+              disabled={isGenerating || !rawSnapshot}
               style={{
-                width: "34px",
-                height: "34px",
+                flex: 1,
+                backgroundColor: "transparent",
+                border: "none",
+                outline: "none",
+                resize: "none",
+                fontSize: "0.875rem",
+                color: "var(--text-main)",
+                lineHeight: 1.45,
+                maxHeight: "150px",
+                fontFamily: "inherit",
+                padding: "4px 0",
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={() => handleSendMessage()}
+              disabled={isGenerating || !rawSnapshot || !inputPrompt.trim()}
+              style={{
+                width: "32px",
+                height: "32px",
                 borderRadius: "50%",
-                backgroundColor: "var(--bg-card)",
-                color: "var(--accent)",
-                border: "1px solid var(--border-card)",
+                backgroundColor: inputPrompt.trim() ? "var(--accent-solid)" : "var(--bg-subtle)",
+                color: inputPrompt.trim() ? "#fff" : "var(--text-muted)",
+                border: "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                cursor: inputPrompt.trim() ? "pointer" : "default",
+                transition: "all 0.15s ease",
                 flexShrink: 0,
               }}
             >
-              <Loader2 size={16} className="animate-spin" />
-            </div>
-
-            <div
-              style={{
-                padding: "0.75rem 1.15rem",
-                borderRadius: "0.875rem",
-                backgroundColor: "var(--accent-subtle)",
-                border: "1px solid var(--accent-border)",
-                color: "var(--accent-text)",
-                fontSize: "0.85rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-              }}
-            >
-              <Loader2 size={15} className="animate-spin" />
-              <span>{statusText || "AI 架构师正在思考与分析..."}</span>
-            </div>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Bottom Sticky Input & Control Area */}
-      <div
-        style={{
-          marginTop: "0.75rem",
-          paddingTop: "0.75rem",
-          borderTop: "1px solid var(--border-subtle)",
-          flexShrink: 0,
-        }}
-      >
-        {/* Quick Suggestion Pills */}
-        <div
-          style={{
-            display: "flex",
-            gap: "0.4rem",
-            overflowX: "auto",
-            paddingBottom: "0.5rem",
-            marginBottom: "0.4rem",
-          }}
-        >
-          {QUICK_PROMPTS.map((qp, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleSendMessage(qp)}
-              disabled={isGenerating || !rawSnapshot}
-              style={{
-                padding: "0.25rem 0.65rem",
-                borderRadius: "9999px",
-                backgroundColor: "var(--bg-subtle)",
-                border: "1px solid var(--border-subtle)",
-                fontSize: "0.72rem",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                transition: "all 0.15s",
-              }}
-            >
-              {qp}
+              {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <ArrowUp size={16} />}
             </button>
-          ))}
-        </div>
-
-        {/* Options Row (Toggles) */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: "0.5rem",
-            fontSize: "0.75rem",
-            color: "var(--text-muted)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={crossPanelMerge}
-                onChange={(e) => setCrossPanelMerge(e.target.checked)}
-                style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
-              />
-              <span>跨面板合并同类标签</span>
-            </label>
-
-            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={createGroupTabs}
-                onChange={(e) => setCreateGroupTabs(e.target.checked)}
-                style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
-              />
-              <span>生成 Sidebery 原生可折叠 Group 组</span>
-            </label>
           </div>
 
-          <span style={{ fontSize: "0.7rem", opacity: 0.8 }}>
-            按 Enter 发送，Shift+Enter 换行
-          </span>
-        </div>
-
-        {/* Textarea + Send Button */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-end",
-            gap: "0.6rem",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-card)",
-            borderRadius: "0.75rem",
-            padding: "0.5rem 0.75rem",
-            boxShadow: "0 2px 6px rgba(0, 0, 0, 0.03)",
-          }}
-        >
-          <textarea
-            ref={inputRef}
-            rows={2}
-            value={inputPrompt}
-            onChange={(e) => setInputPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            placeholder="输入自然语言要求（例如：“帮我把开发和游戏分开”、“按生命周期划分面板”、“把超过5个标签的域名合并为组”...）"
-            disabled={isGenerating || !rawSnapshot}
-            style={{
-              flex: 1,
-              backgroundColor: "transparent",
-              border: "none",
-              outline: "none",
-              resize: "none",
-              fontSize: "0.85rem",
-              color: "var(--text-main)",
-              lineHeight: 1.4,
-              fontFamily: "inherit",
-            }}
-          />
-
-          <Button
-            variant="solid"
-            size="sm"
-            pill
-            onClick={() => handleSendMessage()}
-            disabled={isGenerating || !rawSnapshot || !inputPrompt.trim()}
-            style={{
-              backgroundColor: "var(--accent-solid)",
-              color: "#fff",
-              fontWeight: 600,
-              flexShrink: 0,
-            }}
-          >
-            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-            <span>发送</span>
-          </Button>
+          {/* Disclaimer */}
+          <div style={{ textAlign: "center", marginTop: "2px" }}>
+            <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", opacity: 0.8 }}>
+              AI 生成方案仅供参考，应用前请在 DIFF 对比窗口核对变更
+            </span>
+          </div>
         </div>
       </div>
     </div>

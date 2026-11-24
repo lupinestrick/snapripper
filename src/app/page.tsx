@@ -142,7 +142,16 @@ export default function WorkbenchPage() {
       >
         <TopNav onOpenExport={() => setExportDialogOpen(true)} />
 
-        <main style={{ flex: 1, overflowY: "auto", position: "relative", paddingBottom: "70px" }}>
+        <main
+          style={{
+            flex: 1,
+            overflowY: activePage === "ai" ? "hidden" : "auto",
+            position: "relative",
+            paddingBottom: activePage === "ai" ? 0 : "70px",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           {activePage === "workbench" && (
             <>
               <StatsHeader />
