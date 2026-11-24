@@ -52,7 +52,7 @@ export function AppSidebar() {
     { page: "workbench", label: "工作台", icon: <Layers size={17} /> },
     { page: "process", label: "处理中心", icon: <Sparkles size={17} /> },
     { page: "rules", label: "规则管理", icon: <SlidersHorizontal size={17} /> },
-    { page: "ai", label: "AI 比例", icon: <Bot size={17} /> },
+    { page: "ai", label: "AI 架构师", icon: <Bot size={17} /> },
     { page: "settings", label: "系统设置", icon: <Settings size={17} /> },
   ];
 

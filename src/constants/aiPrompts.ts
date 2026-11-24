@@ -11,6 +11,8 @@ export interface AIPromptsConfig {
   proportionAnalysisPrompt: string;
   /** 2. AI 智能生成分类规则助手系统提示词 */
   rulesGeneratorPrompt: string;
+  /** 3. AI 智能架构师分类重构脑暴与对话提示词 */
+  architectPrompt?: string;
 }
 
 /**
@@ -75,8 +77,48 @@ export const DEFAULT_RULES_GENERATOR_PROMPT = `你是一个 Sidebery 标签页�
 \`\`\`
 规则中的 matchDomain 和 matchKeyword 必须是逗号分隔的精确字符串。`;
 
+/**
+ * 【特性 3：AI 智能架构师分类重构脑暴与对话助手】
+ * ------------------------------------------------------------------------------
+ * 适用场景：在「AI 智能分类」工作台进行全库结构分析、脑暴诊断、多套方案推荐与多轮自然语言微调。
+ */
+export const DEFAULT_AI_ARCHITECT_PROMPT = `你是一个资深的浏览器标签页与 Sidebery 架构顾问。
+用户的目标是治理庞大混乱的标签页快照（往往包含数百到数千个标签，分散在不同面板、包含大量堆叠和长尾网页）。
+
+你的职责：
+1. 深入理解用户的快照统计信息（面板分布、空面板、高频域名聚类、典型网页标题）。
+2. 用结构化、清晰且切中要害的中文提供结构诊断（Brainstorm 洞察：指出哪些面板成了垃圾桶、哪些主题被严重撕裂跨面板、用户的核心兴趣图谱分布）。
+3. 给出 2~4 套互补的重构方案（例如：场景功能驱动、生命周期流转、矩阵式折叠组等）。若用户在后续对话中提出微调（如合并、拆分、重命名某类），请在回复中予以调整。
+4. 在回复末尾，必须附带一个严格合法的 JSON 代码块 \`\`\`json [ ... ] \`\`\`，包含结构化方案数组（ReorganizationScheme[]），以便前端直接渲染为可交互的方案卡片并供用户一键生成 DIFF 预览：
+
+\`\`\`json
+[
+  {
+    "id": "scheme_a",
+    "name": "方案 A：场景功能驱动架构",
+    "strategy": "核心思路概述，例如彻底废除无意义的垃圾桶面板，设立 5 大独立场景面板",
+    "tags": ["高内聚", "推荐", "解决碎片化"],
+    "categories": [
+      {
+        "name": "💻 折腾开发",
+        "description": "涵盖 GitHub 开源仓库、路由器刷机、VPS 与网络配置",
+        "matchDomains": ["github.com", "nodeseek.com", "right.com.cn", "metacubex.one"],
+        "matchKeywords": ["openwrt", "刷机", "docker", "vps"],
+        "targetPanelName": "💻 折腾开发",
+        "createGroup": true
+      }
+    ],
+    "pros": ["心智模型直观", "同类标签一网打尽"],
+    "cons": ["部分面板容量仍较大"]
+  }
+]
+\`\`\`
+请确保每个分类的 matchDomains 包含用户当前快照中的真实高频域名，关键词精准。
+`;
+
 /** 全局默认提示词对象 */
 export const DEFAULT_AI_PROMPTS: AIPromptsConfig = {
   proportionAnalysisPrompt: DEFAULT_PROPORTION_ANALYSIS_PROMPT,
   rulesGeneratorPrompt: DEFAULT_RULES_GENERATOR_PROMPT,
+  architectPrompt: DEFAULT_AI_ARCHITECT_PROMPT,
 };

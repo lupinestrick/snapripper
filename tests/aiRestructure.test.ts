@@ -6,6 +6,11 @@ import { determineTargetPanelForCategory } from "../src/services/treeOperations"
 import { isGroupTab, getGroupTitle } from "../src/services/snapshotParser";
 import { computeSnapshotDiff } from "../src/services/diffEngine";
 import {
+  generateSnapshotDiagnosticSummary,
+  applySchemeToSnapshot,
+  getFallbackSchemes,
+} from "../src/services/aiArchitectEngine";
+import {
   setCookie,
   getCookie,
   deleteCookie,
@@ -606,6 +611,72 @@ Based on your tabs, here is the distribution:
   assert(useSnapshotStore.getState().rawSnapshot === null, "clearAllCache resets rawSnapshot to null");
   assert(useSnapshotStore.getState().rootNodes.length === 0, "clearAllCache resets rootNodes to empty array");
   assert(getSnapshotCookieInfo() === null, "clearAllCache clears cookies");
+
+  // --- Test Set 11: AI Architect Engine & Reorganization Schemes ---
+  const sampleArchitectTabs: SideberyTab[] = [
+    { id: "t1", url: "https://github.com/facebook/react", title: "React GitHub", panelId: "p_dev", parentId: -1 },
+    { id: "t2", url: "https://dlsite.com/work/RJ123456", title: "音声作品 | DLsite", panelId: "p_main", parentId: -1 },
+    { id: "t3", url: "https://erogamescape.dyndns.org/game/1", title: "批评空间评分", panelId: "p_main", parentId: -1 },
+    { id: "t4", url: "https://booth.pm/items/999", title: "3D 模型 | Booth", panelId: "p_main", parentId: -1 },
+    { id: "t5", url: "https://reddit.com/r/webdev", title: "Webdev on Reddit", panelId: "p_dev", parentId: -1 },
+    { id: "t6", url: "about:config", title: "Firefox Config", pinned: true, panelId: "p_main", parentId: -1 },
+  ];
+  const samplePanels = {
+    p_dev: { id: "p_dev", name: "开发面板" },
+    p_main: { id: "p_main", name: "主面板" },
+    p_empty: { id: "p_empty", name: "闲置空面板" },
+  };
+
+  // 11.1 Diagnostic summary
+  const diagSummaryJson = generateSnapshotDiagnosticSummary(sampleArchitectTabs, samplePanels as any);
+  const diag = JSON.parse(diagSummaryJson);
+  assert(diag.totalTabs === 6, "generateSnapshotDiagnosticSummary counts total tabs correctly");
+  assert(diag.nonExemptCount === 5, "generateSnapshotDiagnosticSummary filters exempt pinned tab");
+  assert(diag.panels.emptyPanelsCount === 1, "generateSnapshotDiagnosticSummary detects empty panel");
+  assert(diag.panels.emptyPanelNames[0] === "闲置空面板", "generateSnapshotDiagnosticSummary identifies correct empty panel name");
+  assert(diag.topDomainClusters.length >= 4, "generateSnapshotDiagnosticSummary groups top domain clusters");
+
+  // 11.2 Fallback schemes
+  const fallbackSchemes = getFallbackSchemes(sampleArchitectTabs);
+  assert(fallbackSchemes.length >= 2, "getFallbackSchemes returns multiple architectures");
+  assert(fallbackSchemes[0].categories.length >= 3, "Fallback scheme contains structured categories");
+  assert(fallbackSchemes[0].categories[0].matchDomains?.includes("github.com"), "Fallback scheme maps github.com to dev category");
+
+  // 11.3 Apply scheme to snapshot
+  const rawTestSnapshot: SideberySnapshot = {
+    id: "snap_arch_test",
+    time: Date.now(),
+    windows: {
+      "1": { tabs: sampleArchitectTabs },
+    },
+    panels: samplePanels as any,
+  };
+
+  const schemeToApply = fallbackSchemes[0];
+  const appliedCache = applySchemeToSnapshot(rawTestSnapshot, schemeToApply, {
+    crossPanelMerge: true,
+    createGroupTabs: true,
+    targetMode: "tree",
+  });
+
+  assert(appliedCache !== null, "applySchemeToSnapshot returns valid AIProcessedCache");
+  assert(appliedCache.summary.total === 6, "applySchemeToSnapshot preserves total tab count");
+  assert(appliedCache.classificationMap["t1"] === "💻 折腾开发", "applySchemeToSnapshot matches GitHub tab to '💻 折腾开发'");
+  assert(appliedCache.classificationMap["t2"] === "🎧 同人音声与二次元", "applySchemeToSnapshot matches DLsite tab to '🎧 同人音声与二次元'");
+  assert(appliedCache.classificationMap["t3"] === "🎮 游艺与模组空间", "applySchemeToSnapshot matches ErogameScape tab to '🎮 游艺与模组空间'");
+  assert(appliedCache.classificationMap["t4"] === "🥽 虚拟工坊 (VRChat & 3D)", "applySchemeToSnapshot matches Booth tab to '🥽 虚拟工坊'");
+
+  // 11.4 Chat state management in useSnapshotStore
+  useSnapshotStore.getState().clearAiChatMessages();
+  assert(useSnapshotStore.getState().aiChatMessages.length === 0, "clearAiChatMessages resets chat history");
+  useSnapshotStore.getState().addAiChatMessage({
+    id: "msg_1",
+    sender: "assistant",
+    timestamp: Date.now(),
+    text: "AI 架构师已就绪",
+    schemes: fallbackSchemes,
+  });
+  assert(useSnapshotStore.getState().aiChatMessages.length === 1, "addAiChatMessage stores assistant message with schemes");
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

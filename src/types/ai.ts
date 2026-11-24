@@ -117,3 +117,35 @@ export interface AIProcessedCache {
   targetMode: "tree" | "panel";
   targetPanelId?: string;
 }
+
+export interface ReorganizationCategory {
+  name: string;
+  description?: string;
+  matchDomains?: string[];
+  matchKeywords?: string[];
+  targetPanelId?: string;
+  targetPanelName?: string;
+  color?: string;
+  createGroup?: boolean;
+  estimatedCount?: number;
+}
+
+export interface ReorganizationScheme {
+  id: string;
+  name: string;
+  strategy: string;
+  tags?: string[];
+  categories: ReorganizationCategory[];
+  pros?: string[];
+  cons?: string[];
+  targetMode?: "tree" | "panel";
+}
+
+export interface AIChatMessage {
+  id: string;
+  sender: "user" | "assistant" | "system";
+  timestamp: number;
+  text: string;
+  schemes?: ReorganizationScheme[];
+  appliedSchemeId?: string;
+}

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SideberySnapshot, SideberyTab, TabTreeNode, CategorizationRule } from "@/types/sidebery";
-import { ProportionReport, AIProcessedCache, CategoryProportion } from "@/types/ai";
+import { ProportionReport, AIProcessedCache, CategoryProportion, AIChatMessage } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
 import { useConfigStore } from "./useConfigStore";
 import { syncSnapshotCookie, clearSnapshotCookies } from "@/utils/cookieHelper";
@@ -116,6 +116,7 @@ interface SnapshotStoreState {
   classificationProgress: { current: number; total: number };
 
   aiProcessedCache: AIProcessedCache | null;
+  aiChatMessages: AIChatMessage[];
   isPostEditMode: boolean;
   isAIDiffModalOpen: boolean;
   isOverviewHopupOpen: boolean;
@@ -165,6 +166,9 @@ interface SnapshotStoreState {
   getExportSnapshot: (mode: "tree" | "panel" | "container") => SideberySnapshot;
 
   setAiProcessedCache: (cache: AIProcessedCache | null) => void;
+  setAiChatMessages: (messages: AIChatMessage[]) => void;
+  addAiChatMessage: (message: AIChatMessage) => void;
+  clearAiChatMessages: () => void;
   setIsAIDiffModalOpen: (open: boolean) => void;
   setIsOverviewHopupOpen: (open: boolean) => void;
   enterPostEditMode: () => void;
@@ -197,6 +201,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   classificationProgress: { current: 0, total: 0 },
 
   aiProcessedCache: null,
+  aiChatMessages: [],
   isPostEditMode: false,
   isAIDiffModalOpen: false,
   isOverviewHopupOpen: false,
@@ -633,6 +638,10 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   },
 
   setAiProcessedCache: (cache) => set({ aiProcessedCache: cache }),
+  setAiChatMessages: (messages) => set({ aiChatMessages: messages }),
+  addAiChatMessage: (message) =>
+    set((state) => ({ aiChatMessages: [...state.aiChatMessages, message] })),
+  clearAiChatMessages: () => set({ aiChatMessages: [] }),
   setIsAIDiffModalOpen: (open) => set({ isAIDiffModalOpen: open }),
   setIsOverviewHopupOpen: (open) => set({ isOverviewHopupOpen: open }),
 
@@ -741,6 +750,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       progressStatus: "",
       classificationProgress: { current: 0, total: 0 },
       aiProcessedCache: null,
+      aiChatMessages: [],
       isPostEditMode: false,
       isAIDiffModalOpen: false,
       isOverviewHopupOpen: false,
@@ -760,6 +770,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
         rootNodes: state.rootNodes,
         proportionReport: state.proportionReport,
         aiProcessedCache: state.aiProcessedCache,
+        aiChatMessages: state.aiChatMessages.slice(-20),
         isPostEditMode: state.isPostEditMode,
         undoStack: state.undoStack.slice(-5),
         redoStack: state.redoStack.slice(-5),
@@ -776,6 +787,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
           duplicateUrls: duplicates,
           expandedIds: initialExpanded,
           selectedIds: new Set<string>(),
+          aiChatMessages: Array.isArray(persistedState.aiChatMessages) ? persistedState.aiChatMessages : [],
         };
       },
       onRehydrateStorage: () => (state) => {
