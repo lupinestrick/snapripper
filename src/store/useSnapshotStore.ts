@@ -117,7 +117,6 @@ interface SnapshotStoreState {
 
   aiProcessedCache: AIProcessedCache | null;
   aiChatMessages: AIChatMessage[];
-  isPostEditMode: boolean;
   isAIDiffModalOpen: boolean;
   isOverviewHopupOpen: boolean;
 
@@ -171,8 +170,6 @@ interface SnapshotStoreState {
   clearAiChatMessages: () => void;
   setIsAIDiffModalOpen: (open: boolean) => void;
   setIsOverviewHopupOpen: (open: boolean) => void;
-  enterPostEditMode: () => void;
-  exitPostEditMode: (apply: boolean) => void;
   updateProcessedTreeTarget: (targetMode: "tree" | "panel", targetPanelId?: string) => void;
   clearAllCache: () => void;
 }
@@ -202,7 +199,6 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
 
   aiProcessedCache: null,
   aiChatMessages: [],
-  isPostEditMode: false,
   isAIDiffModalOpen: false,
   isOverviewHopupOpen: false,
 
@@ -237,7 +233,6 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       redoStack: [],
       proportionReport: null,
       aiProcessedCache: null,
-      isPostEditMode: false,
       isAIDiffModalOpen: false,
     });
   },
@@ -645,63 +640,15 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   setIsAIDiffModalOpen: (open) => set({ isAIDiffModalOpen: open }),
   setIsOverviewHopupOpen: (open) => set({ isOverviewHopupOpen: open }),
 
-  enterPostEditMode: () => {
-    const { aiProcessedCache, activeWindowId } = get();
-    if (!aiProcessedCache) return;
-    const procWinTabs = aiProcessedCache.processedSnapshot.windows[activeWindowId]?.tabs || [];
-    const tree = buildTabTree(procWinTabs);
-    const expandedIds = new Set<string>(tree.map((n) => n.id));
-    set({
-      isPostEditMode: true,
-      rootNodes: tree,
-      expandedIds,
-      selectedIds: new Set<string>(),
-    });
-    useConfigStore.getState().setActivePage("workbench");
-  },
-
-  exitPostEditMode: (apply) => {
-    const { aiProcessedCache, rootNodes, rawSnapshot, activeWindowId, undoStack } = get();
-    if (!aiProcessedCache || !rawSnapshot) {
-      set({ isPostEditMode: false });
-      return;
-    }
-
-    if (apply) {
-      const updatedTabs = flattenTabTree(rootNodes);
-      const committedSnapshot: SideberySnapshot = {
-        ...aiProcessedCache.processedSnapshot,
-        windows: {
-          ...aiProcessedCache.processedSnapshot.windows,
-          [activeWindowId]: { tabs: updatedTabs },
-        },
-      };
-      set({
-        undoStack: [...undoStack, rawSnapshot],
-        redoStack: [],
-        rawSnapshot: committedSnapshot,
-        isPostEditMode: false,
-      });
-    } else {
-      const origWinTabs = aiProcessedCache.originalSnapshot.windows[activeWindowId]?.tabs || [];
-      const origTree = buildTabTree(origWinTabs);
-      set({
-        rawSnapshot: aiProcessedCache.originalSnapshot,
-        rootNodes: origTree,
-        isPostEditMode: false,
-      });
-    }
-  },
-
   updateProcessedTreeTarget: (targetMode, targetPanelId) => {
-    const { aiProcessedCache, isPostEditMode } = get();
+    const { aiProcessedCache } = get();
     if (!aiProcessedCache) return;
 
     const classificationMap = new Map<string, string>(Object.entries(aiProcessedCache.classificationMap));
     const categories = aiProcessedCache.categoryNames.map((name, i) => ({ id: `cat_${i}`, name }));
 
     const { crossPanelMerge, createGroupTabs } = useConfigStore.getState();
-    const { processedSnapshot, processedTree } = buildProcessedSnapshot(
+    const { processedSnapshot } = buildProcessedSnapshot(
       aiProcessedCache.originalSnapshot,
       classificationMap,
       categories,
@@ -719,7 +666,6 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
 
     set({
       aiProcessedCache: updatedCache,
-      ...(isPostEditMode ? { rootNodes: processedTree } : {}),
     });
   },
 
@@ -751,7 +697,6 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       classificationProgress: { current: 0, total: 0 },
       aiProcessedCache: null,
       aiChatMessages: [],
-      isPostEditMode: false,
       isAIDiffModalOpen: false,
       isOverviewHopupOpen: false,
       undoStack: [],
@@ -771,7 +716,6 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
         proportionReport: state.proportionReport,
         aiProcessedCache: state.aiProcessedCache,
         aiChatMessages: state.aiChatMessages.slice(-20),
-        isPostEditMode: state.isPostEditMode,
         undoStack: state.undoStack.slice(-5),
         redoStack: state.redoStack.slice(-5),
       }),

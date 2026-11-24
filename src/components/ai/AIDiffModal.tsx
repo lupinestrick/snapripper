@@ -15,7 +15,6 @@ import {
   Check,
   FolderTree,
   PanelsTopLeft,
-  FileEdit,
   GitCommit,
   ListTree,
   Folder,
@@ -31,11 +30,8 @@ interface AIDiffModalProps {
 export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
   const {
     aiProcessedCache,
-    isPostEditMode,
     rootNodes,
     activeWindowId,
-    enterPostEditMode,
-    exitPostEditMode,
     updateProcessedTreeTarget,
     applySnapshotUpdate,
   } = useSnapshotStore();
@@ -75,10 +71,8 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
 
   const processedTabs = useMemo(() => {
     if (!aiProcessedCache) return [];
-    return isPostEditMode
-      ? flattenTabTree(rootNodes)
-      : aiProcessedCache.processedSnapshot.windows[activeWindowId]?.tabs || [];
-  }, [aiProcessedCache, isPostEditMode, rootNodes, activeWindowId]);
+    return aiProcessedCache.processedSnapshot.windows[activeWindowId]?.tabs || [];
+  }, [aiProcessedCache, activeWindowId]);
 
   const panelList = useMemo(() => {
     if (!aiProcessedCache) return [{ id: "main", name: "主面板" }];
@@ -122,11 +116,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
   );
 
   const beforeTree = buildTabTree(beforePanelTabs);
-  const afterTree = isPostEditMode
-    ? rootNodes.filter(
-        (n) => (n.tab.panelId || "main") === effectivePanelId || (!n.tab.panelId && effectivePanelId === "main")
-      )
-    : buildTabTree(afterPanelTabs);
+  const afterTree = buildTabTree(afterPanelTabs);
 
   // Identify new category groups created by AI in the active panel
   const newlyCreatedGroups = afterTree.filter(
@@ -143,17 +133,8 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     updateProcessedTreeTarget(selectedMode, panelId || undefined);
   };
 
-  const handleEnterPostEdit = () => {
-    enterPostEditMode();
-    onClose();
-  };
-
   const handleDirectApply = () => {
-    if (isPostEditMode) {
-      exitPostEditMode(true);
-    } else {
-      applySnapshotUpdate(aiProcessedCache.processedSnapshot, "应用 AI 比例重组");
-    }
+    applySnapshotUpdate(aiProcessedCache.processedSnapshot, "应用 AI 重构方案");
     onClose();
   };
 
@@ -213,9 +194,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                   变更确认
                 </Dialog.Title>
                 <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                  {isPostEditMode
-                    ? "正在对比工作台当前手动调整状态与重组前原始快照"
-                    : "已完成智能语义归类，请确认差分变更并选择重组应用方式"}
+                  已完成智能重构方案生成，请确认差分变更并选择重组应用方式
                 </div>
               </div>
             </div>
@@ -517,33 +496,15 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
               确认应用后写入快照树，可通过撤销按钮回滚。
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-              <Button
-                variant="outline"
-                size="sm"
-                pill
-                onClick={handleEnterPostEdit}
-                style={{
-                  borderColor: "var(--accent-solid)",
-                  color: "var(--accent-text)",
-                  fontWeight: 600,
-                }}
-                title="进入工作台可自由手动调整分类与结构"
-              >
-                <FileEdit size={14} />
-                <span>进入工作台微调 (Post Edit)</span>
-              </Button>
-
-              <Button
-                variant="solid"
-                size="sm"
-                pill
-                onClick={handleDirectApply}
-              >
-                <Check size={15} />
-                <span>确认应用修改</span>
-              </Button>
-            </div>
+            <Button
+              variant="solid"
+              size="sm"
+              pill
+              onClick={handleDirectApply}
+            >
+              <Check size={15} />
+              <span>确认应用修改</span>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Positioner>

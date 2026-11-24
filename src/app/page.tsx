@@ -7,7 +7,6 @@ import { StatsHeader } from "@/components/layout/StatsHeader";
 import { SearchFilter } from "@/components/editor/SearchFilter";
 import { TabTreeView } from "@/components/editor/TabTreeView";
 import { BatchBar } from "@/components/editor/BatchBar";
-import { PostEditBanner } from "@/components/editor/PostEditBanner";
 import { ProcessPage } from "@/components/process/ProcessPage";
 import { RulesPage } from "@/components/rules/RulesPage";
 import { AIPage } from "@/components/ai/AIPage";
@@ -155,7 +154,6 @@ export default function WorkbenchPage() {
           {activePage === "workbench" && (
             <>
               <StatsHeader />
-              <PostEditBanner />
               {rawSnapshot && <SearchFilter />}
               <TabTreeView />
               <BatchBar />

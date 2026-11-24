@@ -42,8 +42,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
     aiProcessedCache,
     setAiProcessedCache,
     setIsAIDiffModalOpen,
-    enterPostEditMode,
-    isPostEditMode,
   } = useSnapshotStore();
 
   const { rulesSettings, aiConfig } = useConfigStore();
@@ -170,10 +168,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
             uncategorizedCount: Math.max(0, totalAnalyzed - Object.keys(nextMap).length),
           },
         });
-
-        if (isPostEditMode) {
-          useSnapshotStore.setState({ rootNodes: processedTree });
-        }
       }
 
       alert(`已成功通过 AI 为「${cat.name}」聚拢并归入 ${matchedIds.length} 个相似标签页！`);
@@ -686,18 +680,6 @@ export function ProportionCard({ onStartClassification, onClose }: ProportionCar
               >
                 <GitCompare size={13} />
                 <span>DIFF 对比</span>
-              </Button>
-
-              <Button
-                variant="solid"
-                size="xs"
-                pill
-                onClick={enterPostEditMode}
-                style={{ backgroundColor: "var(--accent-solid)", color: "#fff" }}
-                title="进入工作台加载被 AI 处理后的数据"
-              >
-                <FileEdit size={13} />
-                <span>AI 处理后编辑 (Post Edit)</span>
               </Button>
             </>
           )}
