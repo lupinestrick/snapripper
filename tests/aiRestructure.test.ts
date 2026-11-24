@@ -570,6 +570,46 @@ Based on your tabs, here is the distribution:
     "diffEngine with crossPanelMerge: true merges tab 203 into panel_dev where most GitHub tabs reside"
   );
 
+  // 9.3 Domain Merge with crossPanelMerge
+  const domainDiffSnapshot: SideberySnapshot = {
+    id: "domain_diff_snap",
+    time: Date.now(),
+    windows: {
+      "1": {
+        tabs: [
+          { id: 301, panelId: "main", parentId: -1, lvl: 0, title: "ZodGame 1", url: "https://zodgame.xyz/thread-1" },
+          { id: 302, panelId: "panel_game", parentId: -1, lvl: 0, title: "ZodGame 2", url: "https://zodgame.xyz/thread-2" },
+          { id: 303, panelId: "panel_game", parentId: -1, lvl: 0, title: "ZodGame 3", url: "https://zodgame.xyz/thread-3" },
+        ],
+      },
+    },
+    panels: {
+      main: { id: "main", name: "主面板" },
+      panel_game: { id: "panel_game", name: "游戏面板" },
+    },
+    extensionBaseUrl: "moz-extension://test",
+  };
+
+  const domainDiffResult = computeSnapshotDiff(
+    domainDiffSnapshot,
+    {
+      enableDedup: false,
+      enableRules: false,
+      enableDomainMerge: true,
+      domainMergeConfig: { matchMode: "suffix", customPattern: "", minThreshold: 2 },
+      enableAICategorize: false,
+      scope: "all",
+      crossPanelMerge: true,
+    },
+    DEFAULT_RULES_SETTINGS
+  );
+
+  const domainMigratedTab = domainDiffResult.newSnapshot.windows["1"].tabs.find((t) => t.id === 301);
+  assert(
+    domainMigratedTab?.panelId === "panel_game",
+    "diffEngine with crossPanelMerge: true merges same-domain tabs into majority panel_game"
+  );
+
   // --- Test Set 10: Cookie Persistence & Cache Clearing ---
   let mockCookieStorage = "";
   (global as any).document = {

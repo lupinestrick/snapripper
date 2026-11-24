@@ -68,8 +68,10 @@ export function DiffHopupModal({
 
   // Calculate Git-style differences for current panel
   const afterTabIds = new Set(currentDiff?.afterTabs.map((t) => t.id));
+  const beforeTabIds = new Set(currentDiff?.beforeTabs.map((t) => t.id));
   const removedTabs = currentDiff?.beforeTabs.filter((t) => !afterTabIds.has(t.id)) || [];
   const newlyCreatedGroups = currentDiff?.afterTree.filter((n) => n.isGroup && n.id.startsWith("group_")) || [];
+  const movedInTabs = currentDiff?.afterTabs.filter((t) => !beforeTabIds.has(t.id) && !String(t.id).startsWith("group_")) || [];
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -222,7 +224,7 @@ export function DiffHopupModal({
           </div>
 
           {/* Diff Content View Area */}
-          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", overflow: "hidden" }}>
+          <div style={{ flex: 1, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", overflow: "hidden" }}>
             {/* Left: Before */}
             <div
               style={{
@@ -288,6 +290,7 @@ export function DiffHopupModal({
                   <GitDiffView
                     removedTabs={removedTabs}
                     newGroups={newlyCreatedGroups}
+                    movedInTabs={movedInTabs}
                     afterTabsCount={currentDiff?.afterTabs.length || 0}
                   />
                 ) : (
@@ -397,13 +400,15 @@ function DiffNodeItem({ node, isBefore }: { node: TabTreeNode; isBefore: boolean
 function GitDiffView({
   removedTabs,
   newGroups,
+  movedInTabs = [],
   afterTabsCount,
 }: {
   removedTabs: SideberyTab[];
   newGroups: TabTreeNode[];
+  movedInTabs?: SideberyTab[];
   afterTabsCount: number;
 }) {
-  const hasChanges = removedTabs.length > 0 || newGroups.length > 0;
+  const hasChanges = removedTabs.length > 0 || newGroups.length > 0 || movedInTabs.length > 0;
 
   if (!hasChanges) {
     return (
@@ -415,6 +420,43 @@ function GitDiffView({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+      {/* Moved In Tabs from other panels (Blue / Cyan +) */}
+      {movedInTabs.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent-text)", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+            <span>↳ 跨面板并入标签 ({movedInTabs.length} 个)</span>
+          </div>
+          {movedInTabs.map((tab) => {
+            const domain = extractDomain(tab.url);
+            return (
+              <div
+                key={tab.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  padding: "0.35rem 0.6rem",
+                  borderRadius: "0.375rem",
+                  backgroundColor: "var(--accent-subtle)",
+                  border: "1px solid var(--accent-border)",
+                  color: "var(--text-main)",
+                  fontSize: "0.78rem",
+                }}
+              >
+                <span style={{ fontWeight: 700, color: "var(--accent)", flexShrink: 0 }}>+</span>
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {tab.title || tab.url}
+                </span>
+                {domain && (
+                  <span style={{ fontSize: "0.68rem", opacity: 0.7, flexShrink: 0 }}>
+                    {domain}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {/* Removed Tabs (Red -) */}
       {removedTabs.length > 0 && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>

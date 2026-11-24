@@ -106,7 +106,7 @@ export function AIPage() {
 
     try {
       const diagnosticSummary = generateSnapshotDiagnosticSummary(allTabs, rawSnapshot.panels);
-      setStatusText(`正在连接 AI 模型 (${aiConfig.model || currentProviderDef.model})...`);
+      setStatusText(`thinking (${aiConfig.model || currentProviderDef.model})...`);
 
       const history = [...aiChatMessages, userMsg].map((m) => ({
         role: m.sender as "user" | "assistant" | "system",
@@ -382,11 +382,6 @@ export function AIPage() {
                   )}
                 </Button>
 
-                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
-                  {rawSnapshot && allTabs.length > 0
-                    ? "一键进行全库健康度诊断，并由 AI 生成多套重构方案选项"
-                    : "载入快照后点击一键分析"}
-                </span>
               </div>
             </div>
           )}
@@ -583,10 +578,6 @@ export function AIPage() {
                 <span>Sidebery 折叠组</span>
               </button>
             </div>
-
-            <span style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
-              Shift + Enter 换行
-            </span>
           </div>
 
           {/* Capsule Input Box */}
@@ -613,7 +604,7 @@ export function AIPage() {
                   handleSendMessage();
                 }
               }}
-              placeholder="给 AI 架构师发送消息 (例如：把游戏和动漫分开，为开发项目建折叠组)..."
+              placeholder="输入文本..."
               disabled={isGenerating || !rawSnapshot}
               style={{
                 flex: 1,

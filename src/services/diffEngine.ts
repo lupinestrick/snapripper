@@ -1,7 +1,7 @@
 import { SideberySnapshot, SideberyTab, TabTreeNode, PanelDiffResult, RulesSettings } from "@/types/sidebery";
 import { buildTabTree, flattenTabTree } from "./snapshotParser";
 import { applyRulesToTreeNodes, deduplicateTreeNodes, matchTabWithRule } from "./ruleEngine";
-import { applyDomainMergeToTreeNodes, DomainMergeConfig } from "./domainMergeEngine";
+import { applyDomainMergeToTreeNodes, DomainMergeConfig, extractDomainByMode } from "./domainMergeEngine";
 import { reorganizeTreeIntoCategories, determineTargetPanelForCategory } from "./treeOperations";
 import { isExemptUrl } from "@/utils/urlHelper";
 
@@ -98,6 +98,35 @@ export function computeSnapshotDiff(
         }
       }
     }
+
+    // 3. 同域名跨面板聚合
+    if (options.enableDomainMerge && options.domainMergeConfig) {
+      const domainMap = new Map<string, SideberyTab[]>();
+      for (const tab of allTabs) {
+        const pId = tab.panelId || "main";
+        if (effectivePanelIds && !effectivePanelIds.has(pId)) continue;
+        if (tab.pinned || isExemptUrl(tab.url, tab.pinned)) continue;
+        const domain = extractDomainByMode(
+          tab.url,
+          options.domainMergeConfig.matchMode,
+          options.domainMergeConfig.customPattern
+        );
+        if (domain) {
+          if (!domainMap.has(domain)) domainMap.set(domain, []);
+          domainMap.get(domain)!.push(tab);
+        }
+      }
+
+      const threshold = options.domainMergeConfig.minThreshold || 2;
+      for (const [, tabs] of domainMap.entries()) {
+        if (tabs.length >= threshold) {
+          const targetPanel = determineTargetPanelForCategory(tabs, tabs[0]?.panelId || "main");
+          for (const tab of tabs) {
+            tab.panelId = targetPanel;
+          }
+        }
+      }
+    }
   }
 
   // Group tabs by panelId
@@ -140,7 +169,19 @@ export function computeSnapshotDiff(
         totalDeduped += panelDeduped;
       }
 
-      // 2. Same-Domain Tabs Merge
+      // 2. Rule-based clustering (Prioritize semantic rules over general domain grouping)
+      if (options.enableRules) {
+        const ruleResult = applyRulesToTreeNodes(
+          currentTree,
+          rulesSettings,
+          snapshot.extensionBaseUrl || "moz-extension://sidebery-placeholder"
+        );
+        currentTree = ruleResult.newNodes;
+        panelGroupsCreated += ruleResult.groupsCreated;
+        totalGroupsCreated += ruleResult.groupsCreated;
+      }
+
+      // 3. Same-Domain Tabs Merge (applied to remaining unassigned tabs)
       if (options.enableDomainMerge && options.domainMergeConfig) {
         const domainResult = applyDomainMergeToTreeNodes(
           currentTree,
@@ -156,18 +197,6 @@ export function computeSnapshotDiff(
         currentTree = domainResult.newNodes;
         panelGroupsCreated += domainResult.groupsCreated;
         totalGroupsCreated += domainResult.groupsCreated;
-      }
-
-      // 3. Rule-based clustering
-      if (options.enableRules) {
-        const ruleResult = applyRulesToTreeNodes(
-          currentTree,
-          rulesSettings,
-          snapshot.extensionBaseUrl || "moz-extension://sidebery-placeholder"
-        );
-        currentTree = ruleResult.newNodes;
-        panelGroupsCreated += ruleResult.groupsCreated;
-        totalGroupsCreated += ruleResult.groupsCreated;
       }
 
       // 4. AI-based category clustering
