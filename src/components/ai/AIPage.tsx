@@ -14,6 +14,7 @@ import { AI_PROVIDERS, ReorganizationScheme, AIChatMessage } from "@/types/ai";
 import { SchemeCard } from "./SchemeCard";
 import { MarkdownView } from "./MarkdownView";
 import { Button } from "@/components/ui/button";
+import { INITIAL_ARCHITECT_ANALYSIS_PROMPT } from "@/constants/aiPrompts";
 import {
   Bot,
   User,
@@ -28,40 +29,6 @@ import {
   ChevronDown,
   Layers,
 } from "lucide-react";
-
-interface SuggestionCard {
-  title: string;
-  desc: string;
-  prompt: string;
-  icon: string;
-}
-
-const DEFAULT_SUGGESTIONS: SuggestionCard[] = [
-  {
-    icon: "🧠",
-    title: "生命周期流转诊断",
-    desc: "排查垃圾桶面板与标签囤积瓶颈",
-    prompt: "请从 GTD 标签消费生命周期与治理囤积症的视角，对当前快照进行深度诊断并推荐重构方案。",
-  },
-  {
-    icon: "💾",
-    title: "识别待下载与转存",
-    desc: "归集同人、音频与资源，准备批量关闭",
-    prompt: "请帮我把快照中所有的同人、音频、网盘与资源类标签单独归集到待下载归档区，以便批量转存后关闭释放内存。",
-  },
-  {
-    icon: "🔨",
-    title: "活跃工程与进行中",
-    desc: "将散落在各处的刷机与开发项目聚合",
-    prompt: "请为我梳理出当前活跃的软硬件刷机、开发与攻略等进行中项目，并独立分组。",
-  },
-  {
-    icon: "🗂️",
-    title: "常驻参考与折叠组",
-    desc: "高频百科、文档速查与后台建立折叠组",
-    prompt: "请规划一套常驻工具与参考知识库，并使用 Sidebery 原生折叠组收拢 80% 高度。",
-  },
-];
 
 export function AIPage() {
   const {
@@ -356,7 +323,7 @@ export function AIPage() {
                   color: "var(--text-main)",
                 }}
               >
-                今天想如何整理你的标签页？
+                Sidebery 智能架构师
               </h2>
 
               {rawSnapshot ? (
@@ -365,67 +332,61 @@ export function AIPage() {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: "0.5rem",
-                    fontSize: "0.78rem",
+                    fontSize: "0.8rem",
                     color: "var(--text-muted)",
-                    marginBottom: "1.75rem",
+                    marginBottom: "1.5rem",
                   }}
                 >
-                  <Layers size={13} style={{ color: "var(--accent)" }} />
+                  <Layers size={14} style={{ color: "var(--accent)" }} />
                   <span>已载入：{allTabs.length} 标签 · {panelCount} 面板</span>
                 </div>
               ) : (
-                <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "1.75rem" }}>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "1.5rem" }}>
                   请在工作台导入 Sidebery 快照 JSON
                 </p>
               )}
 
-              {/* 2x2 Suggestion Cards */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                  gap: "0.75rem",
-                  width: "100%",
-                }}
-              >
-                {DEFAULT_SUGGESTIONS.map((s, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSendMessage(s.prompt)}
-                    disabled={isGenerating || !rawSnapshot}
-                    style={{
-                      padding: "0.85rem 1rem",
-                      borderRadius: "0.875rem",
-                      backgroundColor: "var(--bg-surface)",
-                      border: "1px solid var(--border-subtle)",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      transition: "all 0.15s ease",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.25rem",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = "var(--accent-border)";
-                      e.currentTarget.style.backgroundColor = "var(--bg-card)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = "var(--border-subtle)";
-                      e.currentTarget.style.backgroundColor = "var(--bg-surface)";
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                      <span style={{ fontSize: "0.95rem" }}>{s.icon}</span>
-                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                        {s.title}
-                      </span>
-                    </div>
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                      {s.desc}
-                    </span>
-                  </button>
-                ))}
+              {/* Prominent Analyze Tabs Action Button */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
+                <Button
+                  variant="solid"
+                  size="md"
+                  pill
+                  onClick={() => handleSendMessage(INITIAL_ARCHITECT_ANALYSIS_PROMPT)}
+                  disabled={isGenerating || !rawSnapshot || allTabs.length === 0}
+                  style={{
+                    backgroundColor: "var(--accent-solid)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: "0.95rem",
+                    padding: "0.75rem 2.25rem",
+                    boxShadow: "0 4px 16px rgba(233, 61, 130, 0.25)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    cursor: (!rawSnapshot || allTabs.length === 0 || isGenerating) ? "not-allowed" : "pointer",
+                    opacity: (!rawSnapshot || allTabs.length === 0) ? 0.6 : 1,
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>正在分析标签页结构...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={18} />
+                      <span>分析标签页</span>
+                    </>
+                  )}
+                </Button>
+
+                <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
+                  {rawSnapshot && allTabs.length > 0
+                    ? "一键进行全库健康度诊断，并由 AI 生成多套重构方案选项"
+                    : "载入快照后点击一键分析"}
+                </span>
               </div>
             </div>
           )}

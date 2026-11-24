@@ -10,6 +10,7 @@ import {
   applySchemeToSnapshot,
   getFallbackSchemes,
 } from "../src/services/aiArchitectEngine";
+import { INITIAL_ARCHITECT_ANALYSIS_PROMPT, DEFAULT_AI_ARCHITECT_PROMPT } from "../src/constants/aiPrompts";
 import {
   setCookie,
   getCookie,
@@ -636,11 +637,13 @@ Based on your tabs, here is the distribution:
   assert(diag.panels.emptyPanelNames[0] === "闲置空面板", "generateSnapshotDiagnosticSummary identifies correct empty panel name");
   assert(diag.topDomainClusters.length >= 4, "generateSnapshotDiagnosticSummary groups top domain clusters");
 
-  // 11.2 Fallback schemes
+  // 11.2 Fallback schemes and prompts
   const fallbackSchemes = getFallbackSchemes(sampleArchitectTabs);
-  assert(fallbackSchemes.length >= 2, "getFallbackSchemes returns multiple architectures");
+  assert(fallbackSchemes.length >= 3, "getFallbackSchemes returns at least 3 distinct architectures");
   assert(fallbackSchemes[0].categories.length >= 3, "Fallback scheme contains structured categories");
   assert(fallbackSchemes[0].categories[0].matchDomains?.includes("github.com"), "Fallback scheme maps github.com to dev category");
+  assert(INITIAL_ARCHITECT_ANALYSIS_PROMPT.includes("结构分析与健康诊断"), "INITIAL_ARCHITECT_ANALYSIS_PROMPT contains diagnostic instructions");
+  assert(DEFAULT_AI_ARCHITECT_PROMPT.includes("快照健康诊断与架构痛点"), "DEFAULT_AI_ARCHITECT_PROMPT contains structured markdown instructions");
 
   // 11.3 Apply scheme to snapshot
   const rawTestSnapshot: SideberySnapshot = {
