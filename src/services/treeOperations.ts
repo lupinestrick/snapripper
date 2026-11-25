@@ -1,5 +1,5 @@
 import { SideberyTab, TabTreeNode, SideberyPanel, SideberyContainer } from "@/types/sidebery";
-import { cleanUrlForAI } from "@/utils/urlHelper";
+import { cleanUrlForAI, isExemptUrl } from "@/utils/urlHelper";
 
 export function filterTree(
   nodes: TabTreeNode[],
@@ -385,4 +385,52 @@ export function reorganizeTabsIntoPanels(
   });
 
   return { tabs: updatedTabs, panels };
+}
+
+export function deduplicateTreeNodes(nodes: TabTreeNode[]): {
+  newNodes: TabTreeNode[];
+  removedCount: number;
+} {
+  const seenUrls = new Set<string>();
+  let removedCount = 0;
+
+  function processList(list: TabTreeNode[]): TabTreeNode[] {
+    const filtered: TabTreeNode[] = [];
+
+    for (const node of list) {
+      if (node.isGroup) {
+        const cleanedChildren = processList(node.children);
+        filtered.push({
+          ...node,
+          children: cleanedChildren,
+        });
+        continue;
+      }
+
+      const normalized = (node.tab.url || "").replace(/#.*$/, "").trim();
+      if (!normalized || isExemptUrl(normalized, node.tab.pinned)) {
+        filtered.push(node);
+        continue;
+      }
+
+      if (seenUrls.has(normalized)) {
+        removedCount += 1;
+        continue;
+      }
+
+      seenUrls.add(normalized);
+      const cleanedChildren = processList(node.children);
+      filtered.push({
+        ...node,
+        children: cleanedChildren,
+      });
+    }
+
+    return filtered;
+  }
+
+  return {
+    newNodes: processList(nodes),
+    removedCount,
+  };
 }

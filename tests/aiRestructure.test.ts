@@ -1,7 +1,14 @@
 import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
 import { CategoryProportion, AIConfig } from "../src/types/ai";
 import { buildProcessedSnapshot, useSnapshotStore } from "../src/store/useSnapshotStore";
-import { matchTabWithRule, DEFAULT_RULES_SETTINGS } from "../src/services/ruleEngine";
+import {
+  matchTabWithRule,
+  DEFAULT_RULES_SETTINGS,
+  normalizeRuleToDSL,
+  previewRulesOnTabs,
+  applyRulesToTreeNodes,
+} from "../src/services/ruleEngine";
+import { buildTabTree } from "../src/services/snapshotParser";
 import { determineTargetPanelForCategory } from "../src/services/treeOperations";
 import { isGroupTab, getGroupTitle } from "../src/services/snapshotParser";
 import { computeSnapshotDiff } from "../src/services/diffEngine";
@@ -9,7 +16,12 @@ import {
   generateSnapshotDiagnosticSummary,
   applySchemeToSnapshot,
   getFallbackSchemes,
+  computeSchemeCoverage,
 } from "../src/services/aiArchitectEngine";
+import {
+  clusterSnapshotTabs,
+  tokenizeTabText,
+} from "../src/services/tabClusterEngine";
 import { INITIAL_ARCHITECT_ANALYSIS_PROMPT, DEFAULT_AI_ARCHITECT_PROMPT } from "../src/constants/aiPrompts";
 import {
   setCookie,
@@ -27,10 +39,12 @@ import {
   normalizeAnthropicModelsUrl,
   normalizeOpenAIChatUrl,
   normalizeOpenAIModelsUrl,
+  normalizeGeminiEndpoint,
   getAPIKeySlot,
   resolveAPIKey,
   resolveBaseURL,
   resolveModel,
+  getProviderMeta,
 } from "../src/services/aiService";
 
 export function runAIRestructureTests(): { passed: number; failed: number } {
@@ -610,6 +624,58 @@ Based on your tabs, here is the distribution:
     "diffEngine with crossPanelMerge: true merges same-domain tabs into majority panel_game"
   );
 
+  // 9.3 Local Cluster Pipeline & Current-Panel Scope
+  const clusterPipelineSnapshot: SideberySnapshot = {
+    id: "snap_clu_pipe",
+    time: Date.now(),
+    windows: {
+      "1": {
+        tabs: [
+          { id: 401, panelId: "main", parentId: -1, lvl: 0, title: "OpenWrt Router Setup", url: "https://forum.example.org/openwrt" },
+          { id: 402, panelId: "main", parentId: -1, lvl: 0, title: "OpenWrt Firmware Releases", url: "https://downloads.example.net/openwrt" },
+          { id: 403, panelId: "panel_other", parentId: -1, lvl: 0, title: "Other A", url: "https://other-a.com/1" },
+          { id: 404, panelId: "panel_other", parentId: -1, lvl: 0, title: "Other A Duplicate", url: "https://other-a.com/1" },
+        ],
+      },
+    },
+    panels: {
+      main: { id: "main", name: "主面板" },
+      panel_other: { id: "panel_other", name: "其他面板" },
+    },
+    extensionBaseUrl: "moz-extension://test",
+  };
+
+  const scopedClusterResult = computeSnapshotDiff(
+    clusterPipelineSnapshot,
+    {
+      enableDedup: true,
+      enableRules: false,
+      enableDomainMerge: false,
+      enableLocalCluster: true,
+      clusterGranularity: "balanced",
+      enableAICategorize: false,
+      scope: "current",
+      currentActivePanelId: "main",
+      crossPanelMerge: false,
+      createGroupTabs: true,
+    },
+    DEFAULT_RULES_SETTINGS
+  );
+
+  assert(
+    scopedClusterResult.totalDeduped === 0,
+    "computeSnapshotDiff with scope: current skips dedup in non-active panels"
+  );
+  assert(
+    scopedClusterResult.totalGroupsCreated >= 1,
+    "computeSnapshotDiff with enableLocalCluster creates Sidebery group for cross-domain topic tabs"
+  );
+  const mainPanelDiff = scopedClusterResult.panelDiffs.find((p) => p.panelId === "main");
+  assert(
+    Boolean(mainPanelDiff?.afterTree.some((n) => n.isGroup && String(n.id).startsWith("group_clu_"))),
+    "Local cluster node carries group_clu_ native Sidebery group ID"
+  );
+
   // --- Test Set 10: Cookie Persistence & Cache Clearing ---
   let mockCookieStorage = "";
   (global as any).document = {
@@ -653,14 +719,18 @@ Based on your tabs, here is the distribution:
   assert(useSnapshotStore.getState().rootNodes.length === 0, "clearAllCache resets rootNodes to empty array");
   assert(getSnapshotCookieInfo() === null, "clearAllCache clears cookies");
 
-  // --- Test Set 11: AI Architect Engine & Reorganization Schemes ---
+  // --- Test Set 11: Option B Local Pre-Clustering & AI Architect Engine ---
   const sampleArchitectTabs: SideberyTab[] = [
-    { id: "t1", url: "https://github.com/facebook/react", title: "React GitHub", panelId: "p_dev", parentId: -1 },
-    { id: "t2", url: "https://dlsite.com/work/RJ123456", title: "音声作品 | DLsite", panelId: "p_main", parentId: -1 },
-    { id: "t3", url: "https://erogamescape.dyndns.org/game/1", title: "批评空间评分", panelId: "p_main", parentId: -1 },
-    { id: "t4", url: "https://booth.pm/items/999", title: "3D 模型 | Booth", panelId: "p_main", parentId: -1 },
-    { id: "t5", url: "https://reddit.com/r/webdev", title: "Webdev on Reddit", panelId: "p_dev", parentId: -1 },
+    { id: "t1", url: "https://github.com/openwrt/openwrt", title: "OpenWrt GitHub Source", panelId: "p_dev", parentId: -1 },
+    { id: "t2", url: "https://forum.example.org/openwrt-guide", title: "OpenWrt 刷机固件教程", panelId: "p_main", parentId: -1 },
+    { id: "t3", url: "https://docs.python.org/3/library/asyncio", title: "Python Asyncio Docs", panelId: "p_dev", parentId: -1 },
+    { id: "t4", url: "https://docs.python.org/3/library/typing", title: "Python Typing Docs", panelId: "p_dev", parentId: -1 },
+    { id: "t5", url: "https://shop.example.com/item/99", title: "3D Model Asset", panelId: "p_main", parentId: -1 },
     { id: "t6", url: "about:config", title: "Firefox Config", pinned: true, panelId: "p_main", parentId: -1 },
+    // Native group subtree
+    { id: "grp_1", url: "moz-extension://test/sidebery/group.html#ProjectGroup", title: "ProjectGroup", isGroup: true, panelId: "p_main", parentId: -1, lvl: 0 },
+    { id: "t7", url: "https://linear.app/issue/101", title: "Linear Issue 101", panelId: "p_main", parentId: "grp_1", lvl: 1 },
+    { id: "t8", url: "https://figma.com/file/abc", title: "UI Mockup", panelId: "p_main", parentId: "grp_1", lvl: 1 },
   ];
   const samplePanels = {
     p_dev: { id: "p_dev", name: "开发面板" },
@@ -668,24 +738,51 @@ Based on your tabs, here is the distribution:
     p_empty: { id: "p_empty", name: "闲置空面板" },
   };
 
-  // 11.1 Diagnostic summary
+  // 11.1 Tokenizer & Local Unsupervised Clustering Engine
+  const tokens = tokenizeTabText("OpenWrt 刷机固件教程 Router Setup");
+  assert(tokens.includes("openwrt") && tokens.includes("刷机"), "tokenizeTabText extracts both ASCII and CJK tokens");
+
+  const clusterReport = clusterSnapshotTabs(sampleArchitectTabs, samplePanels as any, "balanced");
+  assert(clusterReport.totalTabs === 9, "clusterSnapshotTabs counts total tabs accurately");
+  assert(clusterReport.nonExemptCount === 8, "clusterSnapshotTabs preserves native group subtree and filters exempt pinned tab");
+  assert(clusterReport.exemptProtectedCount === 1, "clusterSnapshotTabs counts exempt pinned tab");
+  assert(clusterReport.emptyPanelNames[0] === "闲置空面板", "clusterSnapshotTabs identifies empty panels");
+
+  const assignedTabIds = new Set(clusterReport.clusters.flatMap((c) => c.tabIds));
+  assert(assignedTabIds.size === 8, "clusterSnapshotTabs achieves 100% coverage of all non-exempt tabs (zero blind spots)");
+
+  const groupSubtreeCluster = clusterReport.clusters.find((c) => c.cohesionReason === "group_subtree");
+  assert(
+    Boolean(groupSubtreeCluster && groupSubtreeCluster.tabIds.includes("grp_1") && groupSubtreeCluster.tabIds.includes("t7") && groupSubtreeCluster.tabIds.includes("t8")),
+    "clusterSnapshotTabs keeps native Sidebery group subtree intact inside a single micro-cluster"
+  );
+
+  // Semantic cross-domain merge (t1 github openwrt + t2 forum openwrt)
+  const openwrtCluster = clusterReport.clusters.find(
+    (c) => c.tabIds.includes("t1") && c.tabIds.includes("t2")
+  );
+  assert(
+    Boolean(openwrtCluster && openwrtCluster.cohesionReason === "semantic_topic"),
+    "clusterSnapshotTabs merges cross-domain tabs sharing topic tokens into semantic_topic cluster"
+  );
+
+  // 11.2 Diagnostic summary JSON format
   const diagSummaryJson = generateSnapshotDiagnosticSummary(sampleArchitectTabs, samplePanels as any);
   const diag = JSON.parse(diagSummaryJson);
-  assert(diag.totalTabs === 6, "generateSnapshotDiagnosticSummary counts total tabs correctly");
-  assert(diag.nonExemptCount === 5, "generateSnapshotDiagnosticSummary filters exempt pinned tab");
-  assert(diag.panels.emptyPanelsCount === 1, "generateSnapshotDiagnosticSummary detects empty panel");
-  assert(diag.panels.emptyPanelNames[0] === "闲置空面板", "generateSnapshotDiagnosticSummary identifies correct empty panel name");
-  assert(diag.topDomainClusters.length >= 4, "generateSnapshotDiagnosticSummary groups top domain clusters");
+  assert(diag.overview?.totalTabs === 9, "generateSnapshotDiagnosticSummary outputs Option B overview");
+  assert(Array.isArray(diag.microClusters) && diag.microClusters.length === clusterReport.clusters.length, "generateSnapshotDiagnosticSummary embeds full microClusters digest");
 
-  // 11.2 Fallback schemes and prompts
-  const fallbackSchemes = getFallbackSchemes(sampleArchitectTabs);
-  assert(fallbackSchemes.length >= 3, "getFallbackSchemes returns at least 3 distinct architectures");
-  assert(fallbackSchemes[0].categories.length >= 3, "Fallback scheme contains structured categories");
-  assert(fallbackSchemes[0].categories[0].matchDomains?.includes("github.com"), "Fallback scheme maps github.com to dev category");
-  assert(INITIAL_ARCHITECT_ANALYSIS_PROMPT.includes("结构分析与健康诊断"), "INITIAL_ARCHITECT_ANALYSIS_PROMPT contains diagnostic instructions");
-  assert(DEFAULT_AI_ARCHITECT_PROMPT.includes("快照健康诊断与架构痛点"), "DEFAULT_AI_ARCHITECT_PROMPT contains structured markdown instructions");
+  // 11.3 Dynamic Option B fallback schemes & prompt checks
+  const fallbackSchemes = getFallbackSchemes(sampleArchitectTabs, clusterReport, "balanced");
+  assert(fallbackSchemes.length === 3, "getFallbackSchemes returns 3 dynamic Option B architectures");
+  assert(fallbackSchemes[0].categories.some((c) => (c.clusterIds?.length || 0) > 0), "Dynamic fallback schemes populate clusterIds directly");
+  assert(INITIAL_ARCHITECT_ANALYSIS_PROMPT.includes("microClusters"), "INITIAL_ARCHITECT_ANALYSIS_PROMPT references microClusters");
+  assert(DEFAULT_AI_ARCHITECT_PROMPT.includes("clusterIds"), "DEFAULT_AI_ARCHITECT_PROMPT instructs clusterIds mapping");
 
-  // 11.3 Apply scheme to snapshot
+  const cov = computeSchemeCoverage(fallbackSchemes[0], clusterReport);
+  assert(cov.coveragePct === 100, `Scheme A dynamic cluster mapping achieves 100% coverage (got ${cov.coveragePct}%)`);
+
+  // 11.4 Apply Option B scheme & verify cluster exclusion + legacy fallback
   const rawTestSnapshot: SideberySnapshot = {
     id: "snap_arch_test",
     time: Date.now(),
@@ -695,21 +792,47 @@ Based on your tabs, here is the distribution:
     panels: samplePanels as any,
   };
 
-  const schemeToApply = fallbackSchemes[0];
-  const appliedCache = applySchemeToSnapshot(rawTestSnapshot, schemeToApply, {
+  const schemeWithExclusion = {
+    ...fallbackSchemes[0],
+    excludedClusterIds: groupSubtreeCluster ? [groupSubtreeCluster.id] : [],
+  };
+
+  const appliedCache = applySchemeToSnapshot(rawTestSnapshot, schemeWithExclusion, {
+    crossPanelMerge: true,
+    createGroupTabs: true,
+    targetMode: "tree",
+    clusterReport,
+  });
+
+  assert(appliedCache !== null, "applySchemeToSnapshot returns valid AIProcessedCache");
+  assert(appliedCache.summary.total === 9, "applySchemeToSnapshot preserves total tab count");
+  assert(!appliedCache.classificationMap["t7"], "excludedClusterIds prevents excluded cluster tabs from being recategorized");
+  assert(Boolean(appliedCache.classificationMap["t3"]), "Included domain cluster tabs are classified accurately via clusterIds");
+
+  // Backward-compatible rule-only scheme (without clusterIds) still works
+  const legacyRuleScheme = {
+    id: "legacy_rule",
+    name: "Legacy Rule Scheme",
+    strategy: "Domain fallback check",
+    categories: [
+      {
+        name: "🐍 Python Docs",
+        matchDomains: ["docs.python.org"],
+        createGroup: true,
+      },
+    ],
+  };
+  const legacyCache = applySchemeToSnapshot(rawTestSnapshot, legacyRuleScheme, {
     crossPanelMerge: true,
     createGroupTabs: true,
     targetMode: "tree",
   });
+  assert(
+    legacyCache.classificationMap["t3"] === "🐍 Python Docs" && legacyCache.classificationMap["t4"] === "🐍 Python Docs",
+    "applySchemeToSnapshot retains backward compatibility for matchDomains rule schemes"
+  );
 
-  assert(appliedCache !== null, "applySchemeToSnapshot returns valid AIProcessedCache");
-  assert(appliedCache.summary.total === 6, "applySchemeToSnapshot preserves total tab count");
-  assert(appliedCache.classificationMap["t1"] === "🔨 活跃工程与开发", "applySchemeToSnapshot matches GitHub tab to '🔨 活跃工程与开发'");
-  assert(appliedCache.classificationMap["t2"] === "💾 待下载转存·同人与资源", "applySchemeToSnapshot matches DLsite tab to '💾 待下载转存·同人与资源'");
-  assert(appliedCache.classificationMap["t3"] === "📚 常驻参考·游戏与模组", "applySchemeToSnapshot matches ErogameScape tab to '📚 常驻参考·游戏与模组'");
-  assert(appliedCache.classificationMap["t4"] === "🥽 虚拟工坊·3D资产与空间", "applySchemeToSnapshot matches Booth tab to '🥽 虚拟工坊·3D资产与空间'");
-
-  // 11.4 Chat state management in useSnapshotStore
+  // 11.5 Chat & 0-token Scheme update in useSnapshotStore
   useSnapshotStore.getState().clearAiChatMessages();
   assert(useSnapshotStore.getState().aiChatMessages.length === 0, "clearAiChatMessages resets chat history");
   useSnapshotStore.getState().addAiChatMessage({
@@ -718,8 +841,175 @@ Based on your tabs, here is the distribution:
     timestamp: Date.now(),
     text: "AI 架构师已就绪",
     schemes: fallbackSchemes,
+    clusterReport,
   });
-  assert(useSnapshotStore.getState().aiChatMessages.length === 1, "addAiChatMessage stores assistant message with schemes");
+  useSnapshotStore.getState().updateSchemeInChat("msg_1", schemeWithExclusion);
+  const updatedMsg = useSnapshotStore.getState().aiChatMessages[0];
+  assert(
+    (updatedMsg?.schemes?.[0].excludedClusterIds?.length || 0) === (groupSubtreeCluster ? 1 : 0),
+    "updateSchemeInChat persists 0-token micro-cluster edits in store"
+  );
+
+  // --- Test Set 12: Option B Condition-Action Rule DSL Engine ---
+  const dslTabs: SideberyTab[] = [
+    { id: "r1", panelId: "main", parentId: -1, lvl: 0, title: "Fix auth bug #42", url: "https://github.com/myorg/app/issues/42" },
+    { id: "r2", panelId: "main", parentId: -1, lvl: 0, title: "Closed old issue", url: "https://github.com/myorg/app/issues/10" },
+    { id: "r3", panelId: "main", parentId: -1, lvl: 0, title: "React Hooks API", url: "https://github.com/myorg/app/blob/main/README.md" },
+    { id: "r4", panelId: "main", parentId: -1, lvl: 0, title: "Open Issue #99", url: "https://github.com/myorg/app/issues/99" },
+  ];
+
+  const andRule = {
+    id: "dsl_open_issues",
+    name: "🐛 Open GitHub Issues",
+    enabled: true,
+    scope: "all" as const,
+    matchMode: "all" as const,
+    conditions: [
+      { id: "c1", field: "domain" as const, operator: "equals" as const, value: "github.com" },
+      { id: "c2", field: "urlPath" as const, operator: "contains" as const, value: "/issues" },
+      { id: "c3", field: "title" as const, operator: "notContains" as const, value: "closed" },
+    ],
+    action: { type: "groupAndMove" as const, targetPanelId: "panel_dev", createGroup: true },
+    minThreshold: 2,
+    color: "#3b82f6",
+  };
+
+  assert(matchTabWithRule(dslTabs[0], andRule), "DSL AND rule matches open GitHub issue");
+  assert(!matchTabWithRule(dslTabs[1], andRule), "DSL notContains excludes closed issue");
+  assert(!matchTabWithRule(dslTabs[2], andRule), "DSL urlPath excludes non-issue README page");
+
+  const normalizedLegacy = normalizeRuleToDSL({
+    id: "leg_1",
+    name: "Legacy",
+    enabled: true,
+    scope: "all",
+    matchDomain: "github.com",
+    minThreshold: 2,
+  });
+  assert(
+    normalizedLegacy.conditions?.[0]?.field === "domain" && normalizedLegacy.action?.type === "group",
+    "normalizeRuleToDSL migrates legacy matchDomain rule seamlessly"
+  );
+
+  const shadowRule = { ...andRule, id: "dsl_shadow", name: "Shadowed Rule" };
+  const previewMap = previewRulesOnTabs(dslTabs, [andRule, shadowRule]);
+  assert(
+    previewMap.get("dsl_open_issues")?.effectiveHits === 2 &&
+      previewMap.get("dsl_shadow")?.shadowedHits === 2,
+    "previewRulesOnTabs computes effectiveHits and shadowedHits conflicts accurately"
+  );
+
+  const exemptRule = {
+    id: "dsl_exempt_closed",
+    name: "Protect Closed",
+    enabled: true,
+    scope: "all" as const,
+    matchMode: "all" as const,
+    conditions: [{ id: "cx", field: "title" as const, operator: "regex" as const, value: "^closed" }],
+    action: { type: "exempt" as const },
+    minThreshold: 1,
+  };
+
+  const dslTree = buildTabTree(dslTabs);
+  const appliedDsl = applyRulesToTreeNodes(dslTree, {
+    treatExistingGroupsAsUnit: true,
+    defaultMinThreshold: 2,
+    createGroupTabs: true,
+    rules: [exemptRule, andRule],
+  });
+  assert(appliedDsl.groupsCreated === 1, "applyRulesToTreeNodes creates 1 group for open issues");
+  const createdGroupNode = appliedDsl.newNodes.find((n) => n.isGroup && n.categoryName === "🐛 Open GitHub Issues");
+  assert(
+    Boolean(createdGroupNode && createdGroupNode.tab.panelId === "panel_dev" && createdGroupNode.children.length === 2),
+    "groupAndMove action places group header and 2 children into target panel_dev"
+  );
+
+  // --- Test Set 13: AI Multi-Session Chat History ---
+  const store = useSnapshotStore.getState();
+  store.clearAllCache();
+  store.addAiChatMessage({
+    id: "h1",
+    sender: "user",
+    timestamp: Date.now(),
+    text: "分析第一份快照",
+  });
+  const firstSessionId = useSnapshotStore.getState().activeChatSessionId;
+  assert(Boolean(firstSessionId), "addAiChatMessage auto-creates active chat session");
+  assert(
+    useSnapshotStore.getState().aiChatSessions.length === 1,
+    "aiChatSessions stores created session"
+  );
+
+  useSnapshotStore.getState().renameAiChatSession(firstSessionId!, "工作区重构会话");
+  assert(
+    useSnapshotStore.getState().aiChatSessions[0].title === "工作区重构会话",
+    "renameAiChatSession updates session title"
+  );
+
+  useSnapshotStore.getState().startNewAiChat();
+  assert(
+    useSnapshotStore.getState().aiChatMessages.length === 0 &&
+      useSnapshotStore.getState().activeChatSessionId === null,
+    "startNewAiChat clears active messages while preserving previous session"
+  );
+
+  useSnapshotStore.getState().selectAiChatSession(firstSessionId!);
+  assert(
+    useSnapshotStore.getState().aiChatMessages.length === 1 &&
+      useSnapshotStore.getState().activeChatSessionId === firstSessionId,
+    "selectAiChatSession restores saved messages"
+  );
+
+  useSnapshotStore.getState().deleteAiChatSession(firstSessionId!);
+  assert(
+    useSnapshotStore.getState().aiChatSessions.length === 0 &&
+      useSnapshotStore.getState().aiChatMessages.length === 0,
+    "deleteAiChatSession removes session and clears active view"
+  );
+
+  // --- Test Set 14: Chinese AI Provider URL Normalization & Custom Provider Meta ---
+  assert(
+    normalizeOpenAIChatUrl("https://ark.cn-beijing.volces.com/api/v3") ===
+      "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+    "normalizeOpenAIChatUrl preserves Volcengine Ark /api/v3 without double /v1"
+  );
+  assert(
+    normalizeOpenAIChatUrl("https://open.bigmodel.cn/api/paas/v4") ===
+      "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+    "normalizeOpenAIChatUrl preserves Zhipu GLM /api/paas/v4 without double /v1"
+  );
+  assert(
+    normalizeOpenAIModelsUrl("https://qianfan.baidubce.com/v2") ===
+      "https://qianfan.baidubce.com/v2/models",
+    "normalizeOpenAIModelsUrl preserves Baidu Qianfan /v2"
+  );
+  assert(
+    normalizeGeminiEndpoint("https://proxy.example.com/v1beta", "gemini-2.5-flash", "generateContent", "k123") ===
+      "https://proxy.example.com/v1beta/models/gemini-2.5-flash:generateContent?key=k123",
+    "normalizeGeminiEndpoint supports custom Gemini relay base URL"
+  );
+  const customMeta = getProviderMeta(
+    {
+      provider: "custom_1",
+      baseURL: "https://api.siliconflow.cn/v1",
+      apiKey: "sk-1",
+      model: "Qwen/Qwen2.5-72B-Instruct",
+      customProviders: [
+        {
+          id: "custom_1",
+          name: "硅基流动",
+          type: "openai",
+          baseUrl: "https://api.siliconflow.cn/v1",
+          model: "Qwen/Qwen2.5-72B-Instruct",
+        },
+      ],
+    },
+    "custom_1"
+  );
+  assert(
+    customMeta.name === "硅基流动" && customMeta.isCustom,
+    "getProviderMeta resolves custom provider metadata accurately"
+  );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };

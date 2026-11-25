@@ -26,10 +26,14 @@ const PRESET_COLORS = [
 /**
  * URL 端点规范化工具函数：兼容 OpenAI 与 Anthropic 两类接口端点
  */
+function hasTrailingApiVersion(cleanUrl: string): boolean {
+  return /\/v\d+(?:alpha|beta|\.\d+)?$/i.test(cleanUrl);
+}
+
 export function normalizeAnthropicMessagesUrl(baseUrl: string): string {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (clean.endsWith("/messages")) return clean;
-  if (clean.endsWith("/v1")) return `${clean}/messages`;
+  if (hasTrailingApiVersion(clean)) return `${clean}/messages`;
   return `${clean}/v1/messages`;
 }
 
@@ -37,14 +41,14 @@ export function normalizeAnthropicModelsUrl(baseUrl: string): string {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (clean.endsWith("/models")) return clean;
   if (clean.endsWith("/messages")) return clean.replace(/\/messages$/, "/models");
-  if (clean.endsWith("/v1")) return `${clean}/models`;
+  if (hasTrailingApiVersion(clean)) return `${clean}/models`;
   return `${clean}/v1/models`;
 }
 
 export function normalizeOpenAIChatUrl(baseUrl: string): string {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (clean.endsWith("/chat/completions")) return clean;
-  if (clean.endsWith("/v1")) return `${clean}/chat/completions`;
+  if (hasTrailingApiVersion(clean)) return `${clean}/chat/completions`;
   return `${clean}/v1/chat/completions`;
 }
 
@@ -52,8 +56,66 @@ export function normalizeOpenAIModelsUrl(baseUrl: string): string {
   const clean = baseUrl.trim().replace(/\/+$/, "");
   if (clean.endsWith("/models")) return clean;
   if (clean.endsWith("/chat/completions")) return clean.replace(/\/chat\/completions$/, "/models");
-  if (clean.endsWith("/v1")) return `${clean}/models`;
+  if (hasTrailingApiVersion(clean)) return `${clean}/models`;
   return `${clean}/v1/models`;
+}
+
+export function normalizeGeminiEndpoint(
+  baseUrl: string,
+  model: string,
+  action: "generateContent" | "models",
+  apiKey?: string
+): string {
+  const clean = baseUrl.trim().replace(/\/+$/, "");
+  const versionedBase = hasTrailingApiVersion(clean) ? clean : `${clean}/v1beta`;
+  const path =
+    action === "models"
+      ? `${versionedBase}/models`
+      : `${versionedBase}/models/${encodeURIComponent(model)}:generateContent`;
+  if (apiKey) {
+    const sep = path.includes("?") ? "&" : "?";
+    return `${path}${sep}key=${encodeURIComponent(apiKey)}`;
+  }
+  return path;
+}
+
+/**
+ * 解析任意供应商（内置或用户自定义）的元数据定义
+ */
+export function getProviderMeta(
+  config: AIConfig | undefined,
+  providerId: string
+): {
+  id: string;
+  name: string;
+  baseUrl: string;
+  model: string;
+  models: string[];
+  type: AIProtocolType;
+  isCustom: boolean;
+} {
+  const custom = config?.customProviders?.find((c) => c.id === providerId);
+  if (custom) {
+    return {
+      id: custom.id,
+      name: custom.name,
+      baseUrl: custom.baseUrl,
+      model: custom.model,
+      models: custom.model ? [custom.model] : [],
+      type: custom.type || "openai",
+      isCustom: true,
+    };
+  }
+  const builtin = AI_PROVIDERS[providerId] || AI_PROVIDERS.custom;
+  return {
+    id: providerId,
+    name: builtin.name,
+    baseUrl: builtin.baseUrl,
+    model: builtin.model,
+    models: builtin.models || [],
+    type: builtin.type || "openai",
+    isCustom: providerId === "custom",
+  };
 }
 
 /**
@@ -82,6 +144,7 @@ export function resolveAPIKey(config: AIConfig): string {
  */
 export function resolveBaseURL(config: AIConfig): string {
   const slot = getAPIKeySlot(config.provider, config.type);
+  const meta = getProviderMeta(config, config.provider);
   if (config.baseURLs && config.baseURLs[slot] && !config.baseURLs[slot].includes("api.custome.ai")) {
     return config.baseURLs[slot].trim();
   }
@@ -91,7 +154,7 @@ export function resolveBaseURL(config: AIConfig): string {
     }
     return config.type === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1";
   }
-  return (config.baseURL || AI_PROVIDERS[config.provider]?.baseUrl || "").trim();
+  return (config.baseURL || meta.baseUrl || "").trim();
 }
 
 /**
@@ -99,6 +162,7 @@ export function resolveBaseURL(config: AIConfig): string {
  */
 export function resolveModel(config: AIConfig): string {
   const slot = getAPIKeySlot(config.provider, config.type);
+  const meta = getProviderMeta(config, config.provider);
   if (config.models && config.models[slot] && config.models[slot].trim()) {
     return config.models[slot].trim();
   }
@@ -111,25 +175,162 @@ export function resolveModel(config: AIConfig): string {
   if (config.model && config.model.trim()) {
     return config.model.trim();
   }
-  return (AI_PROVIDERS[config.provider]?.model || "gpt-4o-mini").trim();
+  return (meta.model || "gpt-4o-mini").trim();
 }
 
 /**
- * 统一多协议模型通信驱动 (OpenAI, Anthropic Claude, Google Gemini)
+ * 获取当前槽位的有序可用模型列表：置顶模型排在最前，依次合并预设模型、缓存模型与当前选中模型
  */
-export async function sendAIChatRequest(
+export function getOrderedModelsForSlot(
+  config: AIConfig,
+  extraModels: string[] = []
+): string[] {
+  const slot = getAPIKeySlot(config.provider, config.type);
+  const meta = getProviderMeta(config, config.provider);
+  const pinned = config.pinnedModels?.[slot] || [];
+  const cached = config.cachedModels?.[slot] || [];
+  const presetModels = meta.models || [];
+  const currentModel = (config.model || "").trim();
+
+  const merged = Array.from(
+    new Set([
+      ...pinned,
+      ...(currentModel ? [currentModel] : []),
+      ...extraModels,
+      ...cached,
+      ...presetModels,
+    ].map((m) => m.trim()).filter(Boolean))
+  );
+
+  const pinnedSet = new Set(pinned);
+  return [
+    ...merged.filter((m) => pinnedSet.has(m)),
+    ...merged.filter((m) => !pinnedSet.has(m)),
+  ];
+}
+
+export interface AIChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+function normalizeMultiTurnMessages(messages: AIChatTurn[]): AIChatTurn[] {
+  const cleaned: AIChatTurn[] = [];
+  for (const m of messages) {
+    const text = (m.content || "").trim();
+    if (!text) continue;
+    const prev = cleaned[cleaned.length - 1];
+    if (prev && prev.role === m.role) {
+      prev.content = `${prev.content}\n\n${text}`;
+    } else {
+      cleaned.push({ role: m.role, content: text });
+    }
+  }
+  if (cleaned.length > 0 && cleaned[0].role !== "user") {
+    cleaned.unshift({ role: "user", content: "请开始分析。" });
+  }
+  return cleaned;
+}
+
+function isLocalEndpoint(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "0.0.0.0" ||
+      host.startsWith("192.168.") ||
+      host.startsWith("10.")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 智能传输层：在浏览器端自动通过 Next.js 服务端代理 (/api/ai/proxy) 彻底绕过国内厂商 CORS 限制；
+ * 本地局域网端点 (Ollama) 或无服务端环境自动降级为直连 fetch。
+ */
+async function smartFetch(
+  url: string,
+  init: {
+    method?: "GET" | "POST";
+    headers?: Record<string, string>;
+    body?: string;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  }
+): Promise<Response> {
+  const canUseProxy = typeof window !== "undefined" && !isLocalEndpoint(url);
+
+  if (canUseProxy) {
+    try {
+      const proxyRes = await fetch("/api/ai/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url,
+          method: init.method || "POST",
+          headers: init.headers || {},
+          body: init.body,
+          timeoutMs: init.timeoutMs || 90000,
+        }),
+        signal: init.signal,
+      });
+
+      // 若部署在无服务端路由的纯静态环境中返回 404/405，自动回退直连
+      if (proxyRes.status !== 404 && proxyRes.status !== 405) {
+        return proxyRes;
+      }
+    } catch (proxyErr: any) {
+      if (proxyErr?.name === "AbortError") throw proxyErr;
+      // 代理不可达时平滑回退直连
+    }
+  }
+
+  return fetch(url, {
+    method: init.method || "POST",
+    headers: init.headers,
+    body: init.body,
+    signal: init.signal,
+  });
+}
+
+function extractReadableAIError(status: number, rawText: string): string {
+  try {
+    const json = JSON.parse(rawText);
+    const msg =
+      json?.error?.message ||
+      json?.base_resp?.status_msg ||
+      json?.msg ||
+      json?.message ||
+      json?.detail;
+    if (typeof msg === "string" && msg.trim()) {
+      return `HTTP ${status}: ${msg.trim().slice(0, 220)}`;
+    }
+  } catch {
+    // plain text fallback
+  }
+  return `HTTP ${status}${rawText ? `: ${rawText.slice(0, 200)}` : ""}`;
+}
+
+/**
+ * 统一多协议多轮对话模型通信驱动 (OpenAI Compatible, Anthropic Claude, Google Gemini)
+ */
+export async function sendAIConversationRequest(
   config: AIConfig,
   systemPrompt: string,
-  userPrompt: string
+  messages: AIChatTurn[]
 ): Promise<string> {
-  const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
-  const protocol = config.type || providerDef.type || "openai";
+  const providerMeta = getProviderMeta(config, config.provider);
+  const protocol = config.type || providerMeta.type || "openai";
   const apiKey = resolveAPIKey(config);
   const model = resolveModel(config);
   const baseUrl = resolveBaseURL(config);
+  const turns = normalizeMultiTurnMessages(messages);
 
   const controller = new AbortController();
-  const timeoutMs = 90000; // 90 秒超时控制，避免网络死等
+  const timeoutMs = 90000;
   const timeoutId = setTimeout(() => {
     controller.abort();
   }, timeoutMs);
@@ -144,11 +345,9 @@ export async function sendAIChatRequest(
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         "anthropic-version": "2023-06-01",
-        "dangerously-allow-browser": "true",
       };
       if (apiKey) {
         headers["x-api-key"] = apiKey;
-        // 若是第三方中转代理（非 api.anthropic.com），同时附带 Authorization 标头以防中转站只认 Bearer
         if (!baseUrl.includes("anthropic.com")) {
           headers["Authorization"] = `Bearer ${apiKey}`;
         }
@@ -157,83 +356,83 @@ export async function sendAIChatRequest(
       const isThinking = model.includes("3-7") || model.includes("thinking");
       const requestBody: Record<string, any> = {
         model,
-        max_tokens: 8192,
+        max_tokens: 4096,
         system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: turns.map((t) => ({ role: t.role, content: t.content })),
       };
       if (!isThinking && config.temperature !== undefined) {
         requestBody.temperature = config.temperature;
       }
 
-      const res = await fetch(endpoint, {
+      const res = await smartFetch(endpoint, {
         method: "POST",
         headers,
         body: JSON.stringify(requestBody),
         signal: controller.signal,
+        timeoutMs,
       });
 
       if (!res.ok) {
         const errText = await res.text().catch(() => "");
-        throw new Error(`Claude/Anthropic API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+        throw new Error(`Anthropic 接口错误 (${extractReadableAIError(res.status, errText)})`);
       }
 
       const data = await res.json();
-      // 兼容 Claude 3.7 / 思考模式等多 Block 响应结构，聚合所有 text 块
       if (Array.isArray(data.content)) {
         const textBlocks = data.content
           .filter((b: any) => b.type === "text" || (typeof b.text === "string" && b.type !== "thinking"))
           .map((b: any) => b.text || "");
-        if (textBlocks.length > 0) {
-          return textBlocks.join("");
-        }
+        if (textBlocks.length > 0) return textBlocks.join("");
         return data.content[0]?.text || data.content[0]?.thinking || "";
       }
-      if (typeof data.text === "string") {
-        return data.text;
-      }
-      if (typeof data.completion === "string") {
-        return data.completion;
-      }
+      if (typeof data.text === "string") return data.text;
+      if (typeof data.completion === "string") return data.completion;
       return "";
     }
 
-    // 2. Google Gemini Protocol
+    // 2. Google Gemini Protocol (同时支持官方端点与国内反代/中转端点)
     if (protocol === "gemini") {
-      const isNativeGemini = baseUrl.includes("generativelanguage.googleapis.com");
-      if (isNativeGemini) {
-        const endpoint = `${baseUrl.replace(/\/+$/, "")}/models/${model}:generateContent?key=${apiKey}`;
-        currentEndpoint = endpoint;
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-            generationConfig: {
-              temperature: config.temperature ?? 0.2,
-            },
-          }),
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          const errText = await res.text().catch(() => "");
-          throw new Error(`Gemini API 错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
-        }
-
-        const data = await res.json();
-        const parts = data.candidates?.[0]?.content?.parts || [];
-        const textParts = parts
-          .filter((p: any) => typeof p.text === "string" && !p.thought)
-          .map((p: any) => p.text);
-        if (textParts.length > 0) {
-          return textParts.join("");
-        }
-        return parts.map((p: any) => p.text || "").join("");
+      const endpoint = normalizeGeminiEndpoint(baseUrl, model, "generateContent", apiKey);
+      currentEndpoint = endpoint;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (apiKey) {
+        headers["x-goog-api-key"] = apiKey;
       }
+
+      const res = await smartFetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: turns.map((t) => ({
+            role: t.role === "assistant" ? "model" : "user",
+            parts: [{ text: t.content }],
+          })),
+          generationConfig: {
+            temperature: config.temperature ?? 0.2,
+          },
+        }),
+        signal: controller.signal,
+        timeoutMs,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        throw new Error(`Gemini 接口错误 (${extractReadableAIError(res.status, errText)})`);
+      }
+
+      const data = await res.json();
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const textParts = parts
+        .filter((p: any) => typeof p.text === "string" && !p.thought)
+        .map((p: any) => p.text);
+      if (textParts.length > 0) return textParts.join("");
+      return parts.map((p: any) => p.text || "").join("");
     }
 
-    // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, SiliconFlow, Groq, etc.)
+    // 3. OpenAI Compatible Protocol (DeepSeek, 硅基流动, 百炼, 智谱 GLM, 火山 Ark, Kimi, MiniMax, 混元, Ollama 等)
     const endpoint = normalizeOpenAIChatUrl(baseUrl);
     currentEndpoint = endpoint;
 
@@ -244,43 +443,73 @@ export async function sendAIChatRequest(
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
+    const lowerModel = model.toLowerCase();
     const isReasoningModel =
-      model.includes("reasoner") ||
-      model.includes("r1") ||
-      model.startsWith("o1") ||
-      model.startsWith("o3") ||
-      model.includes("qwq");
+      lowerModel.includes("reasoner") ||
+      lowerModel.includes("r1") ||
+      lowerModel.startsWith("o1") ||
+      lowerModel.startsWith("o3") ||
+      lowerModel.includes("qwq") ||
+      lowerModel.includes("thinking") ||
+      lowerModel.includes("-z1");
+
+    const openAiMessages =
+      lowerModel.startsWith("o1-mini") || lowerModel.startsWith("o1-preview")
+        ? turns.map((t, idx) =>
+            idx === 0 ? { role: t.role, content: `${systemPrompt}\n\n${t.content}` } : { role: t.role, content: t.content }
+          )
+        : [{ role: "system", content: systemPrompt }, ...turns.map((t) => ({ role: t.role, content: t.content }))];
 
     const requestBody: Record<string, any> = {
       model,
-      messages: model.startsWith("o1-mini") || model.startsWith("o1-preview")
-        ? [{ role: "user", content: `${systemPrompt}\n\n${userPrompt}` }]
-        : [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
+      messages: openAiMessages,
     };
 
-    if (model.startsWith("o1") || model.startsWith("o3")) {
-      requestBody.max_completion_tokens = 8192;
-    } else {
-      requestBody.max_tokens = 8192;
-      // 推理模型（如 deepseek-reasoner）禁止传递 temperature，否则返回 400
-      if (!isReasoningModel) {
-        requestBody.temperature = config.temperature ?? 0.2;
-      }
+    // 不强制传递 max_tokens，避免部分国内模型因上限低于 8192 而报错 400
+    if (!isReasoningModel && config.temperature !== undefined) {
+      requestBody.temperature = config.temperature;
     }
 
-    const res = await fetch(endpoint, {
+    let res = await smartFetch(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify(requestBody),
       signal: controller.signal,
+      timeoutMs,
     });
+
+    // 参数兼容性自愈重试：部分模型不接受 temperature 或 system 角色时，降级精简参数重试一次
+    if (res.status === 400) {
+      const firstErrText = await res.text().catch(() => "");
+      const errLower = firstErrText.toLowerCase();
+      if (
+        errLower.includes("temperature") ||
+        errLower.includes("max_tokens") ||
+        errLower.includes("system")
+      ) {
+        const minimalMessages = turns.map((t, idx) =>
+          idx === 0
+            ? { role: t.role, content: `${systemPrompt}\n\n${t.content}` }
+            : { role: t.role, content: t.content }
+        );
+        res = await smartFetch(endpoint, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model,
+            messages: errLower.includes("system") ? minimalMessages : openAiMessages,
+          }),
+          signal: controller.signal,
+          timeoutMs,
+        });
+      } else {
+        throw new Error(`AI 服务响应错误 (${extractReadableAIError(res.status, firstErrText)})`);
+      }
+    }
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      throw new Error(`AI 服务响应错误 (HTTP ${res.status}): ${errText.slice(0, 200)}`);
+      throw new Error(`AI 服务响应错误 (${extractReadableAIError(res.status, errText)})`);
     }
 
     const data = await res.json();
@@ -296,34 +525,47 @@ export async function sendAIChatRequest(
       content = choice.text;
     }
 
-    // 针对 DeepSeek-R1 / QwQ 等推理模型，若 content 为空则提取 reasoning_content
     if (!content.trim() && typeof message?.reasoning_content === "string") {
       content = message.reasoning_content;
     }
 
-    // 针对某些三方代理网关或非标准响应，提取顶层 response / text / output
     if (!content.trim()) {
-      if (typeof (data as any)?.response === "string") {
-        content = (data as any).response;
-      } else if (typeof (data as any)?.text === "string") {
-        content = (data as any).text;
-      } else if (typeof (data as any)?.output === "string") {
-        content = (data as any).output;
+      if (typeof data?.output?.text === "string") {
+        content = data.output.text;
+      } else if (typeof data?.result === "string") {
+        content = data.result;
+      } else if (typeof data?.response === "string") {
+        content = data.response;
+      } else if (typeof data?.text === "string") {
+        content = data.text;
+      } else if (typeof data?.output === "string") {
+        content = data.output;
       }
     }
 
     return content;
   } catch (err: any) {
     if (err.name === "AbortError" || controller.signal.aborted) {
-      throw new Error(`AI 请求超时 (${timeoutMs / 1000} 秒未收到响应)，请检查网络连接、接口地址或更换响应更快的模型`);
+      throw new Error(`AI 请求超时 (${timeoutMs / 1000} 秒未收到响应)，请检查网络连接或更换模型`);
     }
     if (err instanceof TypeError && err.message.includes("fetch")) {
-      throw new Error(`无法连接到 AI 服务端点 (${currentEndpoint || baseUrl})，请检查网络连接、Base URL 是否填写正确或接口服务是否支持跨域 (CORS)`);
+      throw new Error(`无法连接到 AI 服务端点 (${currentEndpoint || baseUrl})，请检查网络连接与 Base URL`);
     }
     throw err;
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * 单轮快捷对话封装（向后兼容旧调用）
+ */
+export async function sendAIChatRequest(
+  config: AIConfig,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  return sendAIConversationRequest(config, systemPrompt, [{ role: "user", content: userPrompt }]);
 }
 
 export async function testAIConnection(config: AIConfig): Promise<{ success: boolean; message: string }> {
@@ -349,8 +591,8 @@ export const pingAIEndpoint = testAIConnection;
  * 动态获取当前配置服务商所支持的可用模型列表
  */
 export async function fetchAvailableModels(config: AIConfig): Promise<string[]> {
-  const providerDef = AI_PROVIDERS[config.provider] || AI_PROVIDERS.custom;
-  const protocol = config.type || providerDef.type || "openai";
+  const providerMeta = getProviderMeta(config, config.provider);
+  const protocol = config.type || providerMeta.type || "openai";
   const apiKey = resolveAPIKey(config);
   const rawBaseUrl = resolveBaseURL(config);
 
@@ -359,7 +601,8 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutMs = 15000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     // 1. Anthropic Claude Protocol
@@ -368,7 +611,6 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
 
       const headers: Record<string, string> = {
         "anthropic-version": "2023-06-01",
-        "dangerously-allow-browser": "true",
       };
       if (apiKey) {
         headers["x-api-key"] = apiKey;
@@ -377,67 +619,85 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
         }
       }
 
-      const res = await fetch(endpoint, {
+      const res = await smartFetch(endpoint, {
         method: "GET",
         headers,
         signal: controller.signal,
+        timeoutMs,
       });
 
       if (!res.ok) {
         const err = await res.text().catch(() => "");
-        throw new Error(`获取 Claude/Anthropic 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+        throw new Error(`获取 Anthropic 模型列表失败 (${extractReadableAIError(res.status, err)})`);
       }
 
       const data = await res.json();
       const list = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
       const models: string[] = list.map((m: any) => String(m.id || m.name || m || "")).filter(Boolean);
       if (models.length > 0) return Array.from(new Set(models)).sort();
-      throw new Error("未解析到有效的 Claude/Anthropic 模型列表");
+      throw new Error("未解析到有效的 Anthropic 模型列表");
     }
 
     // 2. Google Gemini Protocol
     if (protocol === "gemini") {
-      const isNativeGemini = rawBaseUrl.includes("generativelanguage.googleapis.com");
-      if (isNativeGemini) {
-        const endpoint = `${rawBaseUrl}/models?key=${apiKey}`;
-        const res = await fetch(endpoint, { method: "GET", signal: controller.signal });
-        if (!res.ok) {
-          const err = await res.text().catch(() => "");
-          throw new Error(`获取 Gemini 模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
-        }
-        const data = await res.json();
-        const list = Array.isArray(data.models) ? data.models : [];
-        const models: string[] = list
-          .map((m: any) => String(m.name ? m.name.replace(/^models\//, "") : m.id || m || ""))
-          .filter(Boolean);
-        if (models.length > 0) return Array.from(new Set(models)).sort();
-        throw new Error("未解析到有效的 Gemini 模型列表");
+      const endpoint = normalizeGeminiEndpoint(rawBaseUrl, "", "models", apiKey);
+      const headers: Record<string, string> = {};
+      if (apiKey) headers["x-goog-api-key"] = apiKey;
+
+      const res = await smartFetch(endpoint, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+        timeoutMs,
+      });
+      if (!res.ok) {
+        const err = await res.text().catch(() => "");
+        throw new Error(`获取 Gemini 模型列表失败 (${extractReadableAIError(res.status, err)})`);
       }
+      const data = await res.json();
+      const list = Array.isArray(data.models) ? data.models : [];
+      const models: string[] = list
+        .map((m: any) => String(m.name ? m.name.replace(/^models\//, "") : m.id || m || ""))
+        .filter(Boolean);
+      if (models.length > 0) return Array.from(new Set(models)).sort();
+      throw new Error("未解析到有效的 Gemini 模型列表");
     }
 
-    // 3. OpenAI Compatible Protocol (DeepSeek, OpenAI, Ollama, OneAPI, vLLM, etc.)
-    let endpoint = normalizeOpenAIModelsUrl(rawBaseUrl);
+    // 3. OpenAI Compatible Protocol
+    const endpoint = normalizeOpenAIModelsUrl(rawBaseUrl);
 
     const headers: Record<string, string> = {};
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`;
     }
 
-    let res = await fetch(endpoint, { method: "GET", headers, signal: controller.signal });
+    let res = await smartFetch(endpoint, {
+      method: "GET",
+      headers,
+      signal: controller.signal,
+      timeoutMs,
+    });
 
-    // If 404, try ${rawBaseUrl}/v1/models if endpoint wasn't /v1/models
     if (!res.ok && res.status === 404 && !endpoint.includes("/v1/models")) {
-      const fallbackEndpoint = `${rawBaseUrl}/v1/models`;
-      const fallbackRes = await fetch(fallbackEndpoint, { method: "GET", headers, signal: controller.signal }).catch(() => null);
+      const fallbackEndpoint = `${rawBaseUrl.replace(/\/+$/, "")}/v1/models`;
+      const fallbackRes = await smartFetch(fallbackEndpoint, {
+        method: "GET",
+        headers,
+        signal: controller.signal,
+        timeoutMs,
+      }).catch(() => null);
       if (fallbackRes && fallbackRes.ok) {
         res = fallbackRes;
       }
     }
 
-    // If Ollama native port 11434, fallback to /api/tags
     if (!res.ok && (rawBaseUrl.includes("11434") || rawBaseUrl.includes("localhost"))) {
-      const ollamaEndpoint = `${rawBaseUrl.replace(/\/v1$/, "")}/api/tags`;
-      const ollamaRes = await fetch(ollamaEndpoint, { method: "GET", signal: controller.signal }).catch(() => null);
+      const ollamaEndpoint = `${rawBaseUrl.replace(/\/v1\/?$/, "")}/api/tags`;
+      const ollamaRes = await smartFetch(ollamaEndpoint, {
+        method: "GET",
+        signal: controller.signal,
+        timeoutMs,
+      }).catch(() => null);
       if (ollamaRes && ollamaRes.ok) {
         const ollamaData = await ollamaRes.json();
         if (Array.isArray(ollamaData.models)) {
@@ -449,7 +709,7 @@ export async function fetchAvailableModels(config: AIConfig): Promise<string[]> 
 
     if (!res.ok) {
       const err = await res.text().catch(() => "");
-      throw new Error(`获取模型列表失败 (HTTP ${res.status}): ${err.slice(0, 150)}`);
+      throw new Error(`获取模型列表失败 (${extractReadableAIError(res.status, err)})`);
     }
 
     const data = await res.json();

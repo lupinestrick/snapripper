@@ -24,70 +24,69 @@ export function BatchBar() {
     <div
       style={{
         position: "fixed",
-        bottom: "1.5rem",
+        bottom: "1.25rem",
         left: "50%",
         transform: "translateX(-50%)",
         backgroundColor: "var(--bg-surface)",
         border: "1px solid var(--border-card)",
         boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
         borderRadius: "9999px",
-        padding: "0.4rem 1rem",
+        padding: "0.35rem 0.85rem",
         display: "flex",
         alignItems: "center",
-        gap: "0.5rem",
+        gap: "0.4rem",
         zIndex: 50,
       }}
     >
-      <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--accent)", padding: "0 0.3rem" }}>
-        已选择 {selectedIds.size} 项
+      <div style={{ fontSize: "0.76rem", fontWeight: 600, color: "var(--accent)", padding: "0 0.25rem" }}>
+        已选 {selectedIds.size} 项
       </div>
 
-      <div style={{ height: "1.2rem", width: "1px", backgroundColor: "var(--border-subtle)" }} />
+      <div style={{ height: "1rem", width: "1px", backgroundColor: "var(--border-subtle)" }} />
 
-      {/* Delete button */}
       <Button
+        size="xs"
+        pill
         onClick={deleteSelected}
         style={{
-          backgroundColor: "rgba(239, 68, 68, 0.15)",
-          color: "#f87171",
+          backgroundColor: "rgba(239, 68, 68, 0.14)",
+          color: "var(--danger)",
           borderColor: "rgba(239, 68, 68, 0.3)",
         }}
       >
-        <Trash2 size={13} />
-        <span>批量删除</span>
+        <Trash2 size={12} />
+        <span>删除</span>
       </Button>
 
-      {/* Pin toggle */}
       <Button
+        size="xs"
+        pill
         onClick={() => markSelectedPinned(true)}
         style={{
-          backgroundColor: "rgba(245, 158, 11, 0.15)",
-          color: "#fbbf24",
+          backgroundColor: "rgba(245, 158, 11, 0.14)",
+          color: "var(--warning)",
           borderColor: "rgba(245, 158, 11, 0.3)",
         }}
       >
-        <Pin size={13} />
-        <span>标记固定</span>
+        <Pin size={12} />
+        <span>固定</span>
       </Button>
 
-      <Button
-        onClick={() => markSelectedPinned(false)}
-      >
-        <PinOff size={13} />
-        <span>取消固定</span>
+      <Button size="xs" pill onClick={() => markSelectedPinned(false)}>
+        <PinOff size={12} />
+        <span>解固</span>
       </Button>
 
-      {/* Move to Panel */}
       {panels.length > 0 && (
         <div style={{ position: "relative" }}>
           <Button
+            size="xs"
+            pill
             onClick={() => setPanelSelectOpen(!panelSelectOpen)}
-            style={{
-              color: "var(--accent)",
-            }}
+            style={{ color: "var(--accent)" }}
           >
-            <FolderInput size={13} />
-            <span>移至面板...</span>
+            <FolderInput size={12} />
+            <span>移至</span>
           </Button>
 
           {panelSelectOpen && (
@@ -100,17 +99,20 @@ export function BatchBar() {
                 border: "1px solid var(--border-card)",
                 boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
                 borderRadius: "0.75rem",
-                padding: "0.35rem",
+                padding: "0.3rem",
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.25rem",
-                minWidth: "160px",
+                gap: "0.15rem",
+                minWidth: "150px",
+                maxHeight: "240px",
+                overflowY: "auto",
               }}
             >
               {panels.map((p) => (
                 <Button
                   key={p.id}
                   variant="ghost"
+                  size="xs"
                   pill={false}
                   onClick={() => {
                     moveSelectedToPanel(p.id);
@@ -120,7 +122,7 @@ export function BatchBar() {
                     justifyContent: "flex-start",
                     color: "var(--text-main)",
                     fontSize: "0.75rem",
-                    padding: "0.35rem 0.6rem",
+                    padding: "0.3rem 0.55rem",
                   }}
                 >
                   {p.name || p.id}
@@ -131,19 +133,15 @@ export function BatchBar() {
         </div>
       )}
 
-      {/* Clear selection */}
       <Button
         variant="ghost"
+        size="xs"
+        pill
         onClick={clearSelection}
-        style={{
-          width: "26px",
-          height: "26px",
-          padding: 0,
-          color: "var(--text-muted)",
-        }}
-        title="清除选择"
+        style={{ width: "24px", height: "24px", padding: 0, color: "var(--text-muted)" }}
+        title="清除"
       >
-        <X size={14} />
+        <X size={13} />
       </Button>
     </div>
   );

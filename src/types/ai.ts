@@ -1,7 +1,16 @@
 import { SideberySnapshot, CategorizationRule } from "./sidebery";
 
-export type AIProviderKey = "deepseek" | "claude" | "openai" | "gemini" | "custom";
+export type BuiltinAIProviderKey = "deepseek" | "claude" | "openai" | "gemini";
+export type AIProviderKey = BuiltinAIProviderKey | "custom" | (string & {});
 export type AIProtocolType = "openai" | "anthropic" | "gemini";
+
+export interface CustomAIProvider {
+  id: string;
+  name: string;
+  type: AIProtocolType;
+  baseUrl: string;
+  model: string;
+}
 
 export interface AIProviderPreset {
   name: string;
@@ -11,7 +20,14 @@ export interface AIProviderPreset {
   type: AIProtocolType;
 }
 
-export const AI_PROVIDERS: Record<AIProviderKey, AIProviderPreset> = {
+export const BUILTIN_PROVIDER_KEYS: BuiltinAIProviderKey[] = [
+  "deepseek",
+  "claude",
+  "openai",
+  "gemini",
+];
+
+export const AI_PROVIDERS: Record<string, AIProviderPreset> = {
   deepseek: {
     name: "DeepSeek",
     baseUrl: "https://api.deepseek.com/v1",
@@ -73,6 +89,23 @@ export interface AIConfig {
    * 各 API 选项独立选中的模型映射池
    */
   models?: Record<string, string>;
+  /**
+   * 各 API 选项置顶的常用模型列表映射池
+   */
+  pinnedModels?: Record<string, string[]>;
+  /**
+   * 各 API 选项最近拉取的可用模型缓存列表
+   */
+  cachedModels?: Record<string, string[]>;
+  /**
+   * 用户通过「+」自定义添加的供应商列表
+   */
+  customProviders?: CustomAIProvider[];
+}
+
+export interface AIDropdownSettings {
+  visibleProviders: string[];
+  maxDropdownModels: number;
 }
 
 export interface CategoryProportion {
@@ -118,9 +151,44 @@ export interface AIProcessedCache {
   targetPanelId?: string;
 }
 
+export type ClusterGranularity = "coarse" | "balanced" | "fine";
+
+export type ClusterCohesionReason =
+  | "group_subtree"
+  | "tree_subtree"
+  | "domain_path"
+  | "semantic_topic"
+  | "tail_misc";
+
+export interface TabMicroCluster {
+  id: string;
+  labelHint: string;
+  tabIds: string[];
+  tabCount: number;
+  domains: string[];
+  sampleTitles: string[];
+  sourcePanelIds: string[];
+  sourcePanelNames: string[];
+  cohesionReason: ClusterCohesionReason;
+  keywords: string[];
+}
+
+export interface ClusterCompressionReport {
+  totalTabs: number;
+  nonExemptCount: number;
+  exemptProtectedCount: number;
+  granularity: ClusterGranularity;
+  clusters: TabMicroCluster[];
+  compressionRatio: number;
+  emptyPanelNames: string[];
+  activePanels: { id: string; name: string; count: number; pct: string }[];
+  treeDepthDistribution: Record<number, number>;
+}
+
 export interface ReorganizationCategory {
   name: string;
   description?: string;
+  clusterIds?: string[];
   matchDomains?: string[];
   matchKeywords?: string[];
   targetPanelId?: string;
@@ -136,6 +204,8 @@ export interface ReorganizationScheme {
   strategy: string;
   tags?: string[];
   categories: ReorganizationCategory[];
+  excludedClusterIds?: string[];
+  granularity?: ClusterGranularity;
   pros?: string[];
   cons?: string[];
   targetMode?: "tree" | "panel";
@@ -147,5 +217,13 @@ export interface AIChatMessage {
   timestamp: number;
   text: string;
   schemes?: ReorganizationScheme[];
+  clusterReport?: ClusterCompressionReport;
   appliedSchemeId?: string;
+}
+
+export interface AIChatSession {
+  id: string;
+  title: string;
+  updatedAt: number;
+  messages: AIChatMessage[];
 }

@@ -1,23 +1,25 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
   Pin,
   ExternalLink,
-  Trash2,
   Copy,
   Layers,
   Globe,
   Folder,
+  Upload,
 } from "lucide-react";
-import { TabTreeNode, SideberyTab } from "@/types/sidebery";
+import { TabTreeNode } from "@/types/sidebery";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { filterTree } from "@/services/treeOperations";
 import { extractDomain, getFaviconUrl } from "@/utils/urlHelper";
+import { Button } from "@/components/ui/button";
 
 export function TabTreeView() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const {
     rootNodes,
     expandedIds,
@@ -25,12 +27,16 @@ export function TabTreeView() {
     selectedIds,
     selectTab,
     searchQuery,
+    setSearchQuery,
     panelFilter,
+    setPanelFilter,
     containerFilter,
+    setContainerFilter,
     onlyDuplicates,
+    setOnlyDuplicates,
     duplicateUrls,
     rawSnapshot,
-    deleteSelected,
+    loadSnapshot,
   } = useSnapshotStore();
 
   const filteredTree = React.useMemo(() => {
@@ -42,6 +48,21 @@ export function TabTreeView() {
     });
   }, [rootNodes, searchQuery, panelFilter, containerFilter, onlyDuplicates, duplicateUrls]);
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        loadSnapshot(event.target?.result as string, file.name);
+      } catch (err: any) {
+        alert(err.message || "读取失败");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   if (rootNodes.length === 0) {
     return (
       <div
@@ -50,20 +71,39 @@ export function TabTreeView() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          height: "60vh",
+          flex: 1,
+          minHeight: "50vh",
           color: "var(--text-muted)",
-          gap: "1rem",
+          gap: "0.75rem",
         }}
       >
-        <Layers size={48} strokeWidth={1.5} color="var(--border-subtle)" />
-        <div style={{ textAlign: "center" }}>
-          <h3 style={{ color: "var(--text-main)", marginBottom: "0.25rem", fontSize: "1.1rem" }}>
-            暂未加载 Sidebery 快照
-          </h3>
-          <p style={{ fontSize: "0.85rem" }}>
-            点击顶部导航栏中的 <strong>“导入快照 JSON”</strong> 或 <strong>“演示样本”</strong> 开始
-          </p>
-        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          onChange={handleFileUpload}
+          style={{ display: "none" }}
+        />
+        <Layers size={40} strokeWidth={1.4} color="var(--border-card)" />
+        <span style={{ fontSize: "0.9rem", color: "var(--text-main)", fontWeight: 500 }}>
+          暂无快照
+        </span>
+        <Button
+          variant="solid"
+          size="sm"
+          pill
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            backgroundColor: "var(--accent-solid)",
+            color: "#fff",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.4rem",
+          }}
+        >
+          <Upload size={14} />
+          <span>导入 JSON</span>
+        </Button>
       </div>
     );
   }
@@ -76,19 +116,32 @@ export function TabTreeView() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          height: "40vh",
+          flex: 1,
+          minHeight: "40vh",
           color: "var(--text-muted)",
-          gap: "0.5rem",
+          gap: "0.65rem",
         }}
       >
-        <p style={{ fontSize: "0.9rem" }}>未匹配到任何标签页</p>
-        <span style={{ fontSize: "0.8rem", opacity: 0.7 }}>请尝试更换搜索关键字或重置筛选条件</span>
+        <span style={{ fontSize: "0.88rem" }}>无匹配标签</span>
+        <Button
+          variant="outline"
+          size="xs"
+          pill
+          onClick={() => {
+            setSearchQuery("");
+            setPanelFilter(null);
+            setContainerFilter(null);
+            setOnlyDuplicates(false);
+          }}
+        >
+          重置筛选
+        </Button>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: "0.75rem 1rem", overflowY: "auto", flex: 1 }}>
+    <div style={{ padding: "0.5rem 0.75rem 5rem 0.75rem", overflowY: "auto", flex: 1 }}>
       {filteredTree.map((node) => (
         <TreeNodeRow
           key={node.id}
@@ -100,7 +153,6 @@ export function TabTreeView() {
           selectTab={selectTab}
           duplicateUrls={duplicateUrls}
           containers={rawSnapshot?.containers || {}}
-          panels={rawSnapshot?.panels || {}}
         />
       ))}
     </div>
@@ -116,7 +168,6 @@ interface TreeNodeRowProps {
   selectTab: (id: string, isMulti?: boolean) => void;
   duplicateUrls: Set<string>;
   containers: Record<string, any>;
-  panels: Record<string, any>;
 }
 
 function TreeNodeRow({
@@ -128,15 +179,16 @@ function TreeNodeRow({
   selectTab,
   duplicateUrls,
   containers,
-  panels,
 }: TreeNodeRowProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const isSelected = selectedIds.has(node.id);
   const isDuplicate = duplicateUrls.has(node.tab.url);
+  const isGroupNode = Boolean(node.isCategoryHeader || node.isGroup);
 
   const container = node.tab.containerId ? containers[node.tab.containerId] : null;
-  const panel = node.tab.panelId ? panels[node.tab.panelId] : null;
   const domain = extractDomain(node.tab.url);
   const favicon = getFaviconUrl(node.tab.url, node.tab.favIconUrl);
 
@@ -156,30 +208,31 @@ function TreeNodeRow({
         onClick={(e) => {
           selectTab(node.id, e.ctrlKey || e.metaKey || e.shiftKey);
         }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.5rem",
-          padding: "0.4rem 0.5rem",
-          paddingLeft: `${depth * 1.5 + 0.5}rem`,
+          gap: "0.45rem",
+          padding: "0.3rem 0.5rem",
+          paddingLeft: `${depth * 1.2 + 0.45}rem`,
           borderRadius: "0.375rem",
-          backgroundColor: isSelected ? "var(--accent-subtle)" : "transparent",
+          backgroundColor: isSelected
+            ? "var(--accent-subtle)"
+            : isHovered
+              ? "var(--bg-hover)"
+              : "transparent",
           border: isSelected ? "1px solid var(--accent-border)" : "1px solid transparent",
           cursor: "pointer",
           transition: "background 0.1s ease",
-          fontSize: "0.85rem",
+          fontSize: "0.82rem",
           userSelect: "none",
         }}
-        onMouseEnter={(e) => {
-          if (!isSelected) e.currentTarget.style.backgroundColor = "var(--bg-hover)";
-        }}
-        onMouseLeave={(e) => {
-          if (!isSelected) e.currentTarget.style.backgroundColor = "transparent";
-        }}
       >
-        <div style={{ width: "1.2rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "1rem", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           {hasChildren ? (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 toggleExpand(node.id);
@@ -194,10 +247,10 @@ function TreeNodeRow({
                 padding: 0,
               }}
             >
-              {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           ) : (
-            <div style={{ width: "15px" }} />
+            <div style={{ width: "14px" }} />
           )}
         </div>
 
@@ -209,21 +262,21 @@ function TreeNodeRow({
             e.stopPropagation();
             selectTab(node.id, true);
           }}
-          style={{ cursor: "pointer", accentColor: "var(--accent)" }}
+          style={{ cursor: "pointer", accentColor: "var(--accent)", flexShrink: 0 }}
         />
 
         <div style={{ display: "flex", alignItems: "center", width: "1rem", flexShrink: 0 }}>
-          {node.isCategoryHeader ? (
-            <Folder size={16} style={{ color: "var(--accent)" }} />
+          {isGroupNode ? (
+            <Folder size={15} style={{ color: "var(--accent)" }} />
           ) : favicon ? (
             <img
               src={favicon}
               alt=""
-              style={{ width: 16, height: 16, borderRadius: 2 }}
+              style={{ width: 15, height: 15, borderRadius: 2 }}
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
           ) : (
-            <Globe size={15} color="var(--text-muted)" />
+            <Globe size={14} color="var(--text-muted)" />
           )}
         </div>
 
@@ -233,26 +286,30 @@ function TreeNodeRow({
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            fontWeight: node.isCategoryHeader ? 600 : 400,
-            color: node.isCategoryHeader ? "var(--accent)" : "var(--text-main)",
+            fontWeight: isGroupNode ? 600 : 400,
+            color: isGroupNode ? "var(--accent-text)" : "var(--text-main)",
           }}
           title={`${node.tab.title}\n${node.tab.url}`}
         >
-          {node.tab.title || "无标题标签"}
+          {node.tab.title || "无标题"}
+          {isGroupNode && hasChildren && (
+            <span style={{ marginLeft: "0.4rem", fontSize: "0.7rem", fontWeight: 400, color: "var(--text-muted)" }}>
+              ({node.children.length})
+            </span>
+          )}
         </span>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", flexShrink: 0 }}>
           {isDuplicate && (
             <span
               style={{
-                fontSize: "0.68rem",
-                padding: "0.1rem 0.35rem",
-                borderRadius: "0.25rem",
-                backgroundColor: "rgba(239, 68, 68, 0.2)",
+                fontSize: "0.65rem",
+                padding: "0.08rem 0.35rem",
+                borderRadius: "9999px",
+                backgroundColor: "rgba(239, 68, 68, 0.16)",
                 color: "var(--danger)",
                 fontWeight: 600,
               }}
-              title="存在重复 URL"
             >
               重复
             </span>
@@ -261,27 +318,26 @@ function TreeNodeRow({
           {node.tab.pinned && (
             <span
               style={{
-                display: "flex",
+                display: "inline-flex",
                 alignItems: "center",
-                gap: "0.2rem",
-                fontSize: "0.68rem",
-                padding: "0.1rem 0.35rem",
-                borderRadius: "0.25rem",
-                backgroundColor: "rgba(245, 158, 11, 0.2)",
+                fontSize: "0.65rem",
+                padding: "0.12rem 0.3rem",
+                borderRadius: "9999px",
+                backgroundColor: "rgba(245, 158, 11, 0.18)",
                 color: "var(--warning)",
               }}
+              title="置顶"
             >
-              <Pin size={11} />
-              置顶
+              <Pin size={10} />
             </span>
           )}
 
           {container && (
             <span
               style={{
-                fontSize: "0.68rem",
-                padding: "0.1rem 0.4rem",
-                borderRadius: "0.25rem",
+                fontSize: "0.66rem",
+                padding: "0.08rem 0.38rem",
+                borderRadius: "4px",
                 backgroundColor: "var(--bg-subtle)",
                 color: "var(--text-muted)",
                 borderLeft: `2px solid ${container.color || "var(--accent)"}`,
@@ -291,49 +347,67 @@ function TreeNodeRow({
             </span>
           )}
 
-          {domain && !node.isCategoryHeader && (
+          {domain && !isGroupNode && (
             <span
               style={{
-                fontSize: "0.7rem",
-                padding: "0.1rem 0.4rem",
-                borderRadius: "0.25rem",
+                fontSize: "0.68rem",
+                padding: "0.08rem 0.4rem",
+                borderRadius: "4px",
                 backgroundColor: "var(--bg-subtle)",
                 color: "var(--text-muted)",
+                maxWidth: "150px",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
               {domain}
             </span>
           )}
 
-          <button
-            onClick={handleCopyUrl}
-            title="复制 URL"
+          {/* Hover-only Row Actions */}
+          <div
             style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--text-muted)",
-              cursor: "pointer",
-              padding: "0.2rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.1rem",
+              opacity: isHovered ? 1 : 0,
+              pointerEvents: isHovered ? "auto" : "none",
+              transition: "opacity 0.1s ease",
             }}
           >
-            <Copy size={13} />
-          </button>
-
-          {!node.isCategoryHeader && (
             <button
-              onClick={handleOpenUrl}
-              title="在新窗口打开"
+              type="button"
+              onClick={handleCopyUrl}
+              title="复制 URL"
               style={{
                 background: "transparent",
                 border: "none",
                 color: "var(--text-muted)",
                 cursor: "pointer",
-                padding: "0.2rem",
+                padding: "0.18rem",
               }}
             >
-              <ExternalLink size={13} />
+              <Copy size={12} />
             </button>
-          )}
+
+            {!isGroupNode && (
+              <button
+                type="button"
+                onClick={handleOpenUrl}
+                title="新窗口打开"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  padding: "0.18rem",
+                }}
+              >
+                <ExternalLink size={12} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -350,7 +424,6 @@ function TreeNodeRow({
               selectTab={selectTab}
               duplicateUrls={duplicateUrls}
               containers={containers}
-              panels={panels}
             />
           ))}
         </div>

@@ -63,14 +63,51 @@ export interface TabTreeNode {
 
 export type RuleScope = "all" | "panel" | "container";
 
+export type RuleConditionField =
+  | "domain"
+  | "urlPath"
+  | "title"
+  | "url"
+  | "panel"
+  | "container";
+
+export type RuleConditionOperator =
+  | "contains"
+  | "equals"
+  | "startsWith"
+  | "regex"
+  | "notContains"
+  | "notEquals";
+
+export type RuleMatchMode = "all" | "any";
+
+export interface RuleCondition {
+  id: string;
+  field: RuleConditionField;
+  operator: RuleConditionOperator;
+  value: string;
+}
+
+export type RuleActionType = "group" | "moveToPanel" | "groupAndMove" | "exempt";
+
+export interface RuleAction {
+  type: RuleActionType;
+  targetPanelId?: string;
+  targetPanelName?: string;
+  createGroup?: boolean;
+}
+
 export interface CategorizationRule {
   id: string;
-  name: string;               // 目标 Group 名称
+  name: string;               // 目标 Group / 规则名称
   enabled: boolean;
   scope: RuleScope;           // 适用范围：全部、指定面板、指定容器
   targetScopeId?: string;     // 对应的 panelId 或 containerId
-  matchDomain?: string;       // 匹配域名 (支持逗号分隔或单个，如 "dlsite.com, ch.dlsite.com")
-  matchKeyword?: string;      // 匹配标题关键词 (支持逗号分隔，如 "RJ, 同人, 音声")
+  matchMode?: RuleMatchMode;  // 条件组合模式：all (AND) | any (OR)
+  conditions?: RuleCondition[]; // Option B 条件组 DSL
+  action?: RuleAction;        // Option B 动作定义
+  matchDomain?: string;       // 兼容旧版：匹配域名 (逗号分隔)
+  matchKeyword?: string;      // 兼容旧版：匹配标题关键词 (逗号分隔)
   minThreshold: number;       // 最低阈值：匹配到几个标签才组成 Group (默认 2)
   color?: string;
 }

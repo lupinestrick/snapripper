@@ -1,8 +1,20 @@
-import { SideberySnapshot, SideberyTab, TabTreeNode, PanelDiffResult, RulesSettings } from "@/types/sidebery";
+import {
+  SideberySnapshot,
+  SideberyTab,
+  TabTreeNode,
+  PanelDiffResult,
+  RulesSettings,
+} from "@/types/sidebery";
+import { ClusterGranularity } from "@/types/ai";
 import { buildTabTree, flattenTabTree } from "./snapshotParser";
 import { applyRulesToTreeNodes, deduplicateTreeNodes, matchTabWithRule } from "./ruleEngine";
-import { applyDomainMergeToTreeNodes, DomainMergeConfig, extractDomainByMode } from "./domainMergeEngine";
+import {
+  applyDomainMergeToTreeNodes,
+  DomainMergeConfig,
+  extractDomainByMode,
+} from "./domainMergeEngine";
 import { reorganizeTreeIntoCategories, determineTargetPanelForCategory } from "./treeOperations";
+import { clusterSnapshotTabs } from "./tabClusterEngine";
 import { isExemptUrl } from "@/utils/urlHelper";
 
 export type ProcessScope = "current" | "all" | "selected";
@@ -12,6 +24,8 @@ export interface ProcessingOptions {
   enableRules: boolean;
   enableDomainMerge?: boolean;
   domainMergeConfig?: DomainMergeConfig;
+  enableLocalCluster?: boolean;
+  clusterGranularity?: ClusterGranularity;
   enableAICategorize: boolean;
   aiClassificationMap?: Map<string, string>;
   aiCategoryNames?: string[];
@@ -27,6 +41,158 @@ export interface ProcessingOptions {
   preserveSubtrees?: boolean;
   crossPanelMerge?: boolean;
   createGroupTabs?: boolean;
+}
+
+function isTabExempted(tab: SideberyTab, options: ProcessingOptions): boolean {
+  const exemptPinned = options.exemptPinned ?? true;
+  const exemptInternal = options.exemptInternalPages ?? true;
+
+  if (tab.pinned) return exemptPinned;
+  if (!exemptInternal) return false;
+  return isExemptUrl(tab.url, false);
+}
+
+function getEffectivePanelIds(options: ProcessingOptions): Set<string> | null {
+  if (options.scope === "current" && options.currentActivePanelId) {
+    return new Set([options.currentActivePanelId]);
+  }
+  if (
+    options.scope === "selected" &&
+    options.targetPanelIds &&
+    options.targetPanelIds.length > 0
+  ) {
+    return new Set(options.targetPanelIds);
+  }
+  return null;
+}
+
+/**
+ * 将本地微簇聚类应用到当前树中尚未归组的散装节点（保持已有规则组、域名组与父子树完整）
+ */
+function applyLocalClusterToTreeNodes(
+  nodes: TabTreeNode[],
+  options: ProcessingOptions,
+  extensionBaseUrl: string
+): { newNodes: TabTreeNode[]; groupsCreated: number } {
+  const preserveSubtrees = options.preserveSubtrees ?? true;
+  const createGroupTab = options.createGroupTabs ?? true;
+  const granularity = options.clusterGranularity || "balanced";
+
+  const pinnedOrGrouped: TabTreeNode[] = [];
+  const looseNodes: TabTreeNode[] = [];
+
+  for (const node of nodes) {
+    const isExemptNode =
+      (node.isPinned && (options.exemptPinned ?? true)) ||
+      (node.isExempt && !node.isPinned && (options.exemptInternalPages ?? true));
+    const isAlreadyGrouped = Boolean(node.isGroup || node.isCategoryHeader);
+    const isProtectedSubtree =
+      preserveSubtrees && Boolean(node.children && node.children.length > 0);
+
+    if (isExemptNode || isAlreadyGrouped || isProtectedSubtree) {
+      pinnedOrGrouped.push(node);
+    } else {
+      looseNodes.push(node);
+    }
+  }
+
+  if (looseNodes.length < 2) {
+    return { newNodes: nodes, groupsCreated: 0 };
+  }
+
+  const looseTabs = looseNodes.map((n) => n.tab);
+  const report = clusterSnapshotTabs(looseTabs, undefined, granularity);
+
+  // 仅对包含 >= 2 个标签的高纯度微簇建立分组，避免出现单页空壳组
+  const validClusters = report.clusters.filter(
+    (c) => c.tabCount >= 2 && c.cohesionReason !== "tail_misc"
+  );
+  if (validClusters.length === 0) {
+    return { newNodes: nodes, groupsCreated: 0 };
+  }
+
+  const tabIdToClusterName = new Map<string, string>();
+  const clusterNames: string[] = [];
+
+  for (const clu of validClusters) {
+    clusterNames.push(clu.labelHint);
+    for (const tid of clu.tabIds) {
+      tabIdToClusterName.set(String(tid), clu.labelHint);
+    }
+  }
+
+  const panelIdFallback = looseNodes[0]?.tab.panelId || "main";
+  const bucketMap = new Map<string, TabTreeNode[]>();
+  const leftoverLoose: TabTreeNode[] = [];
+
+  for (const node of looseNodes) {
+    const label = tabIdToClusterName.get(String(node.id));
+    if (label) {
+      if (!bucketMap.has(label)) bucketMap.set(label, []);
+      bucketMap.get(label)!.push(node);
+    } else {
+      leftoverLoose.push(node);
+    }
+  }
+
+  let virtualCounter = 850000;
+  const clusterHeaderNodes: TabTreeNode[] = [];
+  let groupsCreated = 0;
+
+  for (const label of clusterNames) {
+    const bucket = bucketMap.get(label);
+    if (!bucket || bucket.length < 2) {
+      if (bucket) leftoverLoose.push(...bucket);
+      continue;
+    }
+
+    const targetPanel = bucket[0]?.tab.panelId || panelIdFallback;
+    const headerId = createGroupTab
+      ? `group_clu_${++virtualCounter}_${Date.now()}`
+      : String(++virtualCounter);
+    const headerUrl = createGroupTab
+      ? `${extensionBaseUrl}/sidebery/group.html#${encodeURIComponent(label)}`
+      : `about:blank#cluster=${encodeURIComponent(label)}`;
+    const headerTitle = createGroupTab ? label : `📁 [${label}] (${bucket.length})`;
+
+    const headerTab: SideberyTab = {
+      id: headerId,
+      panelId: targetPanel,
+      parentId: -1,
+      lvl: 0,
+      title: headerTitle,
+      url: headerUrl,
+      folded: true,
+      isGroup: createGroupTab,
+      customTitle: createGroupTab ? null : `📁 [${label}]`,
+    };
+
+    clusterHeaderNodes.push({
+      id: headerId,
+      tab: headerTab,
+      depth: 0,
+      isCategoryHeader: true,
+      isGroup: createGroupTab,
+      categoryName: label,
+      children: bucket.map((child) => ({
+        ...child,
+        depth: 1,
+        tab: {
+          ...child.tab,
+          panelId: targetPanel,
+          parentId: headerId,
+          lvl: 1,
+        },
+      })),
+    });
+
+    groupsCreated++;
+  }
+
+  return {
+    newNodes: [...pinnedOrGrouped, ...clusterHeaderNodes, ...leftoverLoose],
+    groupsCreated,
+  };
 }
 
 export function computeSnapshotDiff(
@@ -46,33 +212,45 @@ export function computeSnapshotDiff(
   const panels = snapshot.panels || {};
   const primaryWinId = Object.keys(snapshot.windows)[0] || "1";
   const allTabs = (snapshot.windows[primaryWinId]?.tabs || []).map((t) => ({ ...t }));
+  const effectivePanelIds = getEffectivePanelIds(options);
+  const shouldCrossPanelMerge =
+    options.crossPanelMerge ?? rulesSettings.crossPanelMerge ?? true;
+  const extensionBaseUrl =
+    snapshot.extensionBaseUrl || "moz-extension://sidebery-placeholder";
 
-  // Determine effective panels based on scope
-  let effectivePanelIds: Set<string> | null = null;
-  if (options.scope === "current" && options.currentActivePanelId) {
-    effectivePanelIds = new Set([options.currentActivePanelId]);
-  } else if (options.scope === "selected" && options.targetPanelIds && options.targetPanelIds.length > 0) {
-    effectivePanelIds = new Set(options.targetPanelIds);
-  }
-
-  const shouldCrossPanelMerge = options.crossPanelMerge ?? rulesSettings.crossPanelMerge ?? true;
-
-  // 跨面板合并预处理：将属于同一规则或 AI 类别的标签合并到此类标签最多的面板
+  // 跨面板合并预处理：按优先级将跨面板散落标签聚合到主体面板
   if (shouldCrossPanelMerge) {
-    // 1. 规则跨面板聚合
+    // 1. 规则跨面板聚合（支持 moveToPanel / groupAndMove 指定目标面板与 exempt 跳过）
     if (options.enableRules) {
       const activeRules = rulesSettings.rules.filter((r) => r.enabled);
       for (const rule of activeRules) {
-        const threshold = rule.minThreshold || rulesSettings.defaultMinThreshold || 2;
+        const actionType = rule.action?.type || "group";
+        if (actionType === "exempt") continue;
+
+        const threshold =
+          actionType === "moveToPanel"
+            ? 1
+            : rule.minThreshold || rulesSettings.defaultMinThreshold || 2;
+
         const matchedTabs = allTabs.filter((t) => {
           const pId = t.panelId || "main";
           if (effectivePanelIds && !effectivePanelIds.has(pId)) return false;
-          if (t.pinned || isExemptUrl(t.url, t.pinned)) return false;
+          if (isTabExempted(t, options)) return false;
           return matchTabWithRule(t, rule);
         });
 
         if (matchedTabs.length >= threshold) {
-          const targetPanel = determineTargetPanelForCategory(matchedTabs, matchedTabs[0]?.panelId || "main");
+          const explicitPanel =
+            (actionType === "moveToPanel" || actionType === "groupAndMove") &&
+            rule.action?.targetPanelId
+              ? rule.action.targetPanelId
+              : undefined;
+          const targetPanel =
+            explicitPanel ||
+            determineTargetPanelForCategory(
+              matchedTabs,
+              matchedTabs[0]?.panelId || "main"
+            );
           for (const tab of matchedTabs) {
             tab.panelId = targetPanel;
           }
@@ -86,12 +264,15 @@ export function computeSnapshotDiff(
         const matchedTabs = allTabs.filter((t) => {
           const pId = t.panelId || "main";
           if (effectivePanelIds && !effectivePanelIds.has(pId)) return false;
-          if (t.pinned || isExemptUrl(t.url, t.pinned)) return false;
+          if (isTabExempted(t, options)) return false;
           return options.aiClassificationMap!.get(String(t.id)) === catName;
         });
 
         if (matchedTabs.length > 0) {
-          const targetPanel = determineTargetPanelForCategory(matchedTabs, matchedTabs[0]?.panelId || "main");
+          const targetPanel = determineTargetPanelForCategory(
+            matchedTabs,
+            matchedTabs[0]?.panelId || "main"
+          );
           for (const tab of matchedTabs) {
             tab.panelId = targetPanel;
           }
@@ -105,7 +286,7 @@ export function computeSnapshotDiff(
       for (const tab of allTabs) {
         const pId = tab.panelId || "main";
         if (effectivePanelIds && !effectivePanelIds.has(pId)) continue;
-        if (tab.pinned || isExemptUrl(tab.url, tab.pinned)) continue;
+        if (isTabExempted(tab, options)) continue;
         const domain = extractDomainByMode(
           tab.url,
           options.domainMergeConfig.matchMode,
@@ -120,10 +301,42 @@ export function computeSnapshotDiff(
       const threshold = options.domainMergeConfig.minThreshold || 2;
       for (const [, tabs] of domainMap.entries()) {
         if (tabs.length >= threshold) {
-          const targetPanel = determineTargetPanelForCategory(tabs, tabs[0]?.panelId || "main");
+          const targetPanel = determineTargetPanelForCategory(
+            tabs,
+            tabs[0]?.panelId || "main"
+          );
           for (const tab of tabs) {
             tab.panelId = targetPanel;
           }
+        }
+      }
+    }
+
+    // 4. Option B 本地微簇跨面板聚合
+    if (options.enableLocalCluster) {
+      const scopedNonExempt = allTabs.filter((t) => {
+        const pId = t.panelId || "main";
+        if (effectivePanelIds && !effectivePanelIds.has(pId)) return false;
+        return !isTabExempted(t, options);
+      });
+      const report = clusterSnapshotTabs(
+        scopedNonExempt,
+        panels,
+        options.clusterGranularity || "balanced"
+      );
+      const tabById = new Map(allTabs.map((t) => [String(t.id), t]));
+      for (const clu of report.clusters) {
+        if (clu.tabCount < 2 || clu.cohesionReason === "tail_misc") continue;
+        const cluTabs = clu.tabIds
+          .map((id) => tabById.get(id))
+          .filter((t): t is SideberyTab => Boolean(t));
+        if (cluTabs.length < 2) continue;
+        const targetPanel = determineTargetPanelForCategory(
+          cluTabs,
+          cluTabs[0]?.panelId || "main"
+        );
+        for (const tab of cluTabs) {
+          tab.panelId = targetPanel;
         }
       }
     }
@@ -139,7 +352,6 @@ export function computeSnapshotDiff(
     panelTabsMap.get(pId)!.push(t);
   }
 
-  // Also include panels that exist in snapshot.panels even if empty
   for (const pId of Object.keys(panels)) {
     if (!panelTabsMap.has(pId)) {
       panelTabsMap.set(pId, []);
@@ -157,7 +369,6 @@ export function computeSnapshotDiff(
     let panelDeduped = 0;
     let panelGroupsCreated = 0;
 
-    // Check if this panel is within scope
     const isPanelInScope = !effectivePanelIds || effectivePanelIds.has(panelId);
 
     if (isPanelInScope) {
@@ -169,19 +380,19 @@ export function computeSnapshotDiff(
         totalDeduped += panelDeduped;
       }
 
-      // 2. Rule-based clustering (Prioritize semantic rules over general domain grouping)
+      // 2. Rule-based clustering
       if (options.enableRules) {
         const ruleResult = applyRulesToTreeNodes(
           currentTree,
           rulesSettings,
-          snapshot.extensionBaseUrl || "moz-extension://sidebery-placeholder"
+          extensionBaseUrl
         );
         currentTree = ruleResult.newNodes;
         panelGroupsCreated += ruleResult.groupsCreated;
         totalGroupsCreated += ruleResult.groupsCreated;
       }
 
-      // 3. Same-Domain Tabs Merge (applied to remaining unassigned tabs)
+      // 3. Same-Domain Tabs Merge
       if (options.enableDomainMerge && options.domainMergeConfig) {
         const domainResult = applyDomainMergeToTreeNodes(
           currentTree,
@@ -191,7 +402,7 @@ export function computeSnapshotDiff(
             exemptInternalPages: options.exemptInternalPages ?? true,
             preserveSubtrees: options.preserveSubtrees ?? true,
             treatExistingGroupsAsUnit: rulesSettings.treatExistingGroupsAsUnit ?? true,
-            extensionBaseUrl: snapshot.extensionBaseUrl || "moz-extension://sidebery-placeholder",
+            extensionBaseUrl,
           }
         );
         currentTree = domainResult.newNodes;
@@ -199,16 +410,32 @@ export function computeSnapshotDiff(
         totalGroupsCreated += domainResult.groupsCreated;
       }
 
-      // 4. AI-based category clustering
-      if (options.enableAICategorize && options.aiClassificationMap && options.aiCategoryNames) {
+      // 4. Option B Local Micro-Cluster Grouping
+      if (options.enableLocalCluster) {
+        const clusterResult = applyLocalClusterToTreeNodes(
+          currentTree,
+          options,
+          extensionBaseUrl
+        );
+        currentTree = clusterResult.newNodes;
+        panelGroupsCreated += clusterResult.groupsCreated;
+        totalGroupsCreated += clusterResult.groupsCreated;
+      }
+
+      // 5. AI-based category clustering
+      if (
+        options.enableAICategorize &&
+        options.aiClassificationMap &&
+        options.aiCategoryNames
+      ) {
         currentTree = reorganizeTreeIntoCategories(
           currentTree,
           options.aiClassificationMap,
           options.aiCategoryNames,
           {
-            crossPanelMerge: false, // 已经在预处理阶段根据整体分布精准迁移过 panelId
+            crossPanelMerge: false,
             createGroupTab: options.createGroupTabs ?? rulesSettings.createGroupTabs ?? true,
-            extensionBaseUrl: snapshot.extensionBaseUrl,
+            extensionBaseUrl,
           }
         );
       }

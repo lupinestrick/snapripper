@@ -1,154 +1,158 @@
-import { SideberyTab, TabTreeNode, CategorizationRule, RulesSettings } from "@/types/sidebery";
+import {
+  SideberyTab,
+  TabTreeNode,
+  CategorizationRule,
+  RulesSettings,
+  RuleCondition,
+  RuleConditionField,
+  RuleConditionOperator,
+} from "@/types/sidebery";
 import { extractDomain, isExemptUrl } from "@/utils/urlHelper";
 import { isGroupTab } from "./snapshotParser";
 
+export {
+  DEFAULT_RULES,
+  RULE_PRESETS,
+  DEFAULT_RULES_SETTINGS,
+} from "@/constants/rulePresets";
+export { deduplicateTreeNodes } from "./treeOperations";
+
 /**
- * 契合主流互联网用户与重度浏览器使用习惯的通用分类规则集
+ * 将旧版 matchDomain / matchKeyword 规则无损标准化为 Option B 条件组 DSL
  */
-export const DEFAULT_RULES: CategorizationRule[] = [
-  {
-    id: "rule_dev",
-    name: "💻 开发与技术",
-    enabled: true,
-    scope: "all",
-    matchDomain: "github.com, gitlab.com, gitee.com, stackoverflow.com, npmjs.com, pypi.org, developer.mozilla.org, rust-lang.org, go.dev, vercel.com",
-    matchKeyword: "github, git, repo, commit, pull request, issue, docs, api, bug, typescript, python, rust, react, vue",
-    minThreshold: 2,
-    color: "#3b82f6",
-  },
-  {
-    id: "rule_ai",
-    name: "🤖 AI 与大模型",
-    enabled: true,
-    scope: "all",
-    matchDomain: "chatgpt.com, openai.com, anthropic.com, claude.ai, perplexity.ai, huggingface.co, deepseek.com, grok.com, ollama.com",
-    matchKeyword: "chatgpt, claude, ai, gpt, llm, prompt, model, 提示词, 大模型",
-    minThreshold: 2,
-    color: "#10b981",
-  },
-  {
-    id: "rule_media",
-    name: "🎬 影音与流媒体",
-    enabled: true,
-    scope: "all",
-    matchDomain: "youtube.com, bilibili.com, netflix.com, twitch.tv, spotify.com, nicovideo.jp, vimeo.com, soundcloud.com",
-    matchKeyword: "youtube, video, watch, 视频, 播放, 直播, live, bgm, 动漫, 影视",
-    minThreshold: 2,
-    color: "#ef4444",
-  },
-  {
-    id: "rule_social",
-    name: "💬 社交与社区交流",
-    enabled: true,
-    scope: "all",
-    matchDomain: "twitter.com, x.com, reddit.com, discord.com, t.me, v2ex.com, threads.net, bluesky.social, weibo.com, tieba.baidu.com",
-    matchKeyword: "reddit, thread, tweet, discussion, 社区, 帖子, 论坛, 讨论, 动态",
-    minThreshold: 2,
-    color: "#06b6d4",
-  },
-  {
-    id: "rule_research",
-    name: "📚 知识库与学术研究",
-    enabled: true,
-    scope: "all",
-    matchDomain: "wikipedia.org, arxiv.org, scholar.google.com, zhihu.com, medium.com, substack.com, juejin.cn, csdn.net",
-    matchKeyword: "wiki, paper, research, article, doc, tutorial, 论文, 专栏, 指南, 百科",
-    minThreshold: 2,
-    color: "#8b5cf6",
-  },
-  {
-    id: "rule_productivity",
-    name: "💼 办公协作与文档",
-    enabled: true,
-    scope: "all",
-    matchDomain: "notion.so, docs.google.com, drive.google.com, feishu.cn, larksuite.com, trello.com, jira.atlassian.com, linear.app, slack.com",
-    matchKeyword: "notion, doc, sheet, slide, board, workspace, 文档, 表格, 协作, 任务",
-    minThreshold: 2,
-    color: "#f59e0b",
-  },
-  {
-    id: "rule_shopping",
-    name: "🛒 电商与购物消费",
-    enabled: true,
-    scope: "all",
-    matchDomain: "amazon.com, taobao.com, jd.com, aliexpress.com, ebay.com, store.steampowered.com",
-    matchKeyword: "buy, shop, cart, store, price, deal, 商品, 购买, 订单, 购物车",
-    minThreshold: 2,
-    color: "#ec4899",
-  },
-  {
-    id: "rule_news",
-    name: "📰 新闻与科技快讯",
-    enabled: true,
-    scope: "all",
-    matchDomain: "news.ycombinator.com, techcrunch.com, theverge.com, bbc.com, 36kr.com, sspai.com",
-    matchKeyword: "news, daily, feed, report, 资讯, 早报, 科技, 快讯",
-    minThreshold: 2,
-    color: "#64748b",
-  },
-  {
-    id: "rule_design",
-    name: "🎨 设计与创意灵感",
-    enabled: true,
-    scope: "all",
-    matchDomain: "figma.com, dribbble.com, behance.net, pinterest.com, artstation.com, unsplash.com",
-    matchKeyword: "design, figma, ui, ux, inspiration, illustration, 设计, 画板, 素材",
-    minThreshold: 2,
-    color: "#f97316",
-  },
-];
+export function normalizeRuleToDSL(rule: CategorizationRule): CategorizationRule {
+  if (rule.conditions && rule.conditions.length > 0) {
+    return {
+      ...rule,
+      matchMode: rule.matchMode || "all",
+      action: rule.action || { type: "group", createGroup: true },
+    };
+  }
 
-export const RULE_PRESETS: Record<string, { name: string; description: string; rules: CategorizationRule[] }> = {
-  general: {
-    name: "🌐 互联网通用日常习惯",
-    description: "涵盖社交、视频、新闻、购物、办公、知识库等主流场景",
-    rules: DEFAULT_RULES,
-  },
-  developer: {
-    name: "💻 程序员/开发者专注",
-    description: "侧重代码托管、技术规范、API文档、AI 助手、Issue 追踪",
-    rules: [
-      DEFAULT_RULES[0], // Dev
-      DEFAULT_RULES[1], // AI
-      DEFAULT_RULES[4], // Research
-      DEFAULT_RULES[5], // Productivity
-      DEFAULT_RULES[7], // News
-    ],
-  },
-  student_research: {
-    name: "📚 学者与深度研究",
-    description: "侧重学术论文、维基百科、文献检索与笔记管理",
-    rules: [
-      DEFAULT_RULES[4], // Research
-      DEFAULT_RULES[1], // AI
-      DEFAULT_RULES[5], // Productivity
-      DEFAULT_RULES[7], // News
-    ],
-  },
-  media_entertainment: {
-    name: "🎬 影音生活与娱乐",
-    description: "侧重长短视频、流媒体、社交讨论、音乐与社区分享",
-    rules: [
-      DEFAULT_RULES[2], // Media
-      DEFAULT_RULES[3], // Social
-      DEFAULT_RULES[6], // Shopping
-      DEFAULT_RULES[8], // Design
-    ],
-  },
-};
+  const synthesized: RuleCondition[] = [];
+  if (rule.matchDomain && rule.matchDomain.trim()) {
+    synthesized.push({
+      id: `${rule.id}_dom`,
+      field: "domain",
+      operator: "contains",
+      value: rule.matchDomain.trim(),
+    });
+  }
+  if (rule.matchKeyword && rule.matchKeyword.trim()) {
+    synthesized.push({
+      id: `${rule.id}_kw`,
+      field: "title",
+      operator: "contains",
+      value: rule.matchKeyword.trim(),
+    });
+  }
 
-export const DEFAULT_RULES_SETTINGS: RulesSettings = {
-  treatExistingGroupsAsUnit: true,
-  defaultMinThreshold: 2,
-  crossPanelMerge: true,
-  createGroupTabs: true,
-  rules: DEFAULT_RULES,
-};
+  return {
+    ...rule,
+    matchMode: rule.matchMode || "any",
+    conditions: synthesized,
+    action: rule.action || { type: "group", createGroup: true },
+  };
+}
 
+function getTabFieldValue(tab: SideberyTab, field: RuleConditionField): string {
+  switch (field) {
+    case "domain":
+      return extractDomain(tab.url).toLowerCase();
+    case "urlPath": {
+      try {
+        return new URL(tab.url).pathname.toLowerCase();
+      } catch {
+        return "";
+      }
+    }
+    case "title":
+      return (tab.title || "").toLowerCase();
+    case "url":
+      return (tab.url || "").toLowerCase();
+    case "panel":
+      return (tab.panelId || "main").toLowerCase();
+    case "container":
+      return (tab.containerId || "").toLowerCase();
+    default:
+      return "";
+  }
+}
+
+function matchSingleValue(
+  haystack: string,
+  field: RuleConditionField,
+  operator: RuleConditionOperator,
+  needle: string
+): boolean {
+  const cleanNeedle = needle.trim().toLowerCase();
+  if (!cleanNeedle) return false;
+
+  if (field === "domain" && (operator === "contains" || operator === "equals")) {
+    return haystack === cleanNeedle || haystack.endsWith(`.${cleanNeedle}`);
+  }
+
+  switch (operator) {
+    case "contains":
+      return haystack.includes(cleanNeedle);
+    case "equals":
+      return haystack === cleanNeedle;
+    case "startsWith":
+      return haystack.startsWith(cleanNeedle);
+    default:
+      return false;
+  }
+}
+
+/**
+ * 评估单条条件是否命中指定标签页（支持逗号分隔多值、正则与否定操作符）
+ */
+export function evaluateCondition(tab: SideberyTab, condition: RuleCondition): boolean {
+  const rawVal = (condition.value || "").trim();
+  if (!rawVal) return false;
+
+  const haystack = getTabFieldValue(tab, condition.field);
+  // title 字段在旧版中同时检查 title 与 url，保持一致体验
+  const secondaryUrl = condition.field === "title" ? (tab.url || "").toLowerCase() : "";
+
+  if (condition.operator === "regex") {
+    try {
+      const re = new RegExp(rawVal, "i");
+      return re.test(haystack) || (secondaryUrl ? re.test(secondaryUrl) : false);
+    } catch {
+      return false;
+    }
+  }
+
+  const terms = rawVal
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (terms.length === 0) return false;
+
+  const isNegated = condition.operator === "notContains" || condition.operator === "notEquals";
+  const baseOp: RuleConditionOperator =
+    condition.operator === "notContains"
+      ? "contains"
+      : condition.operator === "notEquals"
+        ? "equals"
+        : condition.operator;
+
+  const anyMatched = terms.some(
+    (term) =>
+      matchSingleValue(haystack, condition.field, baseOp, term) ||
+      (secondaryUrl ? matchSingleValue(secondaryUrl, "url", baseOp, term) : false)
+  );
+
+  return isNegated ? !anyMatched : anyMatched;
+}
+
+/**
+ * 评估标签页是否命中规则（支持 scope 过滤、Condition DSL 与旧版兼容）
+ */
 export function matchTabWithRule(tab: SideberyTab, rule: CategorizationRule): boolean {
   if (!rule.enabled) return false;
 
-  // Scope check
   if (rule.scope === "panel" && rule.targetScopeId && tab.panelId !== rule.targetScopeId) {
     return false;
   }
@@ -156,32 +160,108 @@ export function matchTabWithRule(tab: SideberyTab, rule: CategorizationRule): bo
     return false;
   }
 
-  // Domain check
-  if (rule.matchDomain) {
-    const domains = rule.matchDomain.split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
-    const tabDomain = extractDomain(tab.url).toLowerCase();
-    for (const d of domains) {
-      if (tabDomain === d || tabDomain.endsWith(`.${d}`)) {
-        return true;
-      }
-    }
-  }
+  const normalized = normalizeRuleToDSL(rule);
+  const conditions = normalized.conditions || [];
+  if (conditions.length === 0) return false;
 
-  // Keyword check in title or URL
-  if (rule.matchKeyword) {
-    const keywords = rule.matchKeyword.split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
-    const titleLower = (tab.title || "").toLowerCase();
-    const urlLower = (tab.url || "").toLowerCase();
-    for (const k of keywords) {
-      if (titleLower.includes(k) || urlLower.includes(k)) {
-        return true;
-      }
-    }
+  if (normalized.matchMode === "all") {
+    return conditions.every((cond) => evaluateCondition(tab, cond));
   }
-
-  return false;
+  return conditions.some((cond) => evaluateCondition(tab, cond));
 }
 
+/**
+ * 解释单个标签在规则集中的命中与被前置规则遮蔽（冲突）情况
+ */
+export function explainTabMatch(
+  tab: SideberyTab,
+  rules: CategorizationRule[]
+): {
+  matchedRule: CategorizationRule | null;
+  allMatchingRules: CategorizationRule[];
+} {
+  const allMatchingRules = rules.filter((r) => matchTabWithRule(tab, r));
+  return {
+    matchedRule: allMatchingRules[0] || null,
+    allMatchingRules,
+  };
+}
+
+export interface RulePreviewStats {
+  ruleId: string;
+  effectiveHits: number;
+  shadowedHits: number;
+  sampleTitles: string[];
+}
+
+/**
+ * 实时计算当前规则列表在快照标签上的命中分布与冲突抢占数
+ */
+export function previewRulesOnTabs(
+  tabs: SideberyTab[],
+  rules: CategorizationRule[]
+): Map<string, RulePreviewStats> {
+  const statsMap = new Map<string, RulePreviewStats>();
+  for (const r of rules) {
+    statsMap.set(r.id, {
+      ruleId: r.id,
+      effectiveHits: 0,
+      shadowedHits: 0,
+      sampleTitles: [],
+    });
+  }
+
+  for (const tab of tabs) {
+    if (tab.pinned || isExemptUrl(tab.url, tab.pinned) || isGroupTab(tab)) continue;
+    const { matchedRule, allMatchingRules } = explainTabMatch(tab, rules);
+    for (const r of allMatchingRules) {
+      const entry = statsMap.get(r.id);
+      if (!entry) continue;
+      if (matchedRule && matchedRule.id === r.id) {
+        entry.effectiveHits++;
+        if (entry.sampleTitles.length < 3 && tab.title) {
+          entry.sampleTitles.push(tab.title.trim().slice(0, 40));
+        }
+      } else {
+        entry.shadowedHits++;
+      }
+    }
+  }
+
+  return statsMap;
+}
+
+const FIELD_LABELS: Record<RuleConditionField, string> = {
+  domain: "域名",
+  urlPath: "路径",
+  title: "标题",
+  url: "URL",
+  panel: "面板",
+  container: "容器",
+};
+
+const OP_LABELS: Record<RuleConditionOperator, string> = {
+  contains: "含",
+  equals: "=",
+  startsWith: "开头",
+  regex: "正则",
+  notContains: "不含",
+  notEquals: "≠",
+};
+
+/**
+ * 将规则条件格式化为极简的胶囊描述标签列表（用于 UI 展示）
+ */
+export function formatRuleConditionsCompact(rule: CategorizationRule): string[] {
+  const normalized = normalizeRuleToDSL(rule);
+  return (normalized.conditions || [])
+    .filter((c) => c.value.trim())
+    .map((c) => `${FIELD_LABELS[c.field]} ${OP_LABELS[c.operator]} ${c.value.trim()}`);
+}
+
+/**
+ * 执行规则集合的动作（建折叠组 / 仅移入面板 / 建组并移入面板 / 跳过保护）
+ */
 export function applyRulesToTreeNodes(
   nodes: TabTreeNode[],
   settings: RulesSettings,
@@ -196,7 +276,6 @@ export function applyRulesToTreeNodes(
     return { newNodes: nodes, matchedCount: 0, groupsCreated: 0 };
   }
 
-  // Group candidate nodes: collect root nodes or nodes to cluster
   const ruleBuckets = new Map<string, { rule: CategorizationRule; nodes: TabTreeNode[] }>();
   for (const rule of activeRules) {
     ruleBuckets.set(rule.id, { rule, nodes: [] });
@@ -206,25 +285,28 @@ export function applyRulesToTreeNodes(
   let matchedCount = 0;
 
   for (const node of nodes) {
-    // Check if node is exempt (pinned, etc.)
     if (node.isPinned || isExemptUrl(node.tab.url, node.tab.pinned)) {
       unassignedNodes.push(node);
       continue;
     }
 
-    // Check if already a group and setting says treat as unit
     if (node.isGroup && settings.treatExistingGroupsAsUnit) {
       unassignedNodes.push(node);
       continue;
     }
 
-    // Match against rules in priority order
     let matched = false;
     for (const rule of activeRules) {
       if (matchTabWithRule(node.tab, rule)) {
-        ruleBuckets.get(rule.id)!.nodes.push(node);
+        const actionType = rule.action?.type || "group";
+        if (actionType === "exempt") {
+          // 跳过保护动作：直接保留在原位且不被后续规则匹配
+          unassignedNodes.push(node);
+        } else {
+          ruleBuckets.get(rule.id)!.nodes.push(node);
+          matchedCount += 1;
+        }
         matched = true;
-        matchedCount += 1;
         break;
       }
     }
@@ -236,109 +318,87 @@ export function applyRulesToTreeNodes(
 
   const resultNodes: TabTreeNode[] = [];
   let groupsCreated = 0;
+  let virtualCounter = 0;
 
-  // Build group headers for rules that meet threshold
-  for (const [_, { rule, nodes: matchedNodes }] of ruleBuckets.entries()) {
+  for (const [, { rule, nodes: matchedNodes }] of ruleBuckets.entries()) {
+    const action = rule.action || { type: "group", createGroup: true };
+
+    if (action.type === "moveToPanel") {
+      const targetPanel = action.targetPanelId || matchedNodes[0]?.tab.panelId || "main";
+      for (const n of matchedNodes) {
+        unassignedNodes.push({
+          ...n,
+          tab: { ...n.tab, panelId: targetPanel },
+        });
+      }
+      continue;
+    }
+
     const threshold = rule.minThreshold || settings.defaultMinThreshold || 2;
-
     if (matchedNodes.length >= threshold) {
+      const shouldCreateGroup =
+        (action.createGroup ?? true) && (settings.createGroupTabs ?? true);
+      const targetPanel =
+        action.type === "groupAndMove" && action.targetPanelId
+          ? action.targetPanelId
+          : matchedNodes[0]?.tab.panelId || "main";
+
       groupsCreated += 1;
-      const groupId = `group_rule_${rule.id}_${Date.now()}`;
-      const groupTabUrl = `${extensionBaseUrl}/sidebery/group.html#${encodeURIComponent(rule.name)}`;
+      virtualCounter += 1;
+
+      const groupId = shouldCreateGroup
+        ? `group_rule_${rule.id}_${virtualCounter}_${Date.now()}`
+        : `cat_rule_${rule.id}_${virtualCounter}_${Date.now()}`;
+      const groupTabUrl = shouldCreateGroup
+        ? `${extensionBaseUrl}/sidebery/group.html#${encodeURIComponent(rule.name)}`
+        : `about:blank#category=${encodeURIComponent(rule.name)}`;
+      const groupTitle = shouldCreateGroup
+        ? rule.name
+        : `📁 [${rule.name}] (${matchedNodes.length})`;
 
       const groupTab: SideberyTab = {
         id: groupId,
-        panelId: matchedNodes[0]?.tab.panelId || "main",
+        panelId: targetPanel,
         parentId: -1,
         lvl: 0,
-        title: rule.name,
+        title: groupTitle,
         url: groupTabUrl,
         folded: true,
-        isGroup: true,
+        isGroup: shouldCreateGroup,
+        customTitle: shouldCreateGroup ? null : `📁 [${rule.name}]`,
         customColor: rule.color,
       };
 
-      // Wrap matched nodes as children with depth + 1
-      const children = matchedNodes.map((childNode) => {
-        return {
-          ...childNode,
-          depth: 1,
-          tab: {
-            ...childNode.tab,
-            parentId: groupId,
-            lvl: 1,
-          },
-        };
-      });
+      const children = matchedNodes.map((childNode) => ({
+        ...childNode,
+        depth: 1,
+        tab: {
+          ...childNode.tab,
+          panelId: targetPanel,
+          parentId: groupId,
+          lvl: 1,
+        },
+      }));
 
       resultNodes.push({
         id: groupId,
         tab: groupTab,
         children,
         depth: 0,
-        isGroup: true,
+        isGroup: shouldCreateGroup,
+        isCategoryHeader: !shouldCreateGroup,
         categoryName: rule.name,
       });
     } else {
-      // Threshold not met, keep nodes unassigned
       unassignedNodes.push(...matchedNodes);
     }
   }
 
-  // Append remaining unassigned nodes
   resultNodes.push(...unassignedNodes);
 
   return {
     newNodes: resultNodes,
     matchedCount,
     groupsCreated,
-  };
-}
-
-export function deduplicateTreeNodes(nodes: TabTreeNode[]): {
-  newNodes: TabTreeNode[];
-  removedCount: number;
-} {
-  const seenUrls = new Set<string>();
-  let removedCount = 0;
-
-  function processList(list: TabTreeNode[]): TabTreeNode[] {
-    const filtered: TabTreeNode[] = [];
-
-    for (const node of list) {
-      if (node.isGroup) {
-        const cleanedChildren = processList(node.children);
-        filtered.push({
-          ...node,
-          children: cleanedChildren,
-        });
-        continue;
-      }
-
-      const normalized = (node.tab.url || "").replace(/#.*$/, "").trim();
-      if (!normalized || isExemptUrl(normalized, node.tab.pinned)) {
-        filtered.push(node);
-        continue;
-      }
-
-      if (seenUrls.has(normalized)) {
-        removedCount += 1;
-        continue;
-      }
-
-      seenUrls.add(normalized);
-      const cleanedChildren = processList(node.children);
-      filtered.push({
-        ...node,
-        children: cleanedChildren,
-      });
-    }
-
-    return filtered;
-  }
-
-  return {
-    newNodes: processList(nodes),
-    removedCount,
   };
 }

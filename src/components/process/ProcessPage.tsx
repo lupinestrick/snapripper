@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
 import { computeSnapshotDiff } from "@/services/diffEngine";
+import { clusterSnapshotTabs } from "@/services/tabClusterEngine";
 import { PanelDiffResult, SideberySnapshot } from "@/types/sidebery";
+import { ClusterGranularity } from "@/types/ai";
 import { DiffHopupModal } from "./DiffHopupModal";
 import { DiffSettingsModal } from "./DiffSettingsModal";
 import { flattenTabTree } from "@/services/snapshotParser";
@@ -18,16 +20,32 @@ import {
   AlertCircle,
   Sparkles,
   Globe,
-  ChevronRight,
   SlidersHorizontal,
   Layers,
   CheckCircle2,
   ArrowRight,
   X,
+  Play,
+  Check,
 } from "lucide-react";
 
+interface PipelineStepState {
+  enableDedup: boolean;
+  enableRules: boolean;
+  enableDomainMerge: boolean;
+  enableLocalCluster: boolean;
+  enableAI: boolean;
+}
+
+const GRANULARITY_LABELS: Record<ClusterGranularity, string> = {
+  coarse: "粗略",
+  balanced: "均衡",
+  fine: "细致",
+};
+
 export function ProcessPage() {
-  const { rawSnapshot, rootNodes, applySnapshotUpdate, aiProcessedCache } = useSnapshotStore();
+  const { rawSnapshot, rootNodes, activePanelId, applySnapshotUpdate, aiProcessedCache } =
+    useSnapshotStore();
   const {
     rulesSettings,
     domainMergeConfig,
@@ -44,18 +62,18 @@ export function ProcessPage() {
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [pageSettingsOpen, setPageSettingsOpen] = useState(false);
   const [appliedNotification, setAppliedNotification] = useState<string | null>(null);
+  const [clusterGranularity, setClusterGranularity] = useState<ClusterGranularity>("balanced");
 
-  const [activeProcessOptions, setActiveProcessOptions] = useState<{
-    enableDedup: boolean;
-    enableRules: boolean;
-    enableDomainMerge: boolean;
-    enableAI: boolean;
-  }>({
+  const [pipeline, setPipeline] = useState<PipelineStepState>({
     enableDedup: true,
     enableRules: true,
     enableDomainMerge: false,
+    enableLocalCluster: true,
     enableAI: false,
   });
+
+  const [lastExecutedOptions, setLastExecutedOptions] =
+    useState<PipelineStepState>(pipeline);
 
   const [diffResults, setDiffResults] = useState<{
     panelDiffs: PanelDiffResult[];
@@ -68,6 +86,25 @@ export function ProcessPage() {
     totalDeduped: 0,
     totalGroupsCreated: 0,
   });
+
+  const allTabs = useMemo(
+    () => (rawSnapshot ? flattenTabTree(rootNodes) : []),
+    [rawSnapshot, rootNodes]
+  );
+
+  const duplicateUrlSet = useMemo(() => getDuplicateUrlSet(allTabs), [allTabs]);
+  const totalDuplicateTabs = useMemo(
+    () =>
+      allTabs.filter(
+        (t) => duplicateUrlSet.has((t.url || "").replace(/#.*$/, "").trim()) && !t.pinned
+      ).length,
+    [allTabs, duplicateUrlSet]
+  );
+
+  const clusterReport = useMemo(() => {
+    if (!rawSnapshot || allTabs.length === 0) return null;
+    return clusterSnapshotTabs(allTabs, rawSnapshot.panels, clusterGranularity);
+  }, [rawSnapshot, allTabs, clusterGranularity]);
 
   if (!rawSnapshot) {
     return (
@@ -82,8 +119,8 @@ export function ProcessPage() {
           gap: "1rem",
         }}
       >
-        <AlertCircle size={40} color="var(--text-muted)" />
-        <p style={{ fontSize: "0.95rem" }}>暂无快照数据，请在工作台导入 Sidebery 快照。</p>
+        <AlertCircle size={36} color="var(--text-muted)" />
+        <p style={{ fontSize: "0.9rem" }}>暂无快照数据</p>
         <Button variant="solid" size="sm" pill onClick={() => setActivePage("workbench")}>
           前往工作台导入
         </Button>
@@ -91,28 +128,33 @@ export function ProcessPage() {
     );
   }
 
-  const allTabs = flattenTabTree(rootNodes);
   const totalTabs = allTabs.length;
-  const panelCount = rawSnapshot.panels ? Object.keys(rawSnapshot.panels).length : 0;
-  const duplicateUrlSet = getDuplicateUrlSet(allTabs);
-  const totalDuplicateTabs = allTabs.filter(
-    (t) => duplicateUrlSet.has((t.url || "").replace(/#.*$/, "").trim()) && !t.pinned
-  ).length;
   const activeRulesCount = rulesSettings.rules.filter((r) => r.enabled).length;
+  const multiTabClustersCount =
+    clusterReport?.clusters.filter((c) => c.tabCount >= 2 && c.cohesionReason !== "tail_misc")
+      .length || 0;
 
-  const runDiffComputation = (options: {
-    enableDedup: boolean;
-    enableRules: boolean;
-    enableDomainMerge: boolean;
-    enableAI: boolean;
-  }) => {
-    setActiveProcessOptions(options);
+  const panelsList = rawSnapshot.panels
+    ? Object.entries(rawSnapshot.panels).map(([id, p]) => ({ id, name: p.name || id }))
+    : [];
+
+  const scopeLabel =
+    processScope === "current"
+      ? `当前面板${activePanelId && rawSnapshot.panels?.[activePanelId]?.name ? ` (${rawSnapshot.panels[activePanelId].name})` : ""}`
+      : processScope === "selected"
+        ? `已选 ${selectedProcessPanelIds.length} 面板`
+        : "全部面板";
+
+  const runDiffComputation = (options: PipelineStepState) => {
+    setLastExecutedOptions(options);
+    const currentConfig = useConfigStore.getState();
+    const currentAiCache = useSnapshotStore.getState().aiProcessedCache;
 
     const aiMap =
-      options.enableAI && aiProcessedCache?.classificationMap
-        ? new Map(Object.entries(aiProcessedCache.classificationMap))
+      options.enableAI && currentAiCache?.classificationMap
+        ? new Map(Object.entries(currentAiCache.classificationMap))
         : undefined;
-    const aiCats = options.enableAI ? aiProcessedCache?.categoryNames : undefined;
+    const aiCats = options.enableAI ? currentAiCache?.categoryNames : undefined;
 
     const result = computeSnapshotDiff(
       rawSnapshot,
@@ -120,48 +162,15 @@ export function ProcessPage() {
         enableDedup: options.enableDedup,
         enableRules: options.enableRules,
         enableDomainMerge: options.enableDomainMerge,
-        domainMergeConfig,
-        enableAICategorize: options.enableAI,
-        aiClassificationMap: aiMap,
-        aiCategoryNames: aiCats,
-        scope: processScope,
-        targetPanelIds: selectedProcessPanelIds,
-        exemptPinned,
-        exemptInternalPages,
-        preserveSubtrees,
-        crossPanelMerge,
-        createGroupTabs,
-      },
-      rulesSettings
-    );
-
-    setDiffResults(result);
-    setDiffModalOpen(true);
-  };
-
-  const handleRecomputeCurrentDiff = () => {
-    if (!rawSnapshot) return;
-    const currentConfig = useConfigStore.getState();
-    const currentAiCache = useSnapshotStore.getState().aiProcessedCache;
-
-    const aiMap =
-      activeProcessOptions.enableAI && currentAiCache?.classificationMap
-        ? new Map(Object.entries(currentAiCache.classificationMap))
-        : undefined;
-    const aiCats = activeProcessOptions.enableAI ? currentAiCache?.categoryNames : undefined;
-
-    const result = computeSnapshotDiff(
-      rawSnapshot,
-      {
-        enableDedup: activeProcessOptions.enableDedup,
-        enableRules: activeProcessOptions.enableRules,
-        enableDomainMerge: activeProcessOptions.enableDomainMerge,
         domainMergeConfig: currentConfig.domainMergeConfig,
-        enableAICategorize: activeProcessOptions.enableAI,
+        enableLocalCluster: options.enableLocalCluster,
+        clusterGranularity,
+        enableAICategorize: options.enableAI,
         aiClassificationMap: aiMap,
         aiCategoryNames: aiCats,
         scope: currentConfig.processScope,
         targetPanelIds: currentConfig.selectedProcessPanelIds,
+        currentActivePanelId: activePanelId || undefined,
         exemptPinned: currentConfig.exemptPinned,
         exemptInternalPages: currentConfig.exemptInternalPages,
         preserveSubtrees: currentConfig.preserveSubtrees,
@@ -172,448 +181,468 @@ export function ProcessPage() {
     );
 
     setDiffResults(result);
+    setDiffModalOpen(true);
   };
 
   const handleConfirmApply = () => {
     if (diffResults.newSnapshot) {
       applySnapshotUpdate(diffResults.newSnapshot, "执行处理中心变更");
       setDiffModalOpen(false);
-      setAppliedNotification("✨ 已成功将处理中心变更应用至快照树，并同步保存到本地持久化缓存。");
+      setAppliedNotification("已应用处理变更至快照");
     }
   };
 
+  const toggleStep = (key: keyof PipelineStepState) => {
+    setPipeline((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const applyPreset = (preset: "full" | "dedup" | "cluster") => {
+    if (preset === "full") {
+      const next: PipelineStepState = {
+        enableDedup: true,
+        enableRules: true,
+        enableDomainMerge: true,
+        enableLocalCluster: true,
+        enableAI: false,
+      };
+      setPipeline(next);
+      runDiffComputation(next);
+    } else if (preset === "dedup") {
+      const next: PipelineStepState = {
+        enableDedup: true,
+        enableRules: false,
+        enableDomainMerge: false,
+        enableLocalCluster: false,
+        enableAI: false,
+      };
+      setPipeline(next);
+      runDiffComputation(next);
+    } else {
+      const next: PipelineStepState = {
+        enableDedup: true,
+        enableRules: false,
+        enableDomainMerge: false,
+        enableLocalCluster: true,
+        enableAI: false,
+      };
+      setPipeline(next);
+      runDiffComputation(next);
+    }
+  };
+
+  const activeStepsCount = Object.values(pipeline).filter(Boolean).length;
+
+  const pipelineRows: Array<{
+    key: keyof PipelineStepState;
+    order: number;
+    title: string;
+    icon: React.ReactNode;
+    badge: React.ReactNode;
+    disabled?: boolean;
+    extraControl?: React.ReactNode;
+  }> = [
+    {
+      key: "enableDedup",
+      order: 1,
+      title: "URL 去重",
+      icon: <Trash2 size={16} />,
+      badge:
+        totalDuplicateTabs > 0 ? (
+          <Badge
+            variant="subtle"
+            size="sm"
+            style={{ backgroundColor: "rgba(239, 68, 68, 0.14)", color: "var(--danger)" }}
+          >
+            {totalDuplicateTabs} 重复
+          </Badge>
+        ) : (
+          <Badge variant="subtle" size="sm" style={{ color: "var(--success)" }}>
+            无重复
+          </Badge>
+        ),
+    },
+    {
+      key: "enableRules",
+      order: 2,
+      title: "规则分组",
+      icon: <FolderPlus size={16} />,
+      badge: (
+        <Badge variant="subtle" size="sm">
+          {activeRulesCount} 条启用
+        </Badge>
+      ),
+    },
+    {
+      key: "enableDomainMerge",
+      order: 3,
+      title: "同域名合并",
+      icon: <Globe size={16} />,
+      badge: (
+        <Badge variant="subtle" size="sm">
+          阈值 ≥{domainMergeConfig.minThreshold || 2}
+        </Badge>
+      ),
+    },
+    {
+      key: "enableLocalCluster",
+      order: 4,
+      title: "本地微簇聚拢",
+      icon: <Layers size={16} />,
+      badge: (
+        <Badge
+          variant="subtle"
+          size="sm"
+          style={{ backgroundColor: "var(--accent-subtle)", color: "var(--accent-text)" }}
+        >
+          {multiTabClustersCount} 组 · 0 Token
+        </Badge>
+      ),
+      extraControl: (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}
+        >
+          {(["coarse", "balanced", "fine"] as ClusterGranularity[]).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setClusterGranularity(g)}
+              style={{
+                padding: "1px 6px",
+                borderRadius: "9999px",
+                fontSize: "0.66rem",
+                border: "1px solid",
+                borderColor:
+                  clusterGranularity === g ? "var(--accent-border)" : "var(--border-subtle)",
+                backgroundColor:
+                  clusterGranularity === g ? "var(--accent-subtle)" : "transparent",
+                color:
+                  clusterGranularity === g ? "var(--accent-text)" : "var(--text-muted)",
+                cursor: "pointer",
+              }}
+            >
+              {GRANULARITY_LABELS[g]}
+            </button>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "enableAI",
+      order: 5,
+      title: "AI 方案映射",
+      icon: <Bot size={16} />,
+      disabled: !aiProcessedCache,
+      badge: aiProcessedCache ? (
+        <Badge
+          variant="subtle"
+          size="sm"
+          style={{ backgroundColor: "rgba(16, 185, 129, 0.14)", color: "var(--success)" }}
+        >
+          {aiProcessedCache.categoryNames?.length || 0} 分类缓存
+        </Badge>
+      ) : (
+        <Badge variant="subtle" size="sm" style={{ color: "var(--text-muted)" }}>
+          无缓存
+        </Badge>
+      ),
+      extraControl: !aiProcessedCache ? (
+        <Button
+          variant="ghost"
+          size="xs"
+          pill
+          onClick={(e) => {
+            e.stopPropagation();
+            setActivePage("ai");
+          }}
+          style={{ fontSize: "0.7rem", color: "var(--accent-text)" }}
+        >
+          <span>AI 架构师</span>
+          <ArrowRight size={11} />
+        </Button>
+      ) : undefined,
+    },
+  ];
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "900px", margin: "0 auto", color: "var(--text-main)" }}>
-      {/* Title & Action Bar */}
+    <div style={{ padding: "1.75rem 2rem", maxWidth: "880px", margin: "0 auto", color: "var(--text-main)" }}>
+      {/* Header */}
       <div
         style={{
           display: "flex",
-          alignItems: "flex-start",
+          alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: "1.5rem",
+          marginBottom: "1rem",
           flexWrap: "wrap",
-          gap: "1rem",
+          gap: "0.75rem",
         }}
       >
-        <div>
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>快照处理中心</h1>
-          <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-            一键批量治理与重构 Sidebery 快照，支持实时差分对比与无损回滚
-          </p>
-        </div>
+        <h1 style={{ fontSize: "1.35rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+          处理中心
+        </h1>
 
-        <Button
-          variant="outline"
-          size="sm"
-          pill
-          onClick={() => setPageSettingsOpen(true)}
-          style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}
-        >
-          <SlidersHorizontal size={14} />
-          <span>整理与规则设置</span>
-        </Button>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+          <Button variant="subtle" size="xs" pill onClick={() => applyPreset("full")}>
+            <Sparkles size={12} />
+            <span>全量预设</span>
+          </Button>
+          <Button variant="outline" size="xs" pill onClick={() => applyPreset("dedup")}>
+            <span>仅去重</span>
+          </Button>
+          <Button variant="outline" size="xs" pill onClick={() => applyPreset("cluster")}>
+            <span>去重+微簇</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            pill
+            onClick={() => setPageSettingsOpen(true)}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+          >
+            <SlidersHorizontal size={12} />
+            <span>设置</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Applied Notification Banner */}
+      {/* Compact Telemetry Strip */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "0.75rem",
+          padding: "0.65rem 1rem",
+          borderRadius: "0.75rem",
+          backgroundColor: "var(--bg-surface)",
+          border: "1px solid var(--border-subtle)",
+          marginBottom: "1rem",
+          fontSize: "0.78rem",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
+          <span>
+            标签 <strong style={{ color: "var(--text-main)" }}>{totalTabs}</strong>
+          </span>
+          <span>
+            重复{" "}
+            <strong style={{ color: totalDuplicateTabs > 0 ? "var(--danger)" : "var(--success)" }}>
+              {totalDuplicateTabs}
+            </strong>
+          </span>
+          <span>
+            规则 <strong style={{ color: "var(--text-main)" }}>{activeRulesCount}</strong>
+          </span>
+          <span>
+            微簇 <strong style={{ color: "var(--accent-text)" }}>{clusterReport?.clusters.length || 0}</strong>
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setPageSettingsOpen(true)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.3rem",
+            padding: "2px 8px",
+            borderRadius: "9999px",
+            border: "1px solid var(--border-subtle)",
+            backgroundColor: "var(--bg-card)",
+            color: "var(--text-muted)",
+            fontSize: "0.72rem",
+            cursor: "pointer",
+          }}
+        >
+          <span>范围：{scopeLabel}</span>
+        </button>
+      </div>
+
+      {/* Applied Notification */}
       {appliedNotification && (
         <div
           style={{
-            padding: "0.75rem 1.25rem",
+            padding: "0.6rem 1rem",
             borderRadius: "0.75rem",
             backgroundColor: "rgba(16, 185, 129, 0.12)",
             border: "1px solid rgba(16, 185, 129, 0.35)",
-            marginBottom: "1.5rem",
+            marginBottom: "1rem",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: "1rem",
-            animation: "fadeIn 0.2s ease-in-out",
+            gap: "0.75rem",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", color: "var(--text-main)" }}>
-            <CheckCircle2 size={16} style={{ color: "var(--success)" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.82rem" }}>
+            <CheckCircle2 size={15} style={{ color: "var(--success)" }} />
             <span>{appliedNotification}</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Button
-              variant="solid"
-              size="xs"
-              pill
-              onClick={() => setActivePage("workbench")}
-              style={{ fontSize: "0.75rem" }}
-            >
-              前往工作台查看
-              <ArrowRight size={12} style={{ marginLeft: "2px" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <Button variant="solid" size="xs" pill onClick={() => setActivePage("workbench")}>
+              查看工作台
             </Button>
             <Button
               variant="ghost"
               size="xs"
               pill
               onClick={() => setAppliedNotification(null)}
-              style={{ color: "var(--text-muted)", padding: "4px" }}
+              style={{ padding: "4px" }}
             >
-              <X size={14} />
+              <X size={13} />
             </Button>
           </div>
         </div>
       )}
 
-      {/* Snapshot Health & Live Diagnostic Card */}
+      {/* Composable Pipeline List */}
       <div
         style={{
-          padding: "1rem 1.25rem",
-          borderRadius: "0.875rem",
-          backgroundColor: "var(--bg-subtle)",
-          border: "1px solid var(--border-subtle)",
+          borderRadius: "0.9rem",
+          border: "1px solid var(--border-card)",
+          backgroundColor: "var(--bg-surface)",
+          overflow: "hidden",
+        }}
+      >
+        {pipelineRows.map((row, idx) => {
+          const isChecked = pipeline[row.key] && !row.disabled;
+          return (
+            <div
+              key={row.key}
+              onClick={() => !row.disabled && toggleStep(row.key)}
+              style={{
+                padding: "0.85rem 1.1rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "0.75rem",
+                borderTop: idx === 0 ? "none" : "1px solid var(--border-subtle)",
+                backgroundColor: isChecked ? "var(--bg-card)" : "transparent",
+                opacity: row.disabled ? 0.55 : 1,
+                cursor: row.disabled ? "default" : "pointer",
+                transition: "background-color 0.12s ease",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0, flexWrap: "wrap" }}>
+                {/* Step Checkbox */}
+                <span
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "5px",
+                    border: "1px solid",
+                    borderColor: isChecked ? "var(--accent-solid)" : "var(--border-card)",
+                    backgroundColor: isChecked ? "var(--accent-solid)" : "transparent",
+                    color: "#fff",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isChecked && <Check size={12} strokeWidth={3} />}
+                </span>
+
+                <span
+                  style={{
+                    fontSize: "0.68rem",
+                    fontFamily: "monospace",
+                    color: "var(--text-muted)",
+                    width: "14px",
+                  }}
+                >
+                  0{row.order}
+                </span>
+
+                <span
+                  style={{
+                    width: "30px",
+                    height: "30px",
+                    borderRadius: "9999px",
+                    backgroundColor: isChecked ? "var(--accent-subtle)" : "var(--bg-subtle)",
+                    color: isChecked ? "var(--accent)" : "var(--text-muted)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {row.icon}
+                </span>
+
+                <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-main)" }}>
+                  {row.title}
+                </span>
+
+                {row.badge}
+              </div>
+
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {row.extraControl}
+
+                {!row.disabled && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    pill
+                    onClick={() =>
+                      runDiffComputation({
+                        enableDedup: row.key === "enableDedup",
+                        enableRules: row.key === "enableRules",
+                        enableDomainMerge: row.key === "enableDomainMerge",
+                        enableLocalCluster: row.key === "enableLocalCluster",
+                        enableAI: row.key === "enableAI",
+                      })
+                    }
+                    style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}
+                  >
+                    单独预览
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Primary Execute Bar */}
+      <div
+        style={{
+          marginTop: "1rem",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: "1.5rem",
           flexWrap: "wrap",
           gap: "0.75rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem", color: "var(--text-main)" }}>
-            <Layers size={15} style={{ color: "var(--accent)" }} />
-            <span style={{ fontWeight: 600 }}>{totalTabs}</span> 标签 ·{" "}
-            <span style={{ fontWeight: 600 }}>{panelCount}</span> 面板
-          </div>
-
-          <div style={{ width: "1px", height: "14px", backgroundColor: "var(--border-subtle)" }} />
-
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-            <span>范围:</span>
-            <Badge variant="outline" size="sm">
-              {processScope === "all" ? "全部面板" : processScope === "current" ? "当前面板" : "指定面板"}
-            </Badge>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.78rem", color: "var(--text-muted)" }}>
-            <span>跨面板合并:</span>
-            <Badge variant="subtle" size="sm" style={{ color: crossPanelMerge ? "var(--accent)" : "var(--text-muted)" }}>
-              {crossPanelMerge ? "已开启" : "已关闭"}
-            </Badge>
-          </div>
+        <div style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
+          已选 {activeStepsCount} 步 · {crossPanelMerge ? "跨面板聚合" : "单面板内"} ·{" "}
+          {createGroupTabs ? "原生折叠组" : "虚拟标题组"}
         </div>
 
-        {totalDuplicateTabs > 0 && (
-          <Badge
-            variant="subtle"
-            size="sm"
-            style={{ backgroundColor: "rgba(239, 68, 68, 0.15)", color: "var(--danger)", fontWeight: 600 }}
-          >
-            ⚠️ 检测到 {totalDuplicateTabs} 个重复标签
-          </Badge>
-        )}
+        <Button
+          variant="solid"
+          size="md"
+          pill
+          disabled={activeStepsCount === 0}
+          onClick={() => runDiffComputation(pipeline)}
+          style={{
+            backgroundColor: "var(--accent-solid)",
+            color: "#fff",
+            fontWeight: 600,
+            padding: "0.5rem 1.4rem",
+          }}
+        >
+          <Play size={14} />
+          <span>预览流水线变更 (DIFF)</span>
+        </Button>
       </div>
 
-      {/* Feature Cards Grid (Direct click triggers diff hopup) */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-        {/* Card 1: All-in-One Optimization */}
-        <div
-          onClick={() =>
-            runDiffComputation({
-              enableDedup: true,
-              enableRules: true,
-              enableDomainMerge: true,
-              enableAI: false,
-            })
-          }
-          style={{
-            padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--accent-solid)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "9999px",
-                backgroundColor: "var(--accent-subtle)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--accent)",
-              }}
-            >
-              <Sparkles size={20} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>
-                  一键全量优化 (去重 + 规则建组 + 同域名合并)
-                </span>
-                <Badge variant="solid" size="sm" style={{ backgroundColor: "var(--accent-solid)", color: "#fff" }}>
-                  推荐全量
-                </Badge>
-              </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                智能优化流水线：依次执行 URL 智能去重、规则语义分组与剩余同域名折叠
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
-            <ChevronRight size={18} />
-          </div>
-        </div>
-
-        {/* Card 2: Deduplication */}
-        <div
-          onClick={() =>
-            runDiffComputation({
-              enableDedup: true,
-              enableRules: false,
-              enableDomainMerge: false,
-              enableAI: false,
-            })
-          }
-          style={{
-            padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-card)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "9999px",
-                backgroundColor: "var(--accent-subtle)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--accent)",
-              }}
-            >
-              <Trash2 size={20} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>URL 智能去重</span>
-                {totalDuplicateTabs > 0 ? (
-                  <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(239, 68, 68, 0.15)", color: "var(--danger)" }}>
-                    可清理 {totalDuplicateTabs} 个重复
-                  </Badge>
-                ) : (
-                  <Badge variant="subtle" size="sm" style={{ color: "var(--success)" }}>
-                    暂无重复
-                  </Badge>
-                )}
-              </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                跨面板或同面板扫描重复打开的相同网页，保留首个实例并清除冗余
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
-            <ChevronRight size={18} />
-          </div>
-        </div>
-
-        {/* Card 3: Rule-based Grouping */}
-        <div
-          onClick={() =>
-            runDiffComputation({
-              enableDedup: false,
-              enableRules: true,
-              enableDomainMerge: false,
-              enableAI: false,
-            })
-          }
-          style={{
-            padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-card)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "9999px",
-                backgroundColor: "var(--accent-subtle)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--accent)",
-              }}
-            >
-              <FolderPlus size={20} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>基于规则自动归类成组</span>
-                <Badge variant="subtle" size="sm">
-                  {activeRulesCount} 条启用规则
-                </Badge>
-              </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                匹配域名与关键词，自动折叠为 Sidebery 原生 Group 分组并按需跨面板迁移
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
-            <ChevronRight size={18} />
-          </div>
-        </div>
-
-        {/* Card 4: Same Domain Tabs Merge */}
-        <div
-          onClick={() =>
-            runDiffComputation({
-              enableDedup: false,
-              enableRules: false,
-              enableDomainMerge: true,
-              enableAI: false,
-            })
-          }
-          style={{
-            padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-card)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "9999px",
-                backgroundColor: "var(--accent-subtle)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--accent)",
-              }}
-            >
-              <Globe size={20} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>同域名标签合并</span>
-                <Badge variant="subtle" size="sm">
-                  成组阈值: ≥{domainMergeConfig.minThreshold || 2}
-                </Badge>
-              </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                将同域名的标签页自动归类折叠为分组（支持完整域名、后缀或关键字匹配）
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
-            <ChevronRight size={18} />
-          </div>
-        </div>
-
-        {/* Card 5: AI Intelligent Restructure & Scheme */}
-        <div
-          onClick={() => {
-            if (aiProcessedCache) {
-              runDiffComputation({
-                enableDedup: false,
-                enableRules: false,
-                enableDomainMerge: false,
-                enableAI: true,
-              });
-            } else {
-              setActivePage("ai");
-            }
-          }}
-          style={{
-            padding: "1.25rem",
-            borderRadius: "1rem",
-            backgroundColor: "var(--bg-card)",
-            border: "1px solid var(--border-card)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-subtle)")}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-card)")}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "9999px",
-                backgroundColor: "var(--accent-subtle)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--accent)",
-              }}
-            >
-              <Bot size={20} />
-            </div>
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <span style={{ fontWeight: 600, fontSize: "1rem", color: "var(--text-main)" }}>
-                  AI 智能架构与分类重构
-                </span>
-                {aiProcessedCache ? (
-                  <Badge variant="subtle" size="sm" style={{ backgroundColor: "rgba(16, 185, 129, 0.15)", color: "var(--success)" }}>
-                    已有 AI 方案缓存
-                  </Badge>
-                ) : (
-                  <Badge variant="subtle" size="sm" style={{ color: "var(--accent)" }}>
-                    前往 AI 架构师 ↳
-                  </Badge>
-                )}
-              </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                {aiProcessedCache
-                  ? `查看并应用最近一次由 AI 智能架构师生成的重构方案（包含 ${aiProcessedCache.categoryNames?.length || 0} 个主题分类）`
-                  : "尚未生成 AI 方案，点击前往「AI 架构师」进行全库深度体检与方案推荐"}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)" }}>
-            <ChevronRight size={18} />
-          </div>
-        </div>
-      </div>
-
-      {/* Hop-up Modal for Diff */}
+      {/* Diff Modal */}
       <DiffHopupModal
         isOpen={diffModalOpen}
         onClose={() => setDiffModalOpen(false)}
@@ -621,18 +650,15 @@ export function ProcessPage() {
         panelDiffs={diffResults.panelDiffs}
         totalDeduped={diffResults.totalDeduped}
         totalGroupsCreated={diffResults.totalGroupsCreated}
-        onRecomputeDiff={handleRecomputeCurrentDiff}
+        onRecomputeDiff={() => runDiffComputation(lastExecutedOptions)}
       />
 
-      {/* Direct Page Settings Modal */}
+      {/* Settings Modal */}
       <DiffSettingsModal
         isOpen={pageSettingsOpen}
         onClose={() => setPageSettingsOpen(false)}
-        panels={
-          rawSnapshot?.panels
-            ? Object.entries(rawSnapshot.panels).map(([id, p]) => ({ id, name: p.name || id }))
-            : []
-        }
+        activePanelId={activePanelId || undefined}
+        panels={panelsList}
       />
     </div>
   );

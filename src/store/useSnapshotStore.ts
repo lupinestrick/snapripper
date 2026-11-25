@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SideberySnapshot, SideberyTab, TabTreeNode, CategorizationRule } from "@/types/sidebery";
-import { ProportionReport, AIProcessedCache, CategoryProportion, AIChatMessage } from "@/types/ai";
+import { ProportionReport, AIProcessedCache, CategoryProportion, AIChatMessage, AIChatSession } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
 import { useConfigStore } from "./useConfigStore";
 import { syncSnapshotCookie, clearSnapshotCookies } from "@/utils/cookieHelper";
@@ -117,6 +117,8 @@ interface SnapshotStoreState {
 
   aiProcessedCache: AIProcessedCache | null;
   aiChatMessages: AIChatMessage[];
+  aiChatSessions: AIChatSession[];
+  activeChatSessionId: string | null;
   isAIDiffModalOpen: boolean;
   isOverviewHopupOpen: boolean;
 
@@ -167,7 +169,12 @@ interface SnapshotStoreState {
   setAiProcessedCache: (cache: AIProcessedCache | null) => void;
   setAiChatMessages: (messages: AIChatMessage[]) => void;
   addAiChatMessage: (message: AIChatMessage) => void;
+  updateSchemeInChat: (messageId: string, updatedScheme: import("@/types/ai").ReorganizationScheme) => void;
   clearAiChatMessages: () => void;
+  startNewAiChat: () => void;
+  selectAiChatSession: (sessionId: string) => void;
+  renameAiChatSession: (sessionId: string, newTitle: string) => void;
+  deleteAiChatSession: (sessionId: string) => void;
   setIsAIDiffModalOpen: (open: boolean) => void;
   setIsOverviewHopupOpen: (open: boolean) => void;
   updateProcessedTreeTarget: (targetMode: "tree" | "panel", targetPanelId?: string) => void;
@@ -199,6 +206,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
 
   aiProcessedCache: null,
   aiChatMessages: [],
+  aiChatSessions: [],
+  activeChatSessionId: null,
   isAIDiffModalOpen: false,
   isOverviewHopupOpen: false,
 
@@ -635,8 +644,100 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   setAiProcessedCache: (cache) => set({ aiProcessedCache: cache }),
   setAiChatMessages: (messages) => set({ aiChatMessages: messages }),
   addAiChatMessage: (message) =>
-    set((state) => ({ aiChatMessages: [...state.aiChatMessages, message] })),
-  clearAiChatMessages: () => set({ aiChatMessages: [] }),
+    set((state) => {
+      const nextMessages = [...state.aiChatMessages, message];
+      const now = Date.now();
+      let sessionId = state.activeChatSessionId;
+      let nextSessions = [...(state.aiChatSessions || [])];
+
+      if (!sessionId) {
+        sessionId = `chat_${now}`;
+        const firstUserText =
+          nextMessages.find((m) => m.sender === "user")?.text ||
+          message.text ||
+          "新对话";
+        const autoTitle = firstUserText.trim().slice(0, 24) || "新对话";
+        nextSessions = [
+          { id: sessionId, title: autoTitle, updatedAt: now, messages: nextMessages },
+          ...nextSessions,
+        ];
+      } else {
+        const exists = nextSessions.some((s) => s.id === sessionId);
+        if (exists) {
+          nextSessions = nextSessions.map((s) =>
+            s.id === sessionId ? { ...s, updatedAt: now, messages: nextMessages } : s
+          );
+        } else {
+          const firstUserText =
+            nextMessages.find((m) => m.sender === "user")?.text || "新对话";
+          nextSessions = [
+            {
+              id: sessionId,
+              title: firstUserText.trim().slice(0, 24) || "新对话",
+              updatedAt: now,
+              messages: nextMessages,
+            },
+            ...nextSessions,
+          ];
+        }
+      }
+
+      return {
+        aiChatMessages: nextMessages,
+        activeChatSessionId: sessionId,
+        aiChatSessions: nextSessions,
+      };
+    }),
+  updateSchemeInChat: (messageId, updatedScheme) =>
+    set((state) => {
+      const nextMessages = state.aiChatMessages.map((msg) => {
+        if (msg.id !== messageId || !msg.schemes) return msg;
+        return {
+          ...msg,
+          schemes: msg.schemes.map((s) => (s.id === updatedScheme.id ? updatedScheme : s)),
+        };
+      });
+      const nextSessions = state.activeChatSessionId
+        ? (state.aiChatSessions || []).map((s) =>
+            s.id === state.activeChatSessionId ? { ...s, messages: nextMessages } : s
+          )
+        : state.aiChatSessions || [];
+      return {
+        aiChatMessages: nextMessages,
+        aiChatSessions: nextSessions,
+      };
+    }),
+  clearAiChatMessages: () => set({ aiChatMessages: [], activeChatSessionId: null }),
+  startNewAiChat: () => set({ aiChatMessages: [], activeChatSessionId: null }),
+  selectAiChatSession: (sessionId) =>
+    set((state) => {
+      const target = (state.aiChatSessions || []).find((s) => s.id === sessionId);
+      if (!target) return state;
+      return {
+        activeChatSessionId: target.id,
+        aiChatMessages: target.messages || [],
+      };
+    }),
+  renameAiChatSession: (sessionId, newTitle) =>
+    set((state) => {
+      const clean = newTitle.trim();
+      if (!clean) return state;
+      return {
+        aiChatSessions: (state.aiChatSessions || []).map((s) =>
+          s.id === sessionId ? { ...s, title: clean } : s
+        ),
+      };
+    }),
+  deleteAiChatSession: (sessionId) =>
+    set((state) => {
+      const remaining = (state.aiChatSessions || []).filter((s) => s.id !== sessionId);
+      const deletingActive = state.activeChatSessionId === sessionId;
+      return {
+        aiChatSessions: remaining,
+        activeChatSessionId: deletingActive ? null : state.activeChatSessionId,
+        aiChatMessages: deletingActive ? [] : state.aiChatMessages,
+      };
+    }),
   setIsAIDiffModalOpen: (open) => set({ isAIDiffModalOpen: open }),
   setIsOverviewHopupOpen: (open) => set({ isOverviewHopupOpen: open }),
 
@@ -697,6 +798,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       classificationProgress: { current: 0, total: 0 },
       aiProcessedCache: null,
       aiChatMessages: [],
+      aiChatSessions: [],
+      activeChatSessionId: null,
       isAIDiffModalOpen: false,
       isOverviewHopupOpen: false,
       undoStack: [],
@@ -716,6 +819,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
         proportionReport: state.proportionReport,
         aiProcessedCache: state.aiProcessedCache,
         aiChatMessages: state.aiChatMessages.slice(-20),
+        aiChatSessions: (state.aiChatSessions || []).slice(0, 25),
+        activeChatSessionId: state.activeChatSessionId,
         undoStack: state.undoStack.slice(-5),
         redoStack: state.redoStack.slice(-5),
       }),
@@ -732,6 +837,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
           expandedIds: initialExpanded,
           selectedIds: new Set<string>(),
           aiChatMessages: Array.isArray(persistedState.aiChatMessages) ? persistedState.aiChatMessages : [],
+          aiChatSessions: Array.isArray(persistedState.aiChatSessions) ? persistedState.aiChatSessions : [],
+          activeChatSessionId: persistedState.activeChatSessionId || null,
         };
       },
       onRehydrateStorage: () => (state) => {

@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { useConfigStore, AppTheme } from "@/store/useConfigStore";
+import { useConfigStore } from "@/store/useConfigStore";
+import { THEME_DEFINITIONS } from "@/constants/themes";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
-import { testAIConnection, fetchAvailableModels, getAPIKeySlot } from "@/services/aiService";
-import { AI_PROVIDERS, AIProviderKey } from "@/types/ai";
+import { testAIConnection, fetchAvailableModels, getAPIKeySlot, getOrderedModelsForSlot, getProviderMeta } from "@/services/aiService";
+import { AI_PROVIDERS, AIProviderKey, AIProtocolType, BUILTIN_PROVIDER_KEYS } from "@/types/ai";
+import { AddProviderModal } from "@/components/ai/AddProviderModal";
 import { Button } from "@/components/ui/button";
 import {
   Bot,
@@ -28,9 +30,10 @@ import {
   ChevronDown,
   RefreshCw,
   Trash2,
+  Pin,
+  Plus,
 } from "lucide-react";
 import {
-  DEFAULT_PROPORTION_ANALYSIS_PROMPT,
   DEFAULT_RULES_GENERATOR_PROMPT,
   DEFAULT_AI_ARCHITECT_PROMPT,
 } from "@/constants/aiPrompts";
@@ -41,6 +44,10 @@ export function SettingsPage() {
     setTheme,
     aiConfig,
     setAIConfig,
+    togglePinnedModel,
+    switchAIProvider,
+    updateCustomProvider,
+    deleteCustomProvider,
     aiPrompts,
     uiSettings,
     setUISettings,
@@ -56,8 +63,6 @@ export function SettingsPage() {
     setCascadeSelectChildren,
     rulesSettings,
     setRulesSettings,
-    aiGenerateRulesFirst,
-    setAiGenerateRulesFirst,
     exportRulesJSON,
     importRulesJSON,
   } = useConfigStore();
@@ -97,12 +102,14 @@ export function SettingsPage() {
     }, 2000);
   };
 
-  const currentPreset = AI_PROVIDERS[aiConfig.provider] || AI_PROVIDERS.custom;
+  const currentPreset = getProviderMeta(aiConfig, aiConfig.provider);
 
   const [availableModels, setAvailableModels] = useState<string[]>(() => currentPreset.models || []);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [fetchModelsStatus, setFetchModelsStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [isSearchingModels, setIsSearchingModels] = useState(false);
+  const [addProviderOpen, setAddProviderOpen] = useState(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
 
   // Click outside to close model dropdown
@@ -125,7 +132,14 @@ export function SettingsPage() {
     setFetchModelsStatus(null);
     try {
       const models = await fetchAvailableModels(aiConfig);
+      const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
       setAvailableModels(models);
+      setAIConfig({
+        cachedModels: {
+          ...(aiConfig.cachedModels || {}),
+          [slot]: models,
+        },
+      });
       setFetchModelsStatus({
         success: true,
         message: `已获取 ${models.length} 个模型`,
@@ -143,74 +157,13 @@ export function SettingsPage() {
   };
 
   const handleSelectProvider = (key: AIProviderKey) => {
-    // 先把当前正在编辑的槽位配置沉淀至映射池，避免切换丢失
-    const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
-    const apiKeysPool = {
-      ...(aiConfig.apiKeys || {}),
-      [currentSlot]: aiConfig.apiKey,
-    };
-    const baseURLsPool = {
-      ...(aiConfig.baseURLs || {}),
-      [currentSlot]: aiConfig.baseURL,
-    };
-    const modelsPool = {
-      ...(aiConfig.models || {}),
-      [currentSlot]: aiConfig.model,
-    };
-
-    const preset = AI_PROVIDERS[key];
-    const newType = key === "custom" ? (aiConfig.type === "anthropic" ? "anthropic" : "openai") : preset.type;
-    const targetSlot = getAPIKeySlot(key, newType);
-    const targetKey = apiKeysPool[targetSlot] || "";
-
-    // 解析目标 Base URL：若是 custom，优先取已保存的自定义地址，无则按协议提供官方标准地址，彻底杜绝回退至 api.custome.ai
-    let targetBaseURL = preset.baseUrl;
-    if (key === "custom") {
-      const savedCustomUrl = baseURLsPool[targetSlot];
-      if (savedCustomUrl && !savedCustomUrl.includes("api.custome.ai")) {
-        targetBaseURL = savedCustomUrl;
-      } else if (aiConfig.provider === "custom" && aiConfig.baseURL && !aiConfig.baseURL.includes("api.custome.ai")) {
-        targetBaseURL = aiConfig.baseURL;
-      } else {
-        targetBaseURL = newType === "anthropic" ? "https://api.anthropic.com/v1" : "https://api.openai.com/v1";
-      }
-    } else if (baseURLsPool[targetSlot]) {
-      targetBaseURL = baseURLsPool[targetSlot];
-    }
-
-    // 解析目标 Model：若是 custom，优先取已保存的模型，无则按协议提供默认模型
-    let targetModel = preset.model;
-    if (key === "custom") {
-      const savedCustomModel = modelsPool[targetSlot];
-      if (savedCustomModel && savedCustomModel !== "deepseek-flash") {
-        targetModel = savedCustomModel;
-      } else if (aiConfig.provider === "custom" && aiConfig.model && aiConfig.model !== "deepseek-flash") {
-        targetModel = aiConfig.model;
-      } else {
-        targetModel = newType === "anthropic" ? "claude-3-7-sonnet-20250219" : "gpt-4o-mini";
-      }
-    } else if (modelsPool[targetSlot]) {
-      targetModel = modelsPool[targetSlot];
-    }
-
-    baseURLsPool[targetSlot] = targetBaseURL;
-    modelsPool[targetSlot] = targetModel;
-    apiKeysPool[targetSlot] = targetKey;
-
-    setAIConfig({
-      provider: key,
-      baseURL: targetBaseURL,
-      model: targetModel,
-      type: newType,
-      apiKey: targetKey,
-      apiKeys: apiKeysPool,
-      baseURLs: baseURLsPool,
-      models: modelsPool,
-    });
-    setAvailableModels(preset.models && preset.models.length > 0 ? preset.models : []);
+    switchAIProvider(key);
+    const meta = getProviderMeta(aiConfig, key);
+    setAvailableModels(meta.models && meta.models.length > 0 ? meta.models : []);
     setTestResult(null);
     setFetchModelsStatus(null);
     setModelDropdownOpen(false);
+    setIsSearchingModels(false);
   };
 
   const handleTestConnection = async () => {
@@ -260,71 +213,31 @@ export function SettingsPage() {
     }
   };
 
-  const THEME_CONFIGS: {
-    id: AppTheme;
-    name: string;
-    colors: string[];
-  }[] = [
-    {
-      id: "park-light",
-      name: "Crimson Light",
-      colors: ["#fcfcfc", "#f0f0f0", "#e93d82", "#cb1d63"],
-    },
-    {
-      id: "park-dark",
-      name: "Crimson Dark",
-      colors: ["#111111", "#202020", "#e93d82", "#ff92ad"],
-    },
-    {
-      id: "midnight",
-      name: "Midnight",
-      colors: ["#0b0f19", "#1e293b", "#2563eb", "#38bdf8"],
-    },
-    {
-      id: "nord-snow-storm",
-      name: "Nord Snow Storm",
-      colors: ["#eceff4", "#e5e9f0", "#88c0d0", "#2e3440"],
-    },
-    {
-      id: "rose-pine-dawn",
-      name: "Rosé Pine Dawn",
-      colors: ["#faf4ed", "#fffaf3", "#d7827e", "#575279"],
-    },
-    {
-      id: "nord-dark",
-      name: "Nord Polar Night",
-      colors: ["#2e3440", "#3b4252", "#88c0d0", "#81a1c1"],
-    },
-    {
-      id: "catppuccin-mocha",
-      name: "Catppuccin Mocha",
-      colors: ["#1e1e2e", "#313244", "#f5c2e7", "#cba6f7"],
-    },
-  ];
+  const THEME_CONFIGS = THEME_DEFINITIONS;
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "960px", margin: "0 auto", color: "var(--text-main)" }}>
+    <div style={{ padding: "1.5rem 2.25rem", maxWidth: "1360px", margin: "0 auto", color: "var(--text-main)" }}>
       {/* Header */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em" }}>系统设置</h1>
+      <div style={{ marginBottom: "1.25rem" }}>
+        <h1 style={{ fontSize: "1.35rem", fontWeight: 700, letterSpacing: "-0.02em" }}>系统设置</h1>
       </div>
 
       {/* Theme Section */}
       <div
         style={{
-          padding: "1.5rem",
+          padding: "1.15rem 1.25rem",
           borderRadius: "var(--radius-btn, 8px)",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
-          marginBottom: "2rem",
+          marginBottom: "1.25rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <Palette size={20} style={{ color: "var(--accent)" }} />
-          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>界面主题与配色方案</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.9rem" }}>
+          <Palette size={18} style={{ color: "var(--accent)" }} />
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>界面主题</h2>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.75rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: "0.6rem" }}>
           {THEME_CONFIGS.map((t) => {
             const isSelected = (theme || "park-light") === t.id;
             return (
@@ -332,7 +245,7 @@ export function SettingsPage() {
                 key={t.id}
                 onClick={() => setTheme(t.id)}
                 style={{
-                  padding: "0.85rem 1rem",
+                  padding: "0.65rem 0.8rem",
                   borderRadius: "var(--radius-btn, 6px)",
                   border: "1.5px solid",
                   borderColor: isSelected ? "var(--accent-solid)" : "var(--border-subtle)",
@@ -341,11 +254,11 @@ export function SettingsPage() {
                   transition: "all 0.15s ease",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.65rem",
+                  gap: "0.45rem",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-main)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {t.name}
                   </span>
                 </div>
@@ -380,121 +293,77 @@ export function SettingsPage() {
       {/* Section: UI Settings */}
       <div
         style={{
-          padding: "1.5rem",
+          padding: "1.15rem 1.25rem",
           borderRadius: "var(--radius-btn, 8px)",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
-          marginBottom: "2rem",
+          marginBottom: "1.25rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <LayoutGrid size={20} style={{ color: "var(--accent)" }} />
-          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>界面设置</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.9rem" }}>
+          <LayoutGrid size={18} style={{ color: "var(--accent)" }} />
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>界面显示</h2>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {/* Toggle: Hide File Name */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={uiSettings?.hideFileName || false}
-              onChange={(e) => setUISettings({ hideFileName: e.target.checked })}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                隐藏配置文件
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                在顶栏隐藏当前快照的配置文件展示。
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle: Hide Quick Theme Button */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={uiSettings?.hideQuickTheme || false}
-              onChange={(e) => setUISettings({ hideQuickTheme: e.target.checked })}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                隐藏快速主题按钮
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                在顶栏右上角隐藏调色板快速主题切换菜单。
-              </div>
-            </div>
-          </label>
-
-          {/* Toggle: Hide 0-Tab Empty Panels */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={uiSettings?.hideEmptyPanels || false}
-              onChange={(e) => setUISettings({ hideEmptyPanels: e.target.checked })}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                隐藏 0 标签页面板
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                在各个差分确认页面以及所有通过按钮样式显示的面板选项中，自动隐藏标签数量为 0 的面板（不包含下拉菜单）。
-              </div>
-            </div>
-          </label>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.55rem" }}>
+          {[
+            {
+              label: "隐藏顶栏配置文件名",
+              checked: uiSettings?.hideFileName || false,
+              onChange: (checked: boolean) => setUISettings({ hideFileName: checked }),
+            },
+            {
+              label: "隐藏顶栏快速主题按钮",
+              checked: uiSettings?.hideQuickTheme || false,
+              onChange: (checked: boolean) => setUISettings({ hideQuickTheme: checked }),
+            },
+            {
+              label: "隐藏 0 标签页空面板",
+              checked: uiSettings?.hideEmptyPanels || false,
+              onChange: (checked: boolean) => setUISettings({ hideEmptyPanels: checked }),
+            },
+          ].map((item) => (
+            <label
+              key={item.label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                cursor: "pointer",
+                padding: "0.55rem 0.75rem",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--border-subtle)",
+                fontSize: "0.82rem",
+                fontWeight: 500,
+                color: "var(--text-main)",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={item.checked}
+                onChange={(e) => item.onChange(e.target.checked)}
+                style={{ accentColor: "var(--accent-solid)", width: "15px", height: "15px", cursor: "pointer" }}
+              />
+              <span>{item.label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
       {/* Section 1: AI Model Services */}
       <div
         style={{
-          padding: "1.5rem",
+          padding: "1.15rem 1.25rem",
           borderRadius: "var(--radius-btn, 8px)",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
-          marginBottom: "2rem",
+          marginBottom: "1.25rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <Bot size={20} style={{ color: "var(--accent)" }} />
-          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>模型服务配置</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+          <Bot size={18} style={{ color: "var(--accent)" }} />
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>模型服务配置</h2>
         </div>
 
         {/* Provider Pills */}
@@ -502,8 +371,8 @@ export function SettingsPage() {
           <label style={{ display: "block", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "0.5rem" }}>
             接口提供方
           </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-            {(Object.keys(AI_PROVIDERS) as AIProviderKey[]).map((key) => {
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.45rem" }}>
+            {BUILTIN_PROVIDER_KEYS.map((key) => {
               const preset = AI_PROVIDERS[key];
               const isSelected = aiConfig.provider === key;
               return (
@@ -518,7 +387,105 @@ export function SettingsPage() {
                 </Button>
               );
             })}
+
+            {(aiConfig.customProviders || []).map((cp) => {
+              const isSelected = aiConfig.provider === cp.id;
+              return (
+                <div key={cp.id} style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                  <Button
+                    type="button"
+                    variant={isSelected ? "solid" : "outline"}
+                    size="xs"
+                    onClick={() => handleSelectProvider(cp.id)}
+                  >
+                    {cp.name}
+                  </Button>
+                  {isSelected && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      pill
+                      onClick={() => deleteCustomProvider(cp.id)}
+                      title="删除此自定义供应商"
+                      style={{ padding: "3px", color: "var(--danger)" }}
+                    >
+                      <Trash2 size={12} />
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              pill
+              onClick={() => setAddProviderOpen(true)}
+              title="添加新的自定义供应商"
+              style={{ borderStyle: "dashed" }}
+            >
+              <Plus size={13} />
+            </Button>
           </div>
+
+          {/* Selected Custom Provider Quick Metadata Editor */}
+          {(() => {
+            const activeCustom = (aiConfig.customProviders || []).find((c) => c.id === aiConfig.provider);
+            if (!activeCustom) return null;
+            return (
+              <div
+                style={{
+                  marginTop: "0.75rem",
+                  padding: "0.65rem 0.85rem",
+                  borderRadius: "var(--radius-btn, 6px)",
+                  backgroundColor: "var(--bg-surface)",
+                  border: "1px solid var(--border-subtle)",
+                  display: "flex",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "0.65rem",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>名称:</span>
+                  <input
+                    type="text"
+                    value={activeCustom.name}
+                    onChange={(e) => updateCustomProvider(activeCustom.id, { name: e.target.value })}
+                    style={{
+                      padding: "0.25rem 0.5rem",
+                      borderRadius: "4px",
+                      backgroundColor: "var(--bg-subtle)",
+                      border: "1px solid var(--border-subtle)",
+                      color: "var(--text-main)",
+                      fontSize: "0.78rem",
+                      width: "140px",
+                      outline: "none",
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                  <span style={{ fontSize: "0.74rem", color: "var(--text-muted)" }}>协议:</span>
+                  {(["openai", "anthropic", "gemini"] as AIProtocolType[]).map((proto) => (
+                    <Button
+                      key={proto}
+                      type="button"
+                      variant={activeCustom.type === proto ? "subtle" : "outline"}
+                      size="xs"
+                      pill
+                      onClick={() => updateCustomProvider(activeCustom.id, { type: proto })}
+                      style={{ fontSize: "0.7rem", padding: "0.15rem 0.55rem" }}
+                    >
+                      {proto === "openai" ? "OpenAI" : proto === "anthropic" ? "Anthropic" : "Gemini"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Form Inputs */}
@@ -698,8 +665,11 @@ export function SettingsPage() {
             <div style={{ position: "relative" }} ref={modelDropdownRef}>
               <input
                 type="text"
-                placeholder="请输入或下拉选择模型标识符"
+                placeholder="输入以搜索或直接填写模型标识符"
                 value={aiConfig.model || ""}
+                onFocus={() => {
+                  setModelDropdownOpen(true);
+                }}
                 onChange={(e) => {
                   const val = e.target.value;
                   const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
@@ -710,6 +680,8 @@ export function SettingsPage() {
                       [slot]: val,
                     },
                   });
+                  setIsSearchingModels(true);
+                  setModelDropdownOpen(true);
                 }}
                 style={{
                   width: "100%",
@@ -726,7 +698,10 @@ export function SettingsPage() {
               {/* Embedded dropdown button on the right inside the input */}
               <button
                 type="button"
-                onClick={() => setModelDropdownOpen((prev) => !prev)}
+                onClick={() => {
+                  setIsSearchingModels(false);
+                  setModelDropdownOpen((prev) => !prev);
+                }}
                 title={availableModels.length > 0 ? "展开模型列表下拉菜单" : "暂无获取到的模型，可点击右上角「获取模型列表」"}
                 style={{
                   position: "absolute",
@@ -782,91 +757,241 @@ export function SettingsPage() {
                     gap: "0.15rem",
                   }}
                 >
-                  {availableModels.length === 0 ? (
-                    <div
-                      style={{
-                        padding: "0.6rem 0.75rem",
-                        fontSize: "0.78rem",
-                        color: "var(--text-muted)",
-                        textAlign: "center",
-                      }}
-                    >
-                      暂无已获取的模型，请点击右上角「获取模型列表」
-                    </div>
-                  ) : (
-                    <>
-                      <div
-                        style={{
-                          fontSize: "0.68rem",
-                          fontWeight: 600,
-                          color: "var(--text-muted)",
-                          padding: "0.2rem 0.45rem",
-                          borderBottom: "1px solid var(--border-subtle)",
-                          marginBottom: "0.15rem",
-                          display: "flex",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <span>可用模型 ({availableModels.length})</span>
-                      </div>
+                  {(() => {
+                    const allOrdered = getOrderedModelsForSlot(aiConfig, availableModels);
+                    const query = isSearchingModels ? (aiConfig.model || "").trim().toLowerCase() : "";
+                    const filtered = query
+                      ? allOrdered.filter((m) => m.toLowerCase().includes(query))
+                      : allOrdered;
 
-                      {availableModels.map((m) => {
-                        const isSelected = aiConfig.model === m;
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => {
-                              const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
-                              setAIConfig({
-                                model: m,
-                                models: {
-                                  ...(aiConfig.models || {}),
-                                  [slot]: m,
-                                },
-                              });
-                              setModelDropdownOpen(false);
-                            }}
+                    if (allOrdered.length === 0) {
+                      return (
+                        <div
+                          style={{
+                            padding: "0.6rem 0.75rem",
+                            fontSize: "0.78rem",
+                            color: "var(--text-muted)",
+                            textAlign: "center",
+                          }}
+                        >
+                          暂无已获取的模型，请点击右上角「获取模型列表」
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <>
+                        <div
+                          style={{
+                            fontSize: "0.68rem",
+                            fontWeight: 600,
+                            color: "var(--text-muted)",
+                            padding: "0.2rem 0.45rem",
+                            borderBottom: "1px solid var(--border-subtle)",
+                            marginBottom: "0.15rem",
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <span>
+                            {query
+                              ? `搜索 "${aiConfig.model?.trim()}" (${filtered.length})`
+                              : `可用模型 (${filtered.length})`}
+                          </span>
+                        </div>
+
+                        {filtered.length === 0 ? (
+                          <div
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "0.35rem 0.55rem",
-                              borderRadius: "var(--radius-btn, 4px)",
-                              border: "1px solid",
-                              borderColor: isSelected ? "var(--accent-border)" : "transparent",
-                              backgroundColor: isSelected ? "var(--accent-subtle)" : "transparent",
-                              color: isSelected ? "var(--accent-text)" : "var(--text-main)",
-                              cursor: "pointer",
-                              outline: "none",
-                              transition: "all 0.15s ease",
-                              textAlign: "left",
-                              fontSize: "0.78rem",
-                              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isSelected) {
-                                e.currentTarget.style.backgroundColor = "transparent";
-                              }
+                              padding: "0.55rem 0.65rem",
+                              fontSize: "0.76rem",
+                              color: "var(--text-muted)",
+                              textAlign: "center",
                             }}
                           >
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {m}
-                            </span>
-                            {isSelected && <Check size={13} style={{ color: "var(--accent)", flexShrink: 0 }} />}
-                          </button>
-                        );
-                      })}
-                    </>
-                  )}
+                            无匹配项，当前输入将作为自定义模型使用
+                          </div>
+                        ) : (
+                          filtered.map((m) => {
+                            const isSelected = aiConfig.model === m;
+                            const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+                            const isPinned = (aiConfig.pinnedModels?.[slot] || []).includes(m);
+                            return (
+                              <div
+                                key={m}
+                                onClick={() => {
+                                  setAIConfig({
+                                    model: m,
+                                    models: {
+                                      ...(aiConfig.models || {}),
+                                      [slot]: m,
+                                    },
+                                  });
+                                  setIsSearchingModels(false);
+                                  setModelDropdownOpen(false);
+                                }}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "0.35rem 0.55rem",
+                                  borderRadius: "var(--radius-btn, 4px)",
+                                  border: "1px solid",
+                                  borderColor: isSelected ? "var(--accent-border)" : "transparent",
+                                  backgroundColor: isSelected ? "var(--accent-subtle)" : "transparent",
+                                  color: isSelected ? "var(--accent-text)" : "var(--text-main)",
+                                  cursor: "pointer",
+                                  outline: "none",
+                                  transition: "all 0.15s ease",
+                                  textAlign: "left",
+                                  fontSize: "0.78rem",
+                                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.backgroundColor = "var(--bg-subtle)";
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.backgroundColor = "transparent";
+                                  }
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", minWidth: 0 }}>
+                                  {isPinned && <Pin size={11} style={{ color: "var(--accent)", flexShrink: 0 }} />}
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {m}
+                                  </span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.25rem", flexShrink: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePinnedModel(slot, m);
+                                    }}
+                                    title={isPinned ? "取消置顶" : "置顶模型"}
+                                    style={{
+                                      background: "transparent",
+                                      border: "none",
+                                      color: isPinned ? "var(--accent)" : "var(--text-muted)",
+                                      cursor: "pointer",
+                                      padding: "2px",
+                                      display: "flex",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <Pin size={12} />
+                                  </button>
+                                  {isSelected && <Check size={13} style={{ color: "var(--accent)", flexShrink: 0 }} />}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
+
+            {/* Pinned Models Quick Bar in SettingsPage */}
+            {(() => {
+              const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+              const pinnedList = aiConfig.pinnedModels?.[slot] || [];
+              const curModel = (aiConfig.model || "").trim();
+              const canPinCurrent = Boolean(curModel && !pinnedList.includes(curModel));
+              if (pinnedList.length === 0 && !canPinCurrent) return null;
+              return (
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.35rem", marginTop: "0.45rem" }}>
+                  <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
+                    <Pin size={10} />
+                    置顶模型:
+                  </span>
+                  {pinnedList.map((pm) => {
+                    const isActive = curModel === pm;
+                    return (
+                      <span
+                        key={pm}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          padding: "1px 7px",
+                          borderRadius: "9999px",
+                          fontSize: "0.7rem",
+                          border: "1px solid",
+                          borderColor: isActive ? "var(--accent-border)" : "var(--border-subtle)",
+                          backgroundColor: isActive ? "var(--accent-subtle)" : "var(--bg-subtle)",
+                          color: isActive ? "var(--accent-text)" : "var(--text-main)",
+                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setAIConfig({
+                              model: pm,
+                              models: { ...(aiConfig.models || {}), [slot]: pm },
+                            })
+                          }
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "inherit",
+                            cursor: "pointer",
+                            padding: 0,
+                            fontSize: "inherit",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          {pm}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => togglePinnedModel(slot, pm)}
+                          title="取消置顶"
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "var(--text-muted)",
+                            cursor: "pointer",
+                            padding: 0,
+                            fontSize: "0.75rem",
+                            lineHeight: 1,
+                          }}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
+                  {canPinCurrent && (
+                    <button
+                      type="button"
+                      onClick={() => togglePinnedModel(slot, curModel)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.2rem",
+                        padding: "1px 7px",
+                        borderRadius: "9999px",
+                        fontSize: "0.68rem",
+                        border: "1px dashed var(--border-card)",
+                        backgroundColor: "transparent",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Pin size={10} />
+                      <span>置顶当前</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div style={{ gridColumn: "span 2" }}>
@@ -966,95 +1091,34 @@ export function SettingsPage() {
       {/* Section 2: AI Prompt Templates Configuration */}
       <div
         style={{
-          padding: "1.5rem",
+          padding: "1.15rem 1.25rem",
           borderRadius: "var(--radius-btn, 8px)",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
-          marginBottom: "2rem",
+          marginBottom: "1.25rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <MessageSquareCode size={20} style={{ color: "var(--accent)" }} />
-          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>AI 提示词模板配置</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.9rem" }}>
+          <MessageSquareCode size={18} style={{ color: "var(--accent)" }} />
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>AI 提示词模板</h2>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          {/* Prompt 1: Tab Proportion Analysis */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+          {/* Prompt 1: Categorization Rules Generator */}
           <div
             style={{
-              padding: "1.1rem",
+              padding: "0.85rem 1rem",
               borderRadius: "var(--radius-btn, 6px)",
               backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
               display: "flex",
               flexDirection: "column",
-              gap: "0.75rem",
+              gap: "0.55rem",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
-                  1. 标签比例分析提示词 (User Prompt)
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem", lineHeight: 1.4 }}>
-                  用于在「AI 比例」分析当前标签的主题分布。系统会自动将待分析标签摘要注入到 <code style={{ color: "var(--accent-text)" }}>{"{{tabsSummary}}"}</code> 占位符处。
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                pill
-                onClick={() => resetAIPrompt("proportionAnalysisPrompt")}
-                title="重置为官方预设提示词"
-              >
-                <RotateCcw size={12} />
-                <span>恢复默认</span>
-              </Button>
-            </div>
-
-            <textarea
-              rows={8}
-              value={aiPrompts?.proportionAnalysisPrompt || DEFAULT_PROPORTION_ANALYSIS_PROMPT}
-              onChange={(e) => setAIPrompt("proportionAnalysisPrompt", e.target.value)}
-              placeholder="请输入标签比例分析提示词模板..."
-              style={{
-                width: "100%",
-                padding: "0.65rem 0.85rem",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-main)",
-                fontSize: "0.8rem",
-                lineHeight: "1.5",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                outline: "none",
-                resize: "vertical",
-              }}
-            />
-          </div>
-
-          {/* Prompt 2: Categorization Rules Generator */}
-          <div
-            style={{
-              padding: "1.1rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.75rem",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
-                  2. 规则生成助手提示词 (System Prompt)
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem", lineHeight: 1.4 }}>
-                  用于在「规则管理」的“AI 生成”对话框中，指导 AI 模型如何根据用户的自然语言需求提炼输出规范的 Sidebery 标签匹配规则。
-                </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--text-main)" }}>
+                1. 规则生成助手 (System Prompt)
               </div>
 
               <Button
@@ -1063,7 +1127,7 @@ export function SettingsPage() {
                 size="xs"
                 pill
                 onClick={() => resetAIPrompt("rulesGeneratorPrompt")}
-                title="重置为官方预设提示词"
+                title="恢复默认"
               >
                 <RotateCcw size={12} />
                 <span>恢复默认</span>
@@ -1071,19 +1135,19 @@ export function SettingsPage() {
             </div>
 
             <textarea
-              rows={8}
+              rows={6}
               value={aiPrompts?.rulesGeneratorPrompt || DEFAULT_RULES_GENERATOR_PROMPT}
               onChange={(e) => setAIPrompt("rulesGeneratorPrompt", e.target.value)}
-              placeholder="请输入规则生成助手的系统提示词..."
+              placeholder="规则生成助手提示词..."
               style={{
                 width: "100%",
-                padding: "0.65rem 0.85rem",
+                padding: "0.55rem 0.75rem",
                 borderRadius: "var(--radius-btn, 6px)",
                 backgroundColor: "var(--bg-card)",
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-main)",
-                fontSize: "0.8rem",
-                lineHeight: "1.5",
+                fontSize: "0.78rem",
+                lineHeight: "1.45",
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
                 outline: "none",
                 resize: "vertical",
@@ -1091,26 +1155,21 @@ export function SettingsPage() {
             />
           </div>
 
-          {/* Prompt 3: AI Architect Reorganization Prompt */}
+          {/* Prompt 2: AI Architect Reorganization Prompt */}
           <div
             style={{
-              padding: "1.1rem",
+              padding: "0.85rem 1rem",
               borderRadius: "var(--radius-btn, 6px)",
               backgroundColor: "var(--bg-subtle)",
               border: "1px solid var(--border-subtle)",
               display: "flex",
               flexDirection: "column",
-              gap: "0.75rem",
+              gap: "0.55rem",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
-              <div>
-                <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-main)" }}>
-                  3. AI 智能架构师提示词 (System Prompt - GTD 消费生命周期)
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.2rem", lineHeight: 1.4 }}>
-                  用于在「AI 架构师」对话工作台中，指导大模型以 GTD 生命周期流转视角进行全库诊断并生成可执行的重构方案卡片。
-                </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <div style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--text-main)" }}>
+                2. AI 架构师 (System Prompt)
               </div>
 
               <Button
@@ -1119,7 +1178,7 @@ export function SettingsPage() {
                 size="xs"
                 pill
                 onClick={() => resetAIPrompt("architectPrompt")}
-                title="重置为官方预设提示词"
+                title="恢复默认"
               >
                 <RotateCcw size={12} />
                 <span>恢复默认</span>
@@ -1127,19 +1186,19 @@ export function SettingsPage() {
             </div>
 
             <textarea
-              rows={8}
+              rows={6}
               value={aiPrompts?.architectPrompt || DEFAULT_AI_ARCHITECT_PROMPT}
               onChange={(e) => setAIPrompt("architectPrompt", e.target.value)}
-              placeholder="请输入 AI 架构师的系统提示词..."
+              placeholder="AI 架构师提示词..."
               style={{
                 width: "100%",
-                padding: "0.65rem 0.85rem",
+                padding: "0.55rem 0.75rem",
                 borderRadius: "var(--radius-btn, 6px)",
                 backgroundColor: "var(--bg-card)",
                 border: "1px solid var(--border-subtle)",
                 color: "var(--text-main)",
-                fontSize: "0.8rem",
-                lineHeight: "1.5",
+                fontSize: "0.78rem",
+                lineHeight: "1.45",
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
                 outline: "none",
                 resize: "vertical",
@@ -1152,264 +1211,131 @@ export function SettingsPage() {
       {/* Section 3: General & Interaction Preferences */}
       <div
         style={{
-          padding: "1.5rem",
+          padding: "1.15rem 1.25rem",
           borderRadius: "var(--radius-btn, 8px)",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
-          marginBottom: "2rem",
+          marginBottom: "1.25rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          <Sliders size={20} style={{ color: "var(--accent)" }} />
-          <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>全局整理偏好</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.9rem" }}>
+          <Sliders size={18} style={{ color: "var(--accent)" }} />
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>整理偏好</h2>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {/* AI generate rules first toggle */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={aiGenerateRulesFirst}
-              onChange={(e) => setAiGenerateRulesFirst(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                AI 分类前先生成匹配规则
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                开启后，AI 比例重构将先依据分析主题提炼域名与关键词匹配规则，优先通过规则引擎快速分类，再对剩余未匹配标签进行 AI 补充归纳；关闭则直接逐批调用大模型分类。
-              </div>
-            </div>
-          </label>
-
-          {/* Cascade select children toggle */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={cascadeSelectChildren}
-              onChange={(e) => setCascadeSelectChildren(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                勾选标签时默认级联勾选所有子标签（包含子标签）
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                在工作台树状图中勾选父标签或组节点时，自动同时勾选其下层的所有子标签页；取消勾选时同理。
-              </div>
-            </div>
-          </label>
-
-          {/* Preserve subtrees */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={preserveSubtrees}
-              onChange={(e) => setPreserveSubtrees(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                保持子树完整性
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                分类与重组时将整个子树作为整体跟随父节点归入新类别，不拆散既有层级结构。
-              </div>
-            </div>
-          </label>
-
-          {/* Treat existing groups as unit */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={rulesSettings.treatExistingGroupsAsUnit}
-              onChange={(e) => setRulesSettings({ treatExistingGroupsAsUnit: e.target.checked })}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                既有 Group 组当成独立整体
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                快照中原本就是 Sidebery Group 的组标签作为一个原子单元参与规则匹配，不拆分内部标签。
-              </div>
-            </div>
-          </label>
-
-          {/* Exempt Pinned */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={exemptPinned}
-              onChange={(e) => setExemptPinned(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                豁免已固定标签 (Pinned Tabs)
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                固定标签默认作为常驻项，不参与批量去重或重组。
-              </div>
-            </div>
-          </label>
-
-          {/* Exempt Internal Pages */}
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "0.75rem",
-              cursor: "pointer",
-              padding: "0.75rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={exemptInternalPages}
-              onChange={(e) => setExemptInternalPages(e.target.checked)}
-              style={{ marginTop: "0.2rem", accentColor: "var(--accent-solid)", width: "16px", height: "16px", cursor: "pointer" }}
-            />
-            <div>
-              <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-main)" }}>
-                豁免浏览器内部页面
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
-                忽略 about:, chrome:, moz-extension: 等本地系统页面。
-              </div>
-            </div>
-          </label>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.55rem" }}>
+          {[
+            {
+              label: "级联勾选子标签",
+              checked: cascadeSelectChildren,
+              onChange: (checked: boolean) => setCascadeSelectChildren(checked),
+            },
+            {
+              label: "保持子树完整性",
+              checked: preserveSubtrees,
+              onChange: (checked: boolean) => setPreserveSubtrees(checked),
+            },
+            {
+              label: "既有组视为整体",
+              checked: rulesSettings.treatExistingGroupsAsUnit,
+              onChange: (checked: boolean) => setRulesSettings({ treatExistingGroupsAsUnit: checked }),
+            },
+            {
+              label: "豁免固定标签",
+              checked: exemptPinned,
+              onChange: (checked: boolean) => setExemptPinned(checked),
+            },
+            {
+              label: "豁免浏览器内部页",
+              checked: exemptInternalPages,
+              onChange: (checked: boolean) => setExemptInternalPages(checked),
+            },
+          ].map((item) => (
+            <label
+              key={item.label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.6rem",
+                cursor: "pointer",
+                padding: "0.55rem 0.75rem",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--border-subtle)",
+                fontSize: "0.82rem",
+                fontWeight: 500,
+                color: "var(--text-main)",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={item.checked}
+                onChange={(e) => item.onChange(e.target.checked)}
+                style={{ accentColor: "var(--accent-solid)", width: "15px", height: "15px", cursor: "pointer" }}
+              />
+              <span>{item.label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
       {/* Section 4: Local Storage & Cache Persistence */}
       <div
         style={{
-          marginBottom: "1.25rem",
-          padding: "1.5rem",
+          marginBottom: "1rem",
+          padding: "1rem 1.25rem",
           borderRadius: "var(--radius-btn, 8px)",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>数据持久化与缓存</h2>
-              {fileName && (
-                <span
-                  style={{
-                    fontSize: "0.72rem",
-                    padding: "2px 8px",
-                    borderRadius: "9999px",
-                    backgroundColor: "rgba(16, 185, 129, 0.12)",
-                    color: "var(--success, #10b981)",
-                    border: "1px solid rgba(16, 185, 129, 0.25)",
-                    fontWeight: 500,
-                  }}
-                >
-                  已持久化: {fileName}
-                </span>
-              )}
-            </div>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-              已启用 Cookie 状态凭据与本地离线持久化，自动实时保存导入的标签数据与编辑记录，防止刷新页面时丢失数据。
-            </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>本地缓存</h2>
+            {fileName && (
+              <span
+                style={{
+                  fontSize: "0.72rem",
+                  padding: "2px 8px",
+                  borderRadius: "9999px",
+                  backgroundColor: "rgba(16, 185, 129, 0.12)",
+                  color: "var(--success, #10b981)",
+                  border: "1px solid rgba(16, 185, 129, 0.25)",
+                  fontWeight: 500,
+                }}
+              >
+                {fileName}
+              </span>
+            )}
           </div>
 
-          <div>
-            <Button
-              onClick={handleClearCache}
-              variant="outline"
-              size="xs"
-              style={{
-                color: "#ef4444",
-                borderColor: "rgba(239, 68, 68, 0.35)",
-              }}
-              title="清除已导入的标签快照、编辑记录及本地 Cookie 缓存"
-            >
-              <Trash2 size={13} />
-              <span>清除缓存</span>
-            </Button>
-          </div>
+          <Button
+            onClick={handleClearCache}
+            variant="outline"
+            size="xs"
+            style={{
+              color: "#ef4444",
+              borderColor: "rgba(239, 68, 68, 0.35)",
+            }}
+            title="清除快照与本地缓存"
+          >
+            <Trash2 size={13} />
+            <span>清除缓存</span>
+          </Button>
         </div>
       </div>
 
       {/* Section 5: Backup & Restore */}
       <div
         style={{
-          padding: "1.5rem",
+          padding: "1rem 1.25rem",
           borderRadius: "var(--radius-btn, 8px)",
           backgroundColor: "var(--bg-card)",
           border: "1px solid var(--border-card)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600 }}>配置备份与恢复</h2>
-            <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-              导出或导入规则列表与全局偏好配置 JSON。
-            </p>
-          </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: "0.95rem", fontWeight: 600 }}>配置备份</h2>
 
           <div style={{ display: "flex", gap: "0.6rem" }}>
             <label
@@ -1454,6 +1380,8 @@ export function SettingsPage() {
           </div>
         </div>
       </div>
+
+      <AddProviderModal isOpen={addProviderOpen} onClose={() => setAddProviderOpen(false)} />
     </div>
   );
 }

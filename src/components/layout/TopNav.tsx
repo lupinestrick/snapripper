@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FolderArchive, Undo2, Palette, Check } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
-import { useConfigStore, AppTheme } from "@/store/useConfigStore";
+import { useConfigStore } from "@/store/useConfigStore";
+import { THEME_DEFINITIONS } from "@/constants/themes";
 import { SnapshotFileHopupModal, formatBytes } from "./SnapshotFileHopupModal";
 import { Button } from "@/components/ui/button";
 
@@ -11,43 +12,7 @@ interface TopNavProps {
   onOpenExport?: () => void;
 }
 
-const THEME_OPTIONS: { id: AppTheme; name: string; previewDot: string }[] = [
-  {
-    id: "park-light",
-    name: "Crimson Light",
-    previewDot: "#e93d82",
-  },
-  {
-    id: "park-dark",
-    name: "Crimson Dark",
-    previewDot: "#e93d82",
-  },
-  {
-    id: "midnight",
-    name: "Midnight",
-    previewDot: "#2563eb",
-  },
-  {
-    id: "nord-snow-storm",
-    name: "Nord Snow Storm",
-    previewDot: "#88c0d0",
-  },
-  {
-    id: "rose-pine-dawn",
-    name: "Rosé Pine Dawn",
-    previewDot: "#d7827e",
-  },
-  {
-    id: "nord-dark",
-    name: "Nord Polar Night",
-    previewDot: "#88c0d0",
-  },
-  {
-    id: "catppuccin-mocha",
-    name: "Catppuccin Mocha",
-    previewDot: "#f5c2e7",
-  },
-];
+const THEME_OPTIONS = THEME_DEFINITIONS;
 
 export function TopNav({ onOpenExport }: TopNavProps) {
   const { undoStack, undo, rawSnapshot, fileName, rawFileSize } = useSnapshotStore();

@@ -2,184 +2,149 @@ import { SideberySnapshot, SideberyTab, SideberyPanel, TabTreeNode } from "@/typ
 import {
   AIConfig,
   AIProcessedCache,
+  ClusterCompressionReport,
+  ClusterGranularity,
   ReorganizationScheme,
   ReorganizationCategory,
+  TabMicroCluster,
 } from "@/types/ai";
 import { extractDomain, isExemptUrl } from "@/utils/urlHelper";
-import { sendAIChatRequest, repairJSONString, extractAndParseJSON } from "./aiService";
+import {
+  AIChatTurn,
+  sendAIConversationRequest,
+  repairJSONString,
+} from "./aiService";
 import { DEFAULT_AI_ARCHITECT_PROMPT } from "@/constants/aiPrompts";
 import {
   reorganizeTreeIntoCategories,
   reorganizeTabsIntoPanels,
 } from "./treeOperations";
 import { buildTabTree, flattenTabTree } from "./snapshotParser";
+import {
+  clusterSnapshotTabs,
+  formatClusterReportForPrompt,
+} from "./tabClusterEngine";
+
+const CATEGORY_PALETTE = [
+  "#3b82f6",
+  "#ec4899",
+  "#10b981",
+  "#8b5cf6",
+  "#f59e0b",
+  "#06b6d4",
+  "#6366f1",
+  "#f97316",
+];
 
 /**
- * 诊断快照元数据与结构分布，生成供 AI 架构师理解的高维特征摘要
+ * 诊断快照元数据与微簇聚类摘要，生成供 AI 架构师理解的零盲区高维摘要
  */
 export function generateSnapshotDiagnosticSummary(
   tabs: SideberyTab[],
-  panels?: Record<string, SideberyPanel>
+  panels?: Record<string, SideberyPanel>,
+  granularity: ClusterGranularity = "balanced"
 ): string {
-  const totalTabs = tabs.length;
-  const nonExempt = tabs.filter((t) => !isExemptUrl(t.url, t.pinned));
-  const exemptCount = totalTabs - nonExempt.length;
-
-  // 1. 面板分布与空闲检测
-  const panelMap: Record<string, { name: string; count: number }> = {};
-  if (panels) {
-    for (const [id, p] of Object.entries(panels)) {
-      panelMap[id] = { name: p.name || id, count: 0 };
-    }
-  }
-
-  for (const t of tabs) {
-    const pId = t.panelId || "main";
-    if (!panelMap[pId]) {
-      panelMap[pId] = { name: pId === "main" ? "主面板" : pId, count: 0 };
-    }
-    panelMap[pId].count++;
-  }
-
-  const emptyPanels: string[] = [];
-  const activePanels: { id: string; name: string; count: number; pct: string }[] = [];
-
-  for (const [id, p] of Object.entries(panelMap)) {
-    if (p.count === 0) {
-      emptyPanels.push(p.name);
-    } else {
-      activePanels.push({
-        id,
-        name: p.name,
-        count: p.count,
-        pct: `${((p.count / Math.max(1, totalTabs)) * 100).toFixed(1)}%`,
-      });
-    }
-  }
-
-  // 2. 域名聚类分析
-  const domainStats: Record<string, { count: number; titles: string[] }> = {};
-  for (const t of nonExempt) {
-    const d = extractDomain(t.url);
-    if (!domainStats[d]) {
-      domainStats[d] = { count: 0, titles: [] };
-    }
-    domainStats[d].count++;
-    if (domainStats[d].titles.length < 3 && t.title) {
-      domainStats[d].titles.push(t.title.trim().slice(0, 45));
-    }
-  }
-
-  const sortedDomains = Object.entries(domainStats).sort((a, b) => b[1].count - a[1].count);
-  const top25Domains = sortedDomains.slice(0, 25).map(([dom, data]) => ({
-    domain: dom,
-    count: data.count,
-    percentage: `${((data.count / Math.max(1, nonExempt.length)) * 100).toFixed(1)}%`,
-    sampleTitles: data.titles,
-  }));
-
-  const tailCount = sortedDomains.slice(25).reduce((sum, [, d]) => sum + d.count, 0);
-
-  // 3. 树层级深度统计
-  const depthDist: Record<number, number> = {};
-  for (const t of tabs) {
-    const lvl = t.lvl || 0;
-    depthDist[lvl] = (depthDist[lvl] || 0) + 1;
-  }
-
-  return JSON.stringify(
-    {
-      totalTabs,
-      nonExemptCount: nonExempt.length,
-      exemptProtectedCount: exemptCount,
-      panels: {
-        activePanels,
-        emptyPanelsCount: emptyPanels.length,
-        emptyPanelNames: emptyPanels,
-      },
-      treeDepthDistribution: depthDist,
-      topDomainClusters: top25Domains,
-      tailSitesSummary: {
-        domainCount: Math.max(0, sortedDomains.length - 25),
-        totalTabs: tailCount,
-      },
-    },
-    null,
-    2
-  );
+  const report = clusterSnapshotTabs(tabs, panels, granularity);
+  return formatClusterReportForPrompt(report);
 }
 
-/**
- * 与 AI 智能架构师进行对话交互：发送诊断数据与历史消息，返回自然语言回复以及结构化的重构方案
- */
-export async function sendArchitectChatRequest(
-  config: AIConfig,
-  messages: { role: "user" | "assistant" | "system"; content: string }[],
-  snapshotSummary?: string,
-  customSystemPrompt?: string
-): Promise<{ text: string; schemes?: ReorganizationScheme[] }> {
-  const baseSystemPrompt = customSystemPrompt?.trim() || DEFAULT_AI_ARCHITECT_PROMPT;
-  const fullSystemPrompt = snapshotSummary
-    ? `${baseSystemPrompt}\n\n【用户当前 Sidebery 快照诊断数据 (JSON)】:\n${snapshotSummary}`
-    : baseSystemPrompt;
+function extractSchemesFromAIResponse(rawResponse: string): {
+  schemes?: ReorganizationScheme[];
+  cleanedText: string;
+} {
+  // 剥离推理模型 <think>...</think> 避免干扰 JSON 匹配
+  const withoutThink = rawResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
-  // 将消息历史拼接为清晰上下文
-  let promptText = "";
-  for (const m of messages) {
-    const rolePrefix = m.role === "user" ? "用户:" : m.role === "assistant" ? "架构师:" : "系统:";
-    promptText += `${rolePrefix} ${m.content}\n\n`;
-  }
+  const fencedMatch = withoutThink.match(/```(?:json)?\s*(\[\s*\{[\s\S]*?\}\s*\])\s*```/);
+  const candidateJson = fencedMatch?.[1] || withoutThink.match(/(\[\s*\{[\s\S]*\}\s*\])/)?.[1];
 
-  const rawResponse = await sendAIChatRequest(config, fullSystemPrompt, promptText.trim());
-
-  // 从响应中提取 ```json [ ... ] ``` 代码块
-  let schemes: ReorganizationScheme[] | undefined = undefined;
-  const jsonMatch = rawResponse.match(/```(?:json)?\s*(\[\s*\{[\s\S]*\}\s*\])\s*```/);
-
-  if (jsonMatch) {
+  let schemes: ReorganizationScheme[] | undefined;
+  if (candidateJson) {
     try {
-      const parsed = JSON.parse(jsonMatch[1]);
+      const parsed = JSON.parse(candidateJson);
       if (Array.isArray(parsed) && parsed.length > 0) {
         schemes = normalizeSchemes(parsed);
       }
     } catch {
       try {
-        const repaired = repairJSONString(jsonMatch[1]);
+        const repaired = repairJSONString(candidateJson);
         const parsed = JSON.parse(repaired);
         if (Array.isArray(parsed) && parsed.length > 0) {
           schemes = normalizeSchemes(parsed);
         }
-      } catch {}
+      } catch {
+        // ignore malformed fallback
+      }
     }
   }
 
-  // 清洗回复文本，移除冗余的原始 JSON 代码块，使聊天气泡保持极高可读性
-  const cleanedText = rawResponse
-    .replace(/```(?:json)?\s*\[\s*\{[\s\S]*\}\s*\]\s*```/, "")
+  const cleanedText = withoutThink
+    .replace(/```(?:json)?\s*\[\s*\{[\s\S]*?\}\s*\]\s*```/g, "")
     .trim();
 
+  return { schemes, cleanedText };
+}
+
+/**
+ * 与 AI 智能架构师进行原生多轮对话交互：发送全量微簇摘要与历史消息，返回回复与微簇映射方案
+ */
+export async function sendArchitectChatRequest(
+  config: AIConfig,
+  messages: { role: "user" | "assistant" | "system"; content: string }[],
+  contextData?: ClusterCompressionReport | string,
+  customSystemPrompt?: string
+): Promise<{ text: string; schemes?: ReorganizationScheme[] }> {
+  const baseSystemPrompt = customSystemPrompt?.trim() || DEFAULT_AI_ARCHITECT_PROMPT;
+
+  const clusterDigest =
+    typeof contextData === "string"
+      ? contextData
+      : contextData
+        ? formatClusterReportForPrompt(contextData)
+        : undefined;
+
+  const fullSystemPrompt = clusterDigest
+    ? `${baseSystemPrompt}\n\n【当前 Sidebery 快照全量微簇聚类摘要 (JSON)】:\n${clusterDigest}`
+    : baseSystemPrompt;
+
+  const turns: AIChatTurn[] = messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+
+  const rawResponse = await sendAIConversationRequest(config, fullSystemPrompt, turns);
+  const { schemes, cleanedText } = extractSchemesFromAIResponse(rawResponse);
+
   return {
-    text: cleanedText || "我已经为你分析了快照结构并生成了重构方案，请查看下方推荐卡片：",
+    text: cleanedText || "已完成全量微簇诊断并生成重构方案，请在下方卡片勾选调整微簇后预览 DIFF：",
     schemes,
   };
 }
 
 /**
- * 校验并规范化重构方案对象
+ * 校验并规范化重构方案对象（同时支持 clusterIds 映射与规则匹配字段）
  */
-function normalizeSchemes(rawList: any[]): ReorganizationScheme[] {
+export function normalizeSchemes(rawList: any[]): ReorganizationScheme[] {
   return rawList.map((item, idx) => {
     const id = item.id || `scheme_${idx + 1}`;
     const name = String(item.name || `重构方案 ${idx + 1}`).trim();
-    const strategy = String(item.strategy || "智能分类重构").trim();
+    const strategy = String(item.strategy || "微簇聚合重构").trim();
     const tags = Array.isArray(item.tags) ? item.tags.map(String) : [];
     const pros = Array.isArray(item.pros) ? item.pros.map(String) : [];
     const cons = Array.isArray(item.cons) ? item.cons.map(String) : [];
+    const excludedClusterIds = Array.isArray(item.excludedClusterIds)
+      ? item.excludedClusterIds.map((c: any) => String(c).trim()).filter(Boolean)
+      : [];
 
     const categories: ReorganizationCategory[] = Array.isArray(item.categories)
-      ? item.categories.map((c: any) => ({
-          name: String(c.name || "未命名分类").trim(),
+      ? item.categories.map((c: any, cIdx: number) => ({
+          name: String(c.name || `分组 ${cIdx + 1}`).trim(),
           description: c.description ? String(c.description).trim() : undefined,
+          clusterIds: Array.isArray(c.clusterIds)
+            ? Array.from(new Set(c.clusterIds.map((cid: any) => String(cid).trim()).filter(Boolean)))
+            : [],
           matchDomains: Array.isArray(c.matchDomains)
             ? c.matchDomains.map((d: any) => String(d).trim().toLowerCase()).filter(Boolean)
             : [],
@@ -188,7 +153,7 @@ function normalizeSchemes(rawList: any[]): ReorganizationScheme[] {
             : [],
           targetPanelName: c.targetPanelName ? String(c.targetPanelName).trim() : undefined,
           targetPanelId: c.targetPanelId ? String(c.targetPanelId).trim() : undefined,
-          color: c.color || "#38bdf8",
+          color: c.color || CATEGORY_PALETTE[cIdx % CATEGORY_PALETTE.length],
           createGroup: c.createGroup ?? true,
         }))
       : [];
@@ -199,6 +164,8 @@ function normalizeSchemes(rawList: any[]): ReorganizationScheme[] {
       strategy,
       tags,
       categories,
+      excludedClusterIds,
+      granularity: item.granularity,
       pros,
       cons,
       targetMode: item.targetMode === "panel" ? "panel" : "tree",
@@ -207,7 +174,72 @@ function normalizeSchemes(rawList: any[]): ReorganizationScheme[] {
 }
 
 /**
- * 将指定重构方案 (ReorganizationScheme) 直接编译应用到快照，生成 AIProcessedCache 对象
+ * 实时计算方案在当前微簇报告下的覆盖率与各分组标签数（0 Token 前端即时计算）
+ */
+export function computeSchemeCoverage(
+  scheme: ReorganizationScheme,
+  clusterReport?: ClusterCompressionReport | null
+): {
+  coveredTabs: number;
+  totalNonExemptTabs: number;
+  coveragePct: number;
+  coveredClusterIds: string[];
+  categoryTabCounts: Record<string, number>;
+} {
+  if (!clusterReport) {
+    return {
+      coveredTabs: 0,
+      totalNonExemptTabs: 0,
+      coveragePct: 0,
+      coveredClusterIds: [],
+      categoryTabCounts: {},
+    };
+  }
+
+  const clusterById = new Map<string, TabMicroCluster>();
+  for (const c of clusterReport.clusters) {
+    clusterById.set(c.id, c);
+  }
+
+  const excluded = new Set(scheme.excludedClusterIds || []);
+  const seenTabIds = new Set<string>();
+  const coveredClusterIds: string[] = [];
+  const categoryTabCounts: Record<string, number> = {};
+
+  for (const cat of scheme.categories) {
+    let catCount = 0;
+    for (const cid of cat.clusterIds || []) {
+      if (excluded.has(cid)) continue;
+      const clu = clusterById.get(cid);
+      if (!clu) continue;
+      coveredClusterIds.push(cid);
+      for (const tid of clu.tabIds) {
+        if (!seenTabIds.has(tid)) {
+          seenTabIds.add(tid);
+          catCount++;
+        }
+      }
+    }
+    categoryTabCounts[cat.name] = catCount;
+  }
+
+  const totalNonExemptTabs = clusterReport.nonExemptCount;
+  const coveredTabs = seenTabIds.size;
+  const coveragePct =
+    totalNonExemptTabs > 0 ? Math.round((coveredTabs / totalNonExemptTabs) * 100) : 0;
+
+  return {
+    coveredTabs,
+    totalNonExemptTabs,
+    coveragePct,
+    coveredClusterIds: Array.from(new Set(coveredClusterIds)),
+    categoryTabCounts,
+  };
+}
+
+/**
+ * 将指定重构方案 (ReorganizationScheme) 编译应用到快照，生成 AIProcessedCache
+ * 优先按 Option B 的 clusterIds 精确映射全部标签，再对未覆盖标签启用域名/关键词规则兜底
  */
 export function applySchemeToSnapshot(
   rawSnapshot: SideberySnapshot,
@@ -216,6 +248,7 @@ export function applySchemeToSnapshot(
     crossPanelMerge?: boolean;
     createGroupTabs?: boolean;
     targetMode?: "tree" | "panel";
+    clusterReport?: ClusterCompressionReport;
   }
 ): AIProcessedCache {
   const primaryWinId = Object.keys(rawSnapshot.windows)[0] || "1";
@@ -231,19 +264,59 @@ export function applySchemeToSnapshot(
   const categoriesDef = scheme.categories.map((c, i) => ({
     id: `cat_${i}_${Date.now()}`,
     name: c.name,
-    color: c.color || "#38bdf8",
+    color: c.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length],
   }));
 
-  // 对每个标签进行规则匹配
+  // 1. 构建微簇查找表（支持传入或按同粒度即时重建）
+  const hasClusterIds = scheme.categories.some((c) => (c.clusterIds?.length || 0) > 0);
+  const report =
+    options?.clusterReport ||
+    (hasClusterIds
+      ? clusterSnapshotTabs(tabs, rawSnapshot.panels, scheme.granularity || "balanced")
+      : undefined);
+
+  const clusterById = new Map<string, TabMicroCluster>();
+  if (report) {
+    for (const c of report.clusters) {
+      clusterById.set(c.id, c);
+    }
+  }
+
+  const excludedClusterIds = new Set(scheme.excludedClusterIds || []);
+  const excludedTabIds = new Set<string>();
+  for (const exCid of excludedClusterIds) {
+    const clu = clusterById.get(exCid);
+    if (clu) {
+      clu.tabIds.forEach((tid) => excludedTabIds.add(String(tid)));
+    }
+  }
+
+  // Pass A: Option B 微簇精准映射
+  for (const cat of scheme.categories) {
+    for (const cid of cat.clusterIds || []) {
+      if (excludedClusterIds.has(cid)) continue;
+      const cluster = clusterById.get(cid);
+      if (!cluster) continue;
+      for (const tabId of cluster.tabIds) {
+        const key = String(tabId);
+        if (!classificationMap.has(key)) {
+          classificationMap.set(key, cat.name);
+        }
+      }
+    }
+  }
+
+  // Pass B: 规则匹配兜底（仅作用于未被微簇映射且未被显式排除的标签）
   for (const tab of nonExemptTabs) {
+    const tabKey = String(tab.id);
+    if (classificationMap.has(tabKey) || excludedTabIds.has(tabKey)) continue;
+
     const domain = extractDomain(tab.url).toLowerCase();
     const titleLower = (tab.title || "").toLowerCase();
     const urlLower = (tab.url || "").toLowerCase();
 
     let matchedCategoryName: string | null = null;
-
     for (const cat of scheme.categories) {
-      // 1. 域名精确或后缀匹配
       if (cat.matchDomains && cat.matchDomains.length > 0) {
         const domainHit = cat.matchDomains.some(
           (d) => domain === d || domain.endsWith(`.${d}`) || d.endsWith(`.${domain}`)
@@ -254,7 +327,6 @@ export function applySchemeToSnapshot(
         }
       }
 
-      // 2. 关键词匹配
       if (cat.matchKeywords && cat.matchKeywords.length > 0) {
         const kwHit = cat.matchKeywords.some(
           (k) => titleLower.includes(k.toLowerCase()) || urlLower.includes(k.toLowerCase())
@@ -267,7 +339,7 @@ export function applySchemeToSnapshot(
     }
 
     if (matchedCategoryName) {
-      classificationMap.set(String(tab.id), matchedCategoryName);
+      classificationMap.set(tabKey, matchedCategoryName);
     }
   }
 
@@ -292,7 +364,6 @@ export function applySchemeToSnapshot(
     };
     processedTree = buildTabTree(updatedTabs);
   } else {
-    // 树状重构
     processedTree = reorganizeTreeIntoCategories(
       buildTabTree(tabs),
       classificationMap,
@@ -341,158 +412,187 @@ export function applySchemeToSnapshot(
   };
 }
 
+function isClusterCompressionReport(
+  val: Record<string, SideberyPanel> | ClusterCompressionReport | undefined
+): val is ClusterCompressionReport {
+  return Boolean(
+    val &&
+      typeof val === "object" &&
+      Array.isArray((val as ClusterCompressionReport).clusters) &&
+      typeof (val as ClusterCompressionReport).nonExemptCount === "number"
+  );
+}
+
 /**
- * 离线/开箱即用的预设架构方案（当网络未就绪或快速体验时提供）
+ * Option B 动态离线/即时架构方案生成器：
+ * 完全依据当前快照的真实微簇聚类结果生成 3 套互补架构选项（零硬编码站点）
  */
 export function getFallbackSchemes(
-  diagnosticTabs: SideberyTab[]
+  tabs: SideberyTab[],
+  panelsOrReport?: Record<string, SideberyPanel> | ClusterCompressionReport,
+  granularity: ClusterGranularity = "balanced"
 ): ReorganizationScheme[] {
+  const report: ClusterCompressionReport = isClusterCompressionReport(panelsOrReport)
+    ? panelsOrReport
+    : clusterSnapshotTabs(tabs, panelsOrReport, granularity);
+
+  const clusters = report.clusters;
+  if (clusters.length === 0) {
+    return [
+      {
+        id: "scheme_empty",
+        name: "方案 A：基础默认归类",
+        strategy: "当前快照暂无可聚类的非豁免标签页",
+        tags: ["空快照"],
+        granularity: report.granularity,
+        categories: [],
+        pros: ["保持现有结构"],
+        cons: [],
+      },
+    ];
+  }
+
+  // 1. 方案 A：高频微簇主题聚合架构（前若干大簇独立成组，长尾归集）
+  const topClusters = clusters.filter((c) => c.cohesionReason !== "tail_misc").slice(0, 6);
+  const topClusterIdSet = new Set(topClusters.map((c) => c.id));
+  const remainingClusters = clusters.filter((c) => !topClusterIdSet.has(c.id));
+
+  const schemeACategories: ReorganizationCategory[] = topClusters.map((c, idx) => ({
+    name: `📌 ${c.labelHint}`,
+    description: `包含 ${c.tabCount} 个标签 (${c.domains.slice(0, 2).join(", ")})`,
+    clusterIds: [c.id],
+    matchDomains: c.domains.slice(0, 3),
+    matchKeywords: c.keywords.slice(0, 3),
+    color: CATEGORY_PALETTE[idx % CATEGORY_PALETTE.length],
+    createGroup: c.tabCount >= 2,
+  }));
+
+  if (remainingClusters.length > 0) {
+    schemeACategories.push({
+      name: "🗂️ 其他长尾与零散专题",
+      description: `聚合剩余 ${remainingClusters.length} 个小微簇，便于集中断舍离`,
+      clusterIds: remainingClusters.map((c) => c.id),
+      matchDomains: [],
+      matchKeywords: [],
+      color: "#64748b",
+      createGroup: true,
+    });
+  }
+
+  // 2. 方案 B：来源面板与跨面板收敛架构（按主来源面板整理 + 多面板聚合）
+  const byPanel = new Map<string, TabMicroCluster[]>();
+  for (const c of clusters) {
+    const pName = c.sourcePanelNames[0] || "主面板";
+    if (!byPanel.has(pName)) byPanel.set(pName, []);
+    byPanel.get(pName)!.push(c);
+  }
+
+  const schemeBCategories: ReorganizationCategory[] = Array.from(byPanel.entries()).map(
+    ([panelName, groupClusters], idx) => ({
+      name: `🧭 ${panelName} · 专题簇`,
+      description: `收敛原本隶属「${panelName}」的 ${groupClusters.length} 个核心微簇`,
+      clusterIds: groupClusters.map((c) => c.id),
+      matchDomains: Array.from(new Set(groupClusters.flatMap((c) => c.domains))).slice(0, 4),
+      matchKeywords: [],
+      targetPanelName: panelName,
+      color: CATEGORY_PALETTE[(idx + 2) % CATEGORY_PALETTE.length],
+      createGroup: true,
+    })
+  );
+
+  // 3. 方案 C：原生折叠组极简收拢架构（按聚类生成动机：折叠组/子树 vs 域名专题 vs 长尾收口）
+  const subtreeClusters = clusters.filter(
+    (c) => c.cohesionReason === "group_subtree" || c.cohesionReason === "tree_subtree"
+  );
+  const topicClusters = clusters.filter(
+    (c) => c.cohesionReason === "domain_path" || c.cohesionReason === "semantic_topic"
+  );
+  const tailClusters = clusters.filter((c) => c.cohesionReason === "tail_misc");
+
+  const schemeCCategories: ReorganizationCategory[] = [];
+  if (subtreeClusters.length > 0) {
+    schemeCCategories.push({
+      name: "🌲 原生树与既有折叠组",
+      description: "完整保留原有的层级子树与折叠上下文",
+      clusterIds: subtreeClusters.map((c) => c.id),
+      matchDomains: [],
+      matchKeywords: [],
+      color: "#10b981",
+      createGroup: true,
+    });
+  }
+  if (topicClusters.length > 0) {
+    const mid = Math.ceil(topicClusters.length / 2);
+    const primaryTopics = topicClusters.slice(0, mid);
+    const secondaryTopics = topicClusters.slice(mid);
+
+    schemeCCategories.push({
+      name: "📁 [折叠] 高频核心站点组",
+      description: `收纳频率最高的 ${primaryTopics.length} 个域名/主题簇`,
+      clusterIds: primaryTopics.map((c) => c.id),
+      matchDomains: Array.from(new Set(primaryTopics.flatMap((c) => c.domains))).slice(0, 5),
+      matchKeywords: [],
+      color: "#3b82f6",
+      createGroup: true,
+    });
+
+    if (secondaryTopics.length > 0) {
+      schemeCCategories.push({
+        name: "📁 [折叠] 专题扩展与语义组",
+        description: `收纳其余 ${secondaryTopics.length} 个细分主题与跨站专题簇`,
+        clusterIds: secondaryTopics.map((c) => c.id),
+        matchDomains: Array.from(new Set(secondaryTopics.flatMap((c) => c.domains))).slice(0, 5),
+        matchKeywords: [],
+        color: "#8b5cf6",
+        createGroup: true,
+      });
+    }
+  }
+  if (tailClusters.length > 0) {
+    schemeCCategories.push({
+      name: "📥 [折叠] 零散长尾待清区",
+      description: "集中待筛选或待关闭的孤立页，随时一键释放内存",
+      clusterIds: tailClusters.map((c) => c.id),
+      matchDomains: [],
+      matchKeywords: [],
+      color: "#f59e0b",
+      createGroup: true,
+    });
+  }
+
   return [
     {
-      id: "scheme_lifecycle_gtd",
-      name: "方案 A：GTD 消费生命周期流转架构 (Lifecycle Pipeline)",
-      strategy: "按任务状态与消费生命周期流转，将待下载资源与活跃工程分流，强力促成内存瘦身与断舍离",
-      tags: ["GTD流转", "强烈推荐", "告别囤积"],
-      categories: [
-        {
-          name: "🔨 活跃工程与开发",
-          description: "当前正在着手推进的软硬件刷机、代码开发与网络调试项目",
-          matchDomains: ["github.com", "nodeseek.com", "right.com.cn", "metacubex.one", "blog.laoda.de", "modules.lsposed.org"],
-          matchKeywords: ["openwrt", "刷机", "docker", "vps", "clash", "git"],
-          targetPanelName: "🔨 活跃工程",
-          color: "#3b82f6",
-          createGroup: true,
-        },
-        {
-          name: "💾 待下载转存·同人与资源",
-          description: "DLsite 作品、同人音声、网盘与论坛资源，建议转存本地或书签后批量关闭",
-          matchDomains: ["dlsite.com", "asmr.one", "anime-sharing.com", "laowang.vip", "otomi-games.com", "doujinstyle.com"],
-          matchKeywords: ["dlsite", "asmr", "同人", "音声", "rj", "download"],
-          targetPanelName: "💾 待下载归档",
-          color: "#ec4899",
-          createGroup: true,
-        },
-        {
-          name: "📚 常驻参考·游戏与模组",
-          description: "Galgame 批评空间评测、Minecraft 模组百科等长期高频回访知识库",
-          matchDomains: ["erogamescape.dyndns.org", "mcmod.cn", "play.mcmod.cn", "think-game.com", "igg-games.com", "zodgame.xyz"],
-          matchKeywords: ["erogame", "批评空间", "mcmod", "模组", "wiki", "百科"],
-          targetPanelName: "📚 常驻参考",
-          color: "#10b981",
-          createGroup: true,
-        },
-        {
-          name: "🥽 虚拟工坊·3D资产与空间",
-          description: "Booth.pm 资产模型、VRChat 空间与 VR 魔趣",
-          matchDomains: ["booth.pm", "vrchat.com", "vrmoo.net"],
-          matchKeywords: ["booth", "vrchat", "avatar", "quest"],
-          targetPanelName: "🥽 虚拟工坊",
-          color: "#8b5cf6",
-          createGroup: true,
-        },
-        {
-          name: "📥 待读流·社交与资讯",
-          description: "X.com 推特动态、Reddit 社区讨论与论坛，阅后即关",
-          matchDomains: ["reddit.com", "x.com", "forum.naixi.net", "google.com"],
-          matchKeywords: ["reddit", "twitter", "tweet"],
-          targetPanelName: "📥 待读流",
-          color: "#06b6d4",
-          createGroup: false,
-        },
-      ],
-      pros: ["专治标签囤积症，待下载和待读页面可一键批量清理", "明确区分正在做的任务与长期资料库"],
-      cons: ["需要养成消费后关闭标签的断舍离习惯"],
+      id: "scheme_cluster_topics",
+      name: "方案 A：高频微簇主题聚合架构",
+      strategy: `基于本地预聚类压缩出的 ${clusters.length} 个微簇（100% 覆盖 ${report.nonExemptCount} 个非豁免标签），将核心专题独立分组并收拢长尾`,
+      tags: ["100%覆盖", "零盲区推荐", "专题清晰"],
+      granularity: report.granularity,
+      categories: schemeACategories,
+      pros: ["直接利用真实微簇映射，未分类率为 0", "可在卡片中点击微簇随时零成本微调"],
+      cons: ["若大簇过多，建议在面板模式或折叠模式下查看"],
+      targetMode: "tree",
     },
     {
-      id: "scheme_matrix_group",
-      name: "方案 B：任务专题折叠组架构 (Task Groups + Fast Triage)",
-      strategy: "将各大重点专题打包进 Sidebery 原生可折叠 Group 组，收拢 80% 视觉高度",
-      tags: ["极简视觉", "折叠整洁", "利用Sidebery特性"],
-      categories: [
-        {
-          name: "📁 [折叠组] 固件刷机与网络配置",
-          matchDomains: ["right.com.cn", "nodeseek.com"],
-          matchKeywords: ["rax3000", "uboot", "刷机", "openwrt"],
-          color: "#3b82f6",
-          createGroup: true,
-        },
-        {
-          name: "📁 [折叠组] Galgame 批评空间鉴赏",
-          matchDomains: ["erogamescape.dyndns.org"],
-          matchKeywords: ["erogamescape", "感想"],
-          color: "#10b981",
-          createGroup: true,
-        },
-        {
-          name: "📁 [折叠组] Booth 3D 资产清单",
-          matchDomains: ["booth.pm"],
-          matchKeywords: ["booth"],
-          color: "#8b5cf6",
-          createGroup: true,
-        },
-        {
-          name: "📁 [折叠组] Minecraft 模组与服服百科",
-          matchDomains: ["mcmod.cn", "play.mcmod.cn"],
-          matchKeywords: ["mcmod"],
-          color: "#f59e0b",
-          createGroup: true,
-        },
-        {
-          name: "📁 [折叠组] 待转存音声与作品清单",
-          matchDomains: ["dlsite.com", "asmr.one"],
-          matchKeywords: ["dlsite", "asmr"],
-          color: "#ec4899",
-          createGroup: true,
-        },
-      ],
-      pros: ["侧边栏高度骤降 80%，无需一直拉滚动条", "每个专题一键折叠或展开"],
-      cons: ["长尾站点仍需归于杂项或保持根层级"],
+      id: "scheme_panel_topology",
+      name: "方案 B：面板拓扑均衡重构架构",
+      strategy: "尊重现有面板划分并收敛散落标签，消除碎片化孤岛，适合多工作区协同",
+      tags: ["面板模式", "拓扑整理", "不破坏习惯"],
+      granularity: report.granularity,
+      categories: schemeBCategories,
+      pros: ["保留用户原有工作区/面板心智", "同一域下的分散标签会自动靠拢"],
+      cons: ["若原面板数量极少，单面板内组数依然较多"],
+      targetMode: schemeBCategories.length > 1 ? "panel" : "tree",
     },
     {
-      id: "scheme_domain_focus",
-      name: "方案 C：核心场景与领域纵深架构 (Domain Focused Architecture)",
-      strategy: "按用户核心业务领域纵向切分，清晰划分技术研发、游戏测评、二次元音画与日常工具",
-      tags: ["领域垂直", "权责清晰", "分类直观"],
-      categories: [
-        {
-          name: "💻 研发·硬件与系统工具",
-          description: "代码仓库、开源工具、路由器刷机与服务器运维",
-          matchDomains: ["github.com", "nodeseek.com", "right.com.cn", "metacubex.one"],
-          matchKeywords: ["openwrt", "刷机", "docker", "vps", "clash"],
-          targetPanelName: "💻 研发工程",
-          color: "#3b82f6",
-          createGroup: true,
-        },
-        {
-          name: "🌸 二次元·同人音声与鉴赏",
-          description: "DLsite 作品、同人音声、Galgame 批评空间测评",
-          matchDomains: ["dlsite.com", "asmr.one", "erogamescape.dyndns.org", "anime-sharing.com"],
-          matchKeywords: ["dlsite", "asmr", "批评空间", "同人"],
-          targetPanelName: "🌸 二次元",
-          color: "#ec4899",
-          createGroup: true,
-        },
-        {
-          name: "🎮 游戏·模组百科与工坊",
-          description: "Minecraft 模组百科、Booth 3D资产与 VRChat 空间",
-          matchDomains: ["mcmod.cn", "play.mcmod.cn", "booth.pm", "vrchat.com"],
-          matchKeywords: ["mcmod", "booth", "vrchat", "模组"],
-          targetPanelName: "🎮 游戏工坊",
-          color: "#8b5cf6",
-          createGroup: true,
-        },
-        {
-          name: "🌐 综合·资讯动态与日常",
-          description: "社交网络动态、社区讨论与搜索引擎",
-          matchDomains: ["x.com", "reddit.com", "google.com"],
-          matchKeywords: ["tweet", "reddit"],
-          targetPanelName: "🌐 综合日常",
-          color: "#06b6d4",
-          createGroup: false,
-        },
-      ],
-      pros: ["符合直觉分类习惯，权责分明", "易于长久维护各领域书签"],
-      cons: ["各面板内仍需定期手动清理待转存页面"],
+      id: "scheme_folding_compact",
+      name: "方案 C：Sidebery 原生折叠组高密收拢",
+      strategy: "保留既有父子树结构，将散装域与语义簇全部打包为 Sidebery 原生可折叠 Group，极大压缩侧边栏高度",
+      tags: ["极简视觉", "高密折叠", "保留子树"],
+      granularity: report.granularity,
+      categories: schemeCCategories,
+      pros: ["保留所有原有树状父子上下文", "垂直滚动高度骤减，视觉极度清爽"],
+      cons: ["需要展开对应折叠组才能浏览底层子标签"],
+      targetMode: "tree",
     },
   ];
 }

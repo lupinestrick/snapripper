@@ -1,34 +1,38 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { AIConfig, AI_PROVIDERS } from "@/types/ai";
+import { AIConfig, AI_PROVIDERS, AIProviderKey, AIProtocolType, AIDropdownSettings, CustomAIProvider } from "@/types/ai";
+import { getAPIKeySlot, getProviderMeta } from "@/services/aiService";
 import { CategorizationRule, RulesSettings } from "@/types/sidebery";
 import { DEFAULT_RULES_SETTINGS } from "@/services/ruleEngine";
 import { DomainMergeConfig, DEFAULT_DOMAIN_MERGE_CONFIG } from "@/services/domainMergeEngine";
 import { AIPromptsConfig, DEFAULT_AI_PROMPTS } from "@/constants/aiPrompts";
 
+import { AppTheme } from "@/constants/themes";
+
+export type { AppTheme };
 export type AppPage = "workbench" | "process" | "rules" | "ai" | "settings";
 
-export type AppTheme =
-  | "park-light"
-  | "park-dark"
-  | "midnight"
-  | "nord-snow-storm"
-  | "rose-pine-dawn"
-  | "nord-dark"
-  | "catppuccin-mocha";
-
 export type ProcessScope = "current" | "all" | "selected";
+
+export type WorkbenchPanelLayout = "vertical" | "horizontal" | "dropdown";
 
 export interface UISettings {
   hideFileName: boolean;
   hideQuickTheme: boolean;
   hideEmptyPanels: boolean;
+  workbenchPanelLayout?: WorkbenchPanelLayout;
 }
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
   hideFileName: false,
   hideQuickTheme: false,
   hideEmptyPanels: false,
+  workbenchPanelLayout: "vertical",
+};
+
+export const DEFAULT_AI_DROPDOWN_SETTINGS: AIDropdownSettings = {
+  visibleProviders: ["deepseek", "claude", "openai", "gemini"],
+  maxDropdownModels: 8,
 };
 
 export interface AIThresholds {
@@ -56,7 +60,14 @@ interface ConfigState {
   domainMergeConfig: DomainMergeConfig;
   aiPrompts: AIPromptsConfig;
   uiSettings: UISettings;
+  aiDropdownSettings: AIDropdownSettings;
   setUISettings: (settings: Partial<UISettings>) => void;
+  setAIDropdownSettings: (settings: Partial<AIDropdownSettings>) => void;
+  togglePinnedModel: (slot: string, modelName: string) => void;
+  switchAIProvider: (key: AIProviderKey, protocolOverride?: AIProtocolType) => void;
+  addCustomProvider: (provider: Omit<CustomAIProvider, "id">, apiKey?: string) => string;
+  updateCustomProvider: (id: string, partial: Partial<CustomAIProvider>) => void;
+  deleteCustomProvider: (id: string) => void;
 
   setActivePage: (page: AppPage) => void;
   setTheme: (theme: AppTheme) => void;
@@ -66,6 +77,7 @@ interface ConfigState {
   updateRule: (id: string, rule: Partial<CategorizationRule>) => void;
   deleteRule: (id: string) => void;
   toggleRule: (id: string) => void;
+  reorderRules: (fromIndex: number, toIndex: number) => void;
   importRulesJSON: (jsonString: string) => boolean;
   exportRulesJSON: () => string;
 
@@ -119,7 +131,199 @@ export const useConfigStore = create<ConfigState>()(
       domainMergeConfig: DEFAULT_DOMAIN_MERGE_CONFIG,
       aiPrompts: DEFAULT_AI_PROMPTS,
       uiSettings: DEFAULT_UI_SETTINGS,
+      aiDropdownSettings: DEFAULT_AI_DROPDOWN_SETTINGS,
       setUISettings: (settings) => set((state) => ({ uiSettings: { ...state.uiSettings, ...settings } })),
+      setAIDropdownSettings: (settings) =>
+        set((state) => ({
+          aiDropdownSettings: {
+            ...(state.aiDropdownSettings || DEFAULT_AI_DROPDOWN_SETTINGS),
+            ...settings,
+          },
+        })),
+
+      togglePinnedModel: (slot, modelName) =>
+        set((state) => {
+          const cleanName = modelName.trim();
+          if (!cleanName) return state;
+          const currentMap = state.aiConfig.pinnedModels || {};
+          const existing = currentMap[slot] || [];
+          const exists = existing.includes(cleanName);
+          const nextList = exists
+            ? existing.filter((m) => m !== cleanName)
+            : [cleanName, ...existing];
+          return {
+            aiConfig: {
+              ...state.aiConfig,
+              pinnedModels: {
+                ...currentMap,
+                [slot]: nextList,
+              },
+            },
+          };
+        }),
+
+      switchAIProvider: (key, protocolOverride) =>
+        set((state) => {
+          const aiConfig = state.aiConfig;
+          const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+          const apiKeysPool = { ...(aiConfig.apiKeys || {}), [currentSlot]: aiConfig.apiKey };
+          const baseURLsPool = { ...(aiConfig.baseURLs || {}), [currentSlot]: aiConfig.baseURL };
+          const modelsPool = { ...(aiConfig.models || {}), [currentSlot]: aiConfig.model };
+
+          const meta = getProviderMeta(aiConfig, key);
+          const newType =
+            key === "custom"
+              ? protocolOverride || (aiConfig.type === "anthropic" ? "anthropic" : "openai")
+              : meta.type;
+          const targetSlot = getAPIKeySlot(key, newType);
+          const targetKey = apiKeysPool[targetSlot] || "";
+
+          let targetBaseURL = meta.baseUrl;
+          if (key === "custom") {
+            const savedCustomUrl = baseURLsPool[targetSlot];
+            if (savedCustomUrl && !savedCustomUrl.includes("api.custome.ai")) {
+              targetBaseURL = savedCustomUrl;
+            } else {
+              targetBaseURL =
+                newType === "anthropic"
+                  ? "https://api.anthropic.com/v1"
+                  : "https://api.openai.com/v1";
+            }
+          } else if (baseURLsPool[targetSlot]) {
+            targetBaseURL = baseURLsPool[targetSlot];
+          }
+
+          let targetModel = meta.model;
+          if (key === "custom") {
+            const savedCustomModel = modelsPool[targetSlot];
+            if (savedCustomModel && savedCustomModel !== "deepseek-flash") {
+              targetModel = savedCustomModel;
+            } else {
+              targetModel =
+                newType === "anthropic" ? "claude-3-7-sonnet-20250219" : "gpt-4o-mini";
+            }
+          } else if (modelsPool[targetSlot]) {
+            targetModel = modelsPool[targetSlot];
+          }
+
+          baseURLsPool[targetSlot] = targetBaseURL;
+          modelsPool[targetSlot] = targetModel;
+          apiKeysPool[targetSlot] = targetKey;
+
+          return {
+            aiConfig: {
+              ...aiConfig,
+              provider: key,
+              type: newType,
+              baseURL: targetBaseURL,
+              model: targetModel,
+              apiKey: targetKey,
+              apiKeys: apiKeysPool,
+              baseURLs: baseURLsPool,
+              models: modelsPool,
+            },
+          };
+        }),
+
+      addCustomProvider: (providerData, apiKey = "") => {
+        const id = `custom_${Date.now()}`;
+        set((state) => {
+          const aiConfig = state.aiConfig;
+          const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
+          const apiKeysPool = { ...(aiConfig.apiKeys || {}), [currentSlot]: aiConfig.apiKey, [id]: apiKey.trim() };
+          const baseURLsPool = { ...(aiConfig.baseURLs || {}), [currentSlot]: aiConfig.baseURL, [id]: providerData.baseUrl.trim() };
+          const modelsPool = { ...(aiConfig.models || {}), [currentSlot]: aiConfig.model, [id]: providerData.model.trim() };
+
+          const newProvider: CustomAIProvider = {
+            id,
+            name: providerData.name.trim() || "自定义供应商",
+            type: providerData.type || "openai",
+            baseUrl: providerData.baseUrl.trim() || "https://api.openai.com/v1",
+            model: providerData.model.trim() || "gpt-4o-mini",
+          };
+
+          const existingDropdown = state.aiDropdownSettings || DEFAULT_AI_DROPDOWN_SETTINGS;
+          const nextVisible = Array.from(new Set([...(existingDropdown.visibleProviders || []), id]));
+
+          return {
+            aiConfig: {
+              ...aiConfig,
+              customProviders: [...(aiConfig.customProviders || []), newProvider],
+              provider: id,
+              type: newProvider.type,
+              baseURL: newProvider.baseUrl,
+              model: newProvider.model,
+              apiKey: apiKey.trim(),
+              apiKeys: apiKeysPool,
+              baseURLs: baseURLsPool,
+              models: modelsPool,
+            },
+            aiDropdownSettings: {
+              ...existingDropdown,
+              visibleProviders: nextVisible,
+            },
+          };
+        });
+        return id;
+      },
+
+      updateCustomProvider: (id, partial) =>
+        set((state) => {
+          const updatedList = (state.aiConfig.customProviders || []).map((c) =>
+            c.id === id ? { ...c, ...partial } : c
+          );
+          const isActive = state.aiConfig.provider === id;
+          const updatedItem = updatedList.find((c) => c.id === id);
+          return {
+            aiConfig: {
+              ...state.aiConfig,
+              customProviders: updatedList,
+              ...(isActive && updatedItem
+                ? {
+                    type: updatedItem.type,
+                    baseURL: updatedItem.baseUrl,
+                    model: updatedItem.model,
+                    baseURLs: { ...(state.aiConfig.baseURLs || {}), [id]: updatedItem.baseUrl },
+                    models: { ...(state.aiConfig.models || {}), [id]: updatedItem.model },
+                  }
+                : {}),
+            },
+          };
+        }),
+
+      deleteCustomProvider: (id) =>
+        set((state) => {
+          const remaining = (state.aiConfig.customProviders || []).filter((c) => c.id !== id);
+          const existingDropdown = state.aiDropdownSettings || DEFAULT_AI_DROPDOWN_SETTINGS;
+          const nextVisible = (existingDropdown.visibleProviders || []).filter((p) => p !== id);
+          const isDeletingActive = state.aiConfig.provider === id;
+
+          let nextConfig = {
+            ...state.aiConfig,
+            customProviders: remaining,
+          };
+
+          if (isDeletingActive) {
+            const fallbackKey = "deepseek";
+            const meta = getProviderMeta(nextConfig, fallbackKey);
+            nextConfig = {
+              ...nextConfig,
+              provider: fallbackKey,
+              type: meta.type,
+              baseURL: nextConfig.baseURLs?.[fallbackKey] || meta.baseUrl,
+              model: nextConfig.models?.[fallbackKey] || meta.model,
+              apiKey: nextConfig.apiKeys?.[fallbackKey] || "",
+            };
+          }
+
+          return {
+            aiConfig: nextConfig,
+            aiDropdownSettings: {
+              ...existingDropdown,
+              visibleProviders: nextVisible.length > 0 ? nextVisible : ["deepseek"],
+            },
+          };
+        }),
 
       setActivePage: (page) => set({ activePage: page }),
       setTheme: (theme) => set({ theme }),
@@ -171,6 +375,28 @@ export const useConfigStore = create<ConfigState>()(
             rules: state.rulesSettings.rules.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)),
           },
         })),
+
+      reorderRules: (fromIndex, toIndex) =>
+        set((state) => {
+          const list = [...state.rulesSettings.rules];
+          if (
+            fromIndex < 0 ||
+            toIndex < 0 ||
+            fromIndex >= list.length ||
+            toIndex >= list.length ||
+            fromIndex === toIndex
+          ) {
+            return state;
+          }
+          const [moved] = list.splice(fromIndex, 1);
+          list.splice(toIndex, 0, moved);
+          return {
+            rulesSettings: {
+              ...state.rulesSettings,
+              rules: list,
+            },
+          };
+        }),
 
       importRulesJSON: (jsonString: string) => {
         try {

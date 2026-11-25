@@ -3,10 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopNav } from "@/components/layout/TopNav";
-import { StatsHeader } from "@/components/layout/StatsHeader";
-import { SearchFilter } from "@/components/editor/SearchFilter";
-import { TabTreeView } from "@/components/editor/TabTreeView";
-import { BatchBar } from "@/components/editor/BatchBar";
+import { WorkbenchView } from "@/components/editor/WorkbenchView";
 import { ProcessPage } from "@/components/process/ProcessPage";
 import { RulesPage } from "@/components/rules/RulesPage";
 import { AIPage } from "@/components/ai/AIPage";
@@ -17,6 +14,7 @@ import { OverviewHopup } from "@/components/layout/OverviewHopup";
 import { Button } from "@/components/ui/button";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
+import { isLightTheme } from "@/constants/themes";
 import { Loader2 } from "lucide-react";
 
 export default function WorkbenchPage() {
@@ -38,10 +36,7 @@ export default function WorkbenchPage() {
     const activeTheme = theme || "park-light";
     document.documentElement.setAttribute("data-theme", activeTheme);
     document.body.setAttribute("data-theme", activeTheme);
-    const isLight =
-      activeTheme === "park-light" ||
-      activeTheme === "nord-snow-storm" ||
-      activeTheme === "rose-pine-dawn";
+    const isLight = isLightTheme(activeTheme);
     if (isLight) {
       document.documentElement.classList.remove("dark");
       document.documentElement.classList.add("light");
@@ -139,26 +134,19 @@ export default function WorkbenchPage() {
           position: "relative",
         }}
       >
-        <TopNav onOpenExport={() => setExportDialogOpen(true)} />
+        {activePage !== "ai" && <TopNav onOpenExport={() => setExportDialogOpen(true)} />}
 
         <main
           style={{
             flex: 1,
-            overflowY: activePage === "ai" ? "hidden" : "auto",
+            overflowY: activePage === "ai" || activePage === "workbench" ? "hidden" : "auto",
             position: "relative",
-            paddingBottom: activePage === "ai" ? 0 : "70px",
+            paddingBottom: activePage === "ai" || activePage === "workbench" ? 0 : "70px",
             display: "flex",
             flexDirection: "column",
           }}
         >
-          {activePage === "workbench" && (
-            <>
-              <StatsHeader />
-              {rawSnapshot && <SearchFilter />}
-              <TabTreeView />
-              <BatchBar />
-            </>
-          )}
+          {activePage === "workbench" && <WorkbenchView />}
 
           {activePage === "process" && <ProcessPage />}
 
