@@ -8,6 +8,8 @@ import { clusterSnapshotTabs } from "@/services/tabClusterEngine";
 import { getAPIKeySlot, getOrderedModelsForSlot, getProviderMeta, checkAICallLimits } from "@/services/aiService";
 import {
   sendArchitectChatRequest,
+  sendArchitectDiagnosisRequest,
+  DEFAULT_ARCHITECT_DIRECTION_CHIPS,
   applySchemeToSnapshot,
   getFallbackSchemes,
   computeSchemeCoverage,
@@ -22,6 +24,7 @@ import {
 import { SchemeCard } from "./SchemeCard";
 import { MarkdownView } from "./MarkdownView";
 import { AIModelSettingsHopup, AIModelSettingsTab } from "./AIModelSettingsHopup";
+import { BlueprintCanvasModal } from "./BlueprintCanvasModal";
 import { SnapshotFileHopupModal } from "@/components/layout/SnapshotFileHopupModal";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -47,6 +50,9 @@ import {
   History,
   Edit3,
   Trash2,
+  Lock,
+  Unlock,
+  Compass,
 } from "lucide-react";
 
 const GRANULARITY_LABELS: Record<ClusterGranularity, string> = {
@@ -62,6 +68,7 @@ function SchemeTabsGroup({
   onApply,
   onTweak,
   onChangeScheme,
+  onOpenBlueprint,
 }: {
   schemes: ReorganizationScheme[];
   clusterReport?: ClusterCompressionReport;
@@ -69,6 +76,7 @@ function SchemeTabsGroup({
   onApply: (scheme: ReorganizationScheme) => void;
   onTweak: (scheme: ReorganizationScheme) => void;
   onChangeScheme: (updated: ReorganizationScheme) => void;
+  onOpenBlueprint: (scheme: ReorganizationScheme) => void;
 }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const safeIdx = selectedIdx < schemes.length ? selectedIdx : 0;
@@ -81,44 +89,116 @@ function SchemeTabsGroup({
       {schemes.length > 1 && (
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.35rem",
-            overflowX: "auto",
-            paddingBottom: "0.25rem",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+            gap: "0.55rem",
+            marginBottom: "0.15rem",
           }}
         >
           {schemes.map((s, idx) => {
             const isActive = idx === safeIdx;
             const cov = clusterReport ? computeSchemeCoverage(s, clusterReport) : null;
+            const assignedClusterCount = s.categories.reduce(
+              (acc, c) => acc + (c.clusterIds?.length || 0),
+              0
+            );
             return (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => setSelectedIdx(idx)}
                 style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  padding: "0.35rem 0.75rem",
-                  borderRadius: "9999px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "flex-start",
+                  gap: "0.3rem",
+                  padding: "0.65rem 0.8rem",
+                  borderRadius: "0.75rem",
                   border: "1px solid",
                   borderColor: isActive ? "var(--accent-solid)" : "var(--border-card)",
                   backgroundColor: isActive ? "var(--accent-subtle)" : "var(--bg-surface)",
-                  color: isActive ? "var(--accent-text)" : "var(--text-muted)",
-                  fontSize: "0.74rem",
-                  fontWeight: isActive ? 600 : 500,
+                  color: "var(--text-main)",
                   cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
+                  textAlign: "left",
                   transition: "all 0.12s ease",
                 }}
               >
-                <span>{s.name.split("：")[0] || `方案 ${idx + 1}`}</span>
-                {cov && cov.totalNonExemptTabs > 0 && (
-                  <span style={{ fontSize: "0.66rem", opacity: 0.85 }}>
-                    {cov.coveragePct}%
+                <div
+                  style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "0.4rem",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      color: isActive ? "var(--accent-text)" : "var(--text-main)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {s.name}
                   </span>
+                  {cov && cov.totalNonExemptTabs > 0 && (
+                    <span
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 600,
+                        color: cov.coveragePct >= 85 ? "var(--success)" : "var(--accent-text)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {cov.coveragePct}%
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "0.7rem",
+                    color: "var(--text-muted)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.4rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span>{s.categories.length} 分类</span>
+                  {assignedClusterCount > 0 && (
+                    <>
+                      <span>·</span>
+                      <span>{assignedClusterCount} 微簇</span>
+                    </>
+                  )}
+                  {cov && cov.totalNonExemptTabs > 0 && (
+                    <>
+                      <span>·</span>
+                      <span>
+                        {cov.coveredTabs}/{cov.totalNonExemptTabs} 标签
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {s.strategy && (
+                  <div
+                    style={{
+                      fontSize: "0.71rem",
+                      color: "var(--text-muted)",
+                      lineHeight: 1.35,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {s.strategy}
+                  </div>
                 )}
               </button>
             );
@@ -133,6 +213,7 @@ function SchemeTabsGroup({
         onApply={onApply}
         onTweak={onTweak}
         onChangeScheme={onChangeScheme}
+        onOpenBlueprint={onOpenBlueprint}
       />
     </div>
   );
@@ -187,6 +268,11 @@ export function AIPage() {
   const [historyMenuOpen, setHistoryMenuOpen] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState("");
+  const [excludedPanelIds, setExcludedPanelIds] = useState<string[]>([]);
+  const [blueprintTarget, setBlueprintTarget] = useState<{
+    messageId: string;
+    scheme: ReorganizationScheme;
+  } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -252,6 +338,95 @@ export function AIPage() {
     return clusterSnapshotTabs(allTabs, rawSnapshot.panels, granularity);
   }, [rawSnapshot, allTabs, granularity]);
 
+  const toggleExcludedPanel = (panelId: string) => {
+    setExcludedPanelIds((prev) =>
+      prev.includes(panelId) ? prev.filter((id) => id !== panelId) : [...prev, panelId]
+    );
+  };
+
+  const buildScopedReport = (report: ClusterCompressionReport): ClusterCompressionReport => {
+    if (excludedPanelIds.length === 0) return report;
+    const lockedSet = new Set(excludedPanelIds);
+    const activeClusters = report.clusters.filter(
+      (c) => !c.sourcePanelIds.every((pid) => lockedSet.has(pid))
+    );
+    const nonExemptCount = activeClusters.reduce((acc, c) => acc + c.tabCount, 0);
+    return {
+      ...report,
+      clusters: activeClusters,
+      nonExemptCount,
+    };
+  };
+
+  const handleRunDiagnosis = async () => {
+    if (isGenerating) return;
+    if (!rawSnapshot || allTabs.length === 0 || !clusterReport) {
+      alert("请先在工作台导入或加载 Sidebery 快照");
+      return;
+    }
+
+    const limitCheck = checkAICallLimits(aiCallSettings, aiUsageStats);
+    if (!limitCheck.ok) {
+      addAiChatMessage({
+        id: `ai_limit_${Date.now()}`,
+        sender: "assistant",
+        timestamp: Date.now(),
+        text: `⏳ **已触发调用限制**：${limitCheck.reason}`,
+      });
+      return;
+    }
+
+    const scopedReport = buildScopedReport(clusterReport);
+
+    addAiChatMessage({
+      id: `user_diag_${Date.now()}`,
+      sender: "user",
+      timestamp: Date.now(),
+      text: "先生成快照结构诊断摘要，并给出可选整理方向",
+    });
+
+    setIsGenerating(true);
+    setStatusText(`正在由 ${aiConfig.model || currentProviderDef.model} 生成结构诊断与反问选项...`);
+
+    let usageRecorded = false;
+    try {
+      const { text, chips } = await sendArchitectDiagnosisRequest(
+        { ...aiConfig, callSettings: aiCallSettings },
+        scopedReport,
+        {
+          onUsage: (u) => {
+            usageRecorded = true;
+            recordAIUsage(u);
+          },
+        }
+      );
+      if (!usageRecorded) {
+        recordAIUsage({ promptTokens: 0, completionTokens: 0 });
+      }
+
+      addAiChatMessage({
+        id: `ai_diag_${Date.now()}`,
+        sender: "assistant",
+        timestamp: Date.now(),
+        text,
+        directionChips: chips,
+        clusterReport: scopedReport,
+      });
+    } catch (err: any) {
+      addAiChatMessage({
+        id: `ai_diag_err_${Date.now()}`,
+        sender: "assistant",
+        timestamp: Date.now(),
+        text: `⚠️ **诊断请求失败** (${err.message || "连接异常"})\n\n你仍可直接选择下方预设整理方向或使用离线方案：`,
+        directionChips: DEFAULT_ARCHITECT_DIRECTION_CHIPS,
+        clusterReport: scopedReport,
+      });
+    } finally {
+      setIsGenerating(false);
+      setStatusText("");
+    }
+  };
+
   const handleInstantLocalSchemes = () => {
     if (!rawSnapshot || allTabs.length === 0 || !clusterReport) {
       alert("请先在工作台导入或加载 Sidebery 快照");
@@ -302,9 +477,16 @@ export function AIPage() {
       textareaRef.current.style.height = "auto";
     }
 
+    const scopedReport = buildScopedReport(clusterReport);
+    const lockedNames = (scopedReport.activePanels || [])
+      .filter((p) => excludedPanelIds.includes(p.id))
+      .map((p) => p.name);
+    const lockNote =
+      lockedNames.length > 0 ? `\n\n（注意：用户已锁定排除以下面板，请勿包含它们：${lockedNames.join("、")}）` : "";
+
     setIsGenerating(true);
     setStatusText(
-      `已压缩 ${clusterReport.clusters.length} 微簇 · 请求 ${aiConfig.model || currentProviderDef.model}...`
+      `已压缩 ${scopedReport.clusters.length} 微簇 · 请求 ${aiConfig.model || currentProviderDef.model}...`
     );
 
     let usageRecorded = false;
@@ -314,13 +496,13 @@ export function AIPage() {
           role: m.sender as "user" | "assistant" | "system",
           content: m.text,
         })),
-        { role: "user" as const, content: promptForAI },
+        { role: "user" as const, content: `${promptForAI}${lockNote}` },
       ];
 
       const { text, schemes } = await sendArchitectChatRequest(
         { ...aiConfig, callSettings: aiCallSettings },
         historyForAI,
-        clusterReport,
+        scopedReport,
         aiPrompts?.architectPrompt,
         {
           onUsage: (u) => {
@@ -336,7 +518,7 @@ export function AIPage() {
       const resolvedSchemes =
         schemes && schemes.length > 0
           ? schemes.map((s) => ({ ...s, granularity }))
-          : getFallbackSchemes(allTabs, clusterReport, granularity);
+          : getFallbackSchemes(allTabs, scopedReport, granularity);
 
       const aiMsg: AIChatMessage = {
         id: `ai_${Date.now()}`,
@@ -344,7 +526,7 @@ export function AIPage() {
         timestamp: Date.now(),
         text,
         schemes: resolvedSchemes,
-        clusterReport,
+        clusterReport: scopedReport,
       };
 
       addAiChatMessage(aiMsg);
@@ -973,7 +1155,7 @@ export function AIPage() {
             gap: "1.15rem",
           }}
         >
-          {/* Minimal Empty State */}
+          {/* Phase 1: 0-Token Local Summary & Direction Selector Card */}
           {aiChatMessages.length === 0 && (
             <div
               style={{
@@ -981,14 +1163,13 @@ export function AIPage() {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                minHeight: "54vh",
-                textAlign: "center",
+                paddingTop: "1rem",
               }}
             >
               <div
                 style={{
-                  width: "46px",
-                  height: "46px",
+                  width: "42px",
+                  height: "42px",
                   borderRadius: "50%",
                   backgroundColor: "var(--bg-card)",
                   border: "1px solid var(--border-card)",
@@ -996,17 +1177,17 @@ export function AIPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  marginBottom: "0.85rem",
+                  marginBottom: "0.7rem",
                 }}
               >
-                <Sparkles size={20} />
+                <Sparkles size={18} />
               </div>
 
               <h2
                 style={{
-                  fontSize: "1.3rem",
+                  fontSize: "1.25rem",
                   fontWeight: 700,
-                  marginBottom: "0.4rem",
+                  marginBottom: "0.35rem",
                   color: "var(--text-main)",
                 }}
               >
@@ -1016,69 +1197,219 @@ export function AIPage() {
               {rawSnapshot && clusterReport ? (
                 <div
                   style={{
-                    fontSize: "0.8rem",
-                    color: "var(--text-muted)",
-                    marginBottom: "1.35rem",
+                    width: "100%",
+                    marginTop: "0.75rem",
+                    padding: "1rem 1.15rem",
+                    borderRadius: "0.9rem",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-card)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.85rem",
                   }}
                 >
-                  {allTabs.length} 标签 · {panelCount} 面板 ·{" "}
-                  <strong style={{ color: "var(--text-main)" }}>
-                    {clusterReport.clusters.length}
-                  </strong>{" "}
-                  微簇
+                  {/* 0-Token Diagnostic Header */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.84rem", fontWeight: 600 }}>
+                      <Compass size={15} style={{ color: "var(--accent)" }} />
+                      <span>本地结构摘要（0 Token）</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                      <span>{allTabs.length} 标签</span>
+                      <span>·</span>
+                      <span>
+                        <strong style={{ color: "var(--text-main)" }}>{clusterReport.clusters.length}</strong> 微簇
+                      </span>
+                      {clusterReport.exemptProtectedCount > 0 && (
+                        <>
+                          <span>·</span>
+                          <span>已豁免 {clusterReport.exemptProtectedCount}</span>
+                        </>
+                      )}
+                      {clusterReport.emptyPanelNames.length > 0 && (
+                        <>
+                          <span>·</span>
+                          <span>{clusterReport.emptyPanelNames.length} 空面板</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Scope Lock: Click panel to lock/exclude */}
+                  {clusterReport.activePanels.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+                        参与整理的面板（点击可锁定跳过）：
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                        {clusterReport.activePanels.map((p) => {
+                          const isLocked = excludedPanelIds.includes(p.id);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => toggleExcludedPanel(p.id)}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.3rem",
+                                padding: "0.24rem 0.6rem",
+                                borderRadius: "9999px",
+                                border: "1px solid",
+                                borderColor: isLocked ? "var(--border-subtle)" : "var(--accent-border)",
+                                backgroundColor: isLocked ? "var(--bg-card)" : "var(--accent-subtle)",
+                                color: isLocked ? "var(--text-muted)" : "var(--accent-text)",
+                                fontSize: "0.72rem",
+                                textDecoration: isLocked ? "line-through" : "none",
+                                cursor: "pointer",
+                              }}
+                              title={isLocked ? "点击解锁纳入整理" : "点击锁定不参与本次整理"}
+                            >
+                              {isLocked ? <Lock size={10} /> : <Unlock size={10} />}
+                              <span>{p.name}</span>
+                              <span style={{ opacity: 0.75 }}>{p.count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Top Micro-Clusters Preview */}
+                  {clusterReport.clusters.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "0.35rem" }}>
+                        主要聚类主题预览：
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
+                        {clusterReport.clusters.slice(0, 6).map((c) => (
+                          <span
+                            key={c.id}
+                            style={{
+                              fontSize: "0.7rem",
+                              padding: "0.18rem 0.55rem",
+                              borderRadius: "9999px",
+                              backgroundColor: "var(--bg-card)",
+                              border: "1px solid var(--border-subtle)",
+                              color: "var(--text-main)",
+                            }}
+                          >
+                            {c.labelHint} <span style={{ color: "var(--text-muted)" }}>({c.tabCount})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Direction Chips */}
+                  <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "0.75rem" }}>
+                    <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginBottom: "0.4rem" }}>
+                      按方向快速生成方案：
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(165px, 1fr))", gap: "0.45rem" }}>
+                      {DEFAULT_ARCHITECT_DIRECTION_CHIPS.map((chip) => (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          disabled={isGenerating}
+                          onClick={() => handleSendMessage(chip.prompt, `按「${chip.label}」方向生成重构方案`)}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-start",
+                            gap: "0.15rem",
+                            padding: "0.5rem 0.65rem",
+                            borderRadius: "0.6rem",
+                            border: "1px solid var(--border-subtle)",
+                            backgroundColor: "var(--bg-card)",
+                            color: "var(--text-main)",
+                            cursor: isGenerating ? "not-allowed" : "pointer",
+                            textAlign: "left",
+                            transition: "border-color 0.12s ease",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.76rem", fontWeight: 600 }}>{chip.label}</span>
+                          {chip.description && (
+                            <span style={{ fontSize: "0.67rem", color: "var(--text-muted)" }}>
+                              {chip.description}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Primary Action Bar */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      justifyContent: "flex-end",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      paddingTop: "0.2rem",
+                    }}
+                  >
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      pill
+                      onClick={handleInstantLocalSchemes}
+                      disabled={isGenerating}
+                      style={{ color: "var(--text-muted)", fontSize: "0.76rem" }}
+                    >
+                      <Zap size={13} style={{ color: "var(--accent)" }} />
+                      <span>离线快速方案</span>
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      pill
+                      onClick={handleRunDiagnosis}
+                      disabled={isGenerating}
+                      style={{ fontSize: "0.76rem" }}
+                    >
+                      <Compass size={13} />
+                      <span>AI 深度诊断并反问</span>
+                    </Button>
+
+                    <Button
+                      variant="solid"
+                      size="xs"
+                      pill
+                      onClick={() =>
+                        handleSendMessage(
+                          INITIAL_ARCHITECT_ANALYSIS_PROMPT,
+                          "分析当前快照结构并生成重构选项"
+                        )
+                      }
+                      disabled={isGenerating}
+                      style={{
+                        backgroundColor: "var(--accent-solid)",
+                        color: "#fff",
+                        fontWeight: 600,
+                        fontSize: "0.78rem",
+                      }}
+                    >
+                      <Sparkles size={13} />
+                      <span>直接生成重构方案</span>
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "1.35rem" }}>
+                <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: "0.4rem" }}>
                   请先在工作台导入 Sidebery 快照
                 </p>
               )}
-
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "0.6rem" }}>
-                <Button
-                  variant="solid"
-                  size="md"
-                  pill
-                  onClick={() =>
-                    handleSendMessage(
-                      INITIAL_ARCHITECT_ANALYSIS_PROMPT,
-                      "分析当前快照结构并生成重构选项"
-                    )
-                  }
-                  disabled={isGenerating || !rawSnapshot || allTabs.length === 0}
-                  style={{
-                    backgroundColor: "var(--accent-solid)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    fontSize: "0.9rem",
-                    padding: "0.65rem 1.85rem",
-                    boxShadow: "0 4px 16px rgba(233, 61, 130, 0.25)",
-                  }}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>分析中...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={16} />
-                      <span>AI 分析标签页</span>
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="md"
-                  pill
-                  onClick={handleInstantLocalSchemes}
-                  disabled={isGenerating || !rawSnapshot || allTabs.length === 0}
-                  style={{ fontSize: "0.84rem", padding: "0.65rem 1.15rem" }}
-                >
-                  <Zap size={14} style={{ color: "var(--accent)" }} />
-                  <span>离线快速选项</span>
-                </Button>
-              </div>
             </div>
           )}
 
@@ -1151,6 +1482,50 @@ export function AIPage() {
                 >
                   <MarkdownView content={msg.text} />
 
+                  {msg.directionChips && msg.directionChips.length > 0 && (
+                    <div
+                      style={{
+                        marginTop: "0.7rem",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(185px, 1fr))",
+                        gap: "0.5rem",
+                      }}
+                    >
+                      {msg.directionChips.map((chip) => (
+                        <button
+                          key={chip.id}
+                          type="button"
+                          disabled={isGenerating}
+                          onClick={() => handleSendMessage(chip.prompt, `按「${chip.label}」方向生成重构方案`)}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-start",
+                            gap: "0.2rem",
+                            padding: "0.6rem 0.75rem",
+                            borderRadius: "0.7rem",
+                            border: "1px solid var(--border-card)",
+                            backgroundColor: "var(--bg-surface)",
+                            color: "var(--text-main)",
+                            cursor: isGenerating ? "not-allowed" : "pointer",
+                            textAlign: "left",
+                            transition: "border-color 0.12s ease",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.78rem", fontWeight: 600, color: "var(--accent-text)" }}>
+                            <Compass size={13} />
+                            <span>{chip.label}</span>
+                          </div>
+                          {chip.description && (
+                            <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1.35 }}>
+                              {chip.description}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {msg.schemes && msg.schemes.length > 0 && (
                     <SchemeTabsGroup
                       schemes={msg.schemes}
@@ -1159,6 +1534,7 @@ export function AIPage() {
                       onApply={(s) => handleApplyScheme(s, msg.clusterReport)}
                       onTweak={handleTweakScheme}
                       onChangeScheme={(updated) => updateSchemeInChat(msg.id, updated)}
+                      onOpenBlueprint={(s) => setBlueprintTarget({ messageId: msg.id, scheme: s })}
                     />
                   )}
                 </div>
@@ -1502,6 +1878,25 @@ export function AIPage() {
         isOpen={modelSettingsHopupOpen}
         onClose={() => setModelSettingsHopupOpen(false)}
         initialTab={settingsHopupTab}
+      />
+
+      {/* Optional Drag-and-Drop Blueprint Canvas Modal */}
+      <BlueprintCanvasModal
+        isOpen={Boolean(blueprintTarget)}
+        scheme={blueprintTarget?.scheme || null}
+        clusterReport={clusterReport}
+        onClose={() => setBlueprintTarget(null)}
+        onSave={(updated) => {
+          if (blueprintTarget) {
+            updateSchemeInChat(blueprintTarget.messageId, updated);
+          }
+        }}
+        onApply={(updated) => {
+          if (blueprintTarget) {
+            updateSchemeInChat(blueprintTarget.messageId, updated);
+          }
+          handleApplyScheme(updated, clusterReport);
+        }}
       />
 
       {/* Snapshot File Hop-up */}

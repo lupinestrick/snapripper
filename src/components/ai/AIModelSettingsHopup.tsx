@@ -921,19 +921,29 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
 
                               {/* Max Tokens */}
                               <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.72rem" }}>
-                                <span style={{ color: "var(--text-muted)" }}>最大输出 Token (留空不限)</span>
+                                <span style={{ color: "var(--text-muted)" }}>最大输出 Token (留空不限，最小 128)</span>
                                 <Input
                                   type="number"
-                                  min={256}
+                                  min={128}
                                   max={32768}
-                                  step={256}
+                                  step={128}
                                   placeholder="不限制"
                                   value={callCfg.maxTokens ?? ""}
                                   onChange={(e) => {
                                     const raw = e.target.value.trim();
-                                    setAICallSettings({
-                                      maxTokens: raw ? Math.max(128, parseInt(raw, 10) || 2048) : undefined,
-                                    });
+                                    if (!raw) {
+                                      setAICallSettings({ maxTokens: undefined });
+                                      return;
+                                    }
+                                    const parsed = parseInt(raw, 10);
+                                    if (!Number.isNaN(parsed)) {
+                                      setAICallSettings({ maxTokens: parsed });
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    if (callCfg.maxTokens !== undefined && callCfg.maxTokens < 128) {
+                                      setAICallSettings({ maxTokens: 128 });
+                                    }
                                   }}
                                   style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem" }}
                                 />

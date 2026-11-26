@@ -7,6 +7,7 @@ import {
   ReorganizationScheme,
   ReorganizationCategory,
   TabMicroCluster,
+  ArchitectDirectionChip,
 } from "@/types/ai";
 import { extractDomain, isExemptUrl } from "@/utils/urlHelper";
 import {
@@ -84,6 +85,123 @@ function extractSchemesFromAIResponse(rawResponse: string): {
     .trim();
 
   return { schemes, cleanedText };
+}
+
+export const DEFAULT_ARCHITECT_DIRECTION_CHIPS: ArchitectDirectionChip[] = [
+  {
+    id: "cleanup",
+    label: "减负清理",
+    description: "归档碎片与低频页面",
+    prompt: "请以「减负清理」为方向：保留核心常用分类，将零散、低频、临时查阅的微簇归拢到「待清理/临时归档」分类中，尽量减少顶层面板数量。",
+  },
+  {
+    id: "reorg",
+    label: "主题重组",
+    description: "跨面板按领域重建",
+    prompt: "请以「主题重组」为方向：打破原有混乱面板，按开发技术、资料文档、媒体娱乐、日常工具等清晰语义领域重新规划面板结构。",
+  },
+  {
+    id: "incremental",
+    label: "增量收纳",
+    description: "保留有序面板仅收杂项",
+    prompt: "请以「增量收纳」为方向：尽量尊重并沿用快照中已有的高聚合面板名称，仅把散落或未分类的微簇归并到最合适的现有分类中。",
+  },
+  {
+    id: "rules",
+    label: "规则优先",
+    description: "高频域名集中便于建规则",
+    prompt: "请以「规则沉淀」为方向：优先将相同高频域名（如 GitHub、B站、文档站等）对应的微簇归入独立专类，方便后续沉淀为自动化规则。",
+  },
+];
+
+export const ARCHITECT_DIAGNOSIS_PROMPT = `你是一位资深的浏览器标签页信息架构师。现在请先对用户的 Sidebery 快照微簇聚类摘要进行【轻量诊断与反问引导】，暂不生成完整重构方案 JSON。
+
+请输出：
+1. 用 3~5 条简明要点总结当前标签库的分布特征、主要冗余/混乱点。
+2. 提出 1~2 个关键反问，帮助用户明确整理方向。
+3. 在回复末尾附带一个 \`\`\`json 代码块，包含 3~4 个贴合当前快照内容的可选整理方向数组，格式严格如下：
+\`\`\`json
+[
+  {
+    "id": "dir_1",
+    "label": "简短方向名称(4~8字)",
+    "description": "一句话说明效果",
+    "prompt": "用户点击该方向后发送给 AI 生成完整重构方案的明确指令"
+  }
+]
+\`\`\``;
+
+export function extractDiagnosisChipsFromResponse(rawResponse: string): {
+  chips: ArchitectDirectionChip[];
+  cleanedText: string;
+} {
+  const withoutThink = rawResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const fencedMatch = withoutThink.match(/```(?:json)?\s*(\[\s*\{[\s\S]*?\}\s*\])\s*```/);
+  const candidateJson = fencedMatch?.[1] || withoutThink.match(/(\[\s*\{[\s\S]*\}\s*\])/)?.[1];
+
+  let chips: ArchitectDirectionChip[] = [];
+  if (candidateJson) {
+    try {
+      const parsed = JSON.parse(candidateJson);
+      if (Array.isArray(parsed)) {
+        chips = parsed
+          .filter((item) => item && typeof item.label === "string" && typeof item.prompt === "string")
+          .slice(0, 5)
+          .map((item, idx) => ({
+            id: String(item.id || `chip_${idx + 1}`),
+            label: item.label.trim(),
+            description: typeof item.description === "string" ? item.description.trim() : undefined,
+            prompt: item.prompt.trim(),
+          }));
+      }
+    } catch {
+      try {
+        const repaired = JSON.parse(repairJSONString(candidateJson));
+        if (Array.isArray(repaired)) {
+          chips = repaired
+            .filter((item) => item && typeof item.label === "string" && typeof item.prompt === "string")
+            .slice(0, 5)
+            .map((item, idx) => ({
+              id: String(item.id || `chip_${idx + 1}`),
+              label: item.label.trim(),
+              description: typeof item.description === "string" ? item.description.trim() : undefined,
+              prompt: item.prompt.trim(),
+            }));
+        }
+      } catch {
+        // fallback below
+      }
+    }
+  }
+
+  const cleanedText = withoutThink
+    .replace(/```(?:json)?\s*\[\s*\{[\s\S]*?\}\s*\]\s*```/g, "")
+    .trim();
+
+  return {
+    chips: chips.length > 0 ? chips : DEFAULT_ARCHITECT_DIRECTION_CHIPS,
+    cleanedText: cleanedText || "已完成快照摘要诊断，请选择一个整理方向继续生成重构方案：",
+  };
+}
+
+/**
+ * 轻量诊断与反问引导：先生成诊断简报与方向选项，不直接输出完整方案
+ */
+export async function sendArchitectDiagnosisRequest(
+  config: AIConfig,
+  contextData: ClusterCompressionReport,
+  options?: AICallOptions
+): Promise<{ text: string; chips: ArchitectDirectionChip[] }> {
+  const clusterDigest = formatClusterReportForPrompt(contextData);
+  const fullSystemPrompt = `${ARCHITECT_DIAGNOSIS_PROMPT}\n\n【当前 Sidebery 快照微簇聚类摘要 (JSON)】:\n${clusterDigest}`;
+  const rawResponse = await sendAIConversationRequest(
+    config,
+    fullSystemPrompt,
+    [{ role: "user", content: "请先帮我诊断当前快照的主要结构问题，并给出可选的整理方向。" }],
+    options
+  );
+  const { chips, cleanedText } = extractDiagnosisChipsFromResponse(rawResponse);
+  return { text: cleanedText, chips };
 }
 
 /**

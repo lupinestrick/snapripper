@@ -17,6 +17,7 @@ import {
   applySchemeToSnapshot,
   getFallbackSchemes,
   computeSchemeCoverage,
+  extractDiagnosisChipsFromResponse,
 } from "../src/services/aiArchitectEngine";
 import {
   clusterSnapshotTabs,
@@ -1081,6 +1082,22 @@ Based on your tabs, here is the distribution:
   assert(
     truncated.length === 3 && truncated[0].content === "q2" && truncated[2].content === "q3",
     "truncateChatTurns keeps latest maxHistoryTurns plus current user turn"
+  );
+
+  const diagParsed = extractDiagnosisChipsFromResponse(
+    `<think>internal reasoning</think>\n诊断要点：开发类标签占比过高。\n\`\`\`json\n[{"id":"d1","label":"合并开发库","description":"聚合 GitHub 与文档","prompt":"按开发聚合"}]\n\`\`\``
+  );
+  assert(
+    diagParsed.chips.length === 1 &&
+      diagParsed.chips[0].label === "合并开发库" &&
+      !diagParsed.cleanedText.includes("<think>"),
+    "extractDiagnosisChipsFromResponse strips think block and parses direction chips"
+  );
+
+  const diagFallback = extractDiagnosisChipsFromResponse("当前结构较为分散，建议进一步分类。");
+  assert(
+    diagFallback.chips.length === 4,
+    "extractDiagnosisChipsFromResponse falls back to default direction chips when JSON is absent"
   );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);

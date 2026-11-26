@@ -1,9 +1,149 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { Copy, Check } from "lucide-react";
 
 interface MarkdownViewProps {
   content: string;
+}
+
+/**
+ * 轻量级无外部依赖 JSON 语法高亮
+ */
+function highlightJSON(code: string): React.ReactNode[] {
+  const tokenRegex =
+    /("(?:\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(?:\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[{}\[\],:])/g;
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+
+  let match: RegExpExecArray | null;
+  while ((match = tokenRegex.exec(code)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(code.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+    let color = "var(--text-main)";
+
+    if (token.startsWith('"')) {
+      if (token.endsWith(":")) {
+        // JSON key (keep trailing colon muted)
+        const keyPart = token.slice(0, -1);
+        nodes.push(
+          <span key={`jk_${key++}`} style={{ color: "var(--accent-text)", fontWeight: 600 }}>
+            {keyPart}
+          </span>
+        );
+        nodes.push(
+          <span key={`jc_${key++}`} style={{ color: "var(--text-muted)" }}>
+            :
+          </span>
+        );
+        lastIndex = tokenRegex.lastIndex;
+        continue;
+      } else {
+        color = "var(--success, #10b981)";
+      }
+    } else if (/^(true|false|null)$/.test(token)) {
+      color = "#c084fc";
+    } else if (/^-?\d/.test(token)) {
+      color = "#f59e0b";
+    } else if (/^[{}\[\],:]$/.test(token)) {
+      color = "var(--text-muted)";
+    }
+
+    nodes.push(
+      <span key={`jt_${key++}`} style={{ color }}>
+        {token}
+      </span>
+    );
+    lastIndex = tokenRegex.lastIndex;
+  }
+
+  if (lastIndex < code.length) {
+    nodes.push(code.slice(lastIndex));
+  }
+  return nodes;
+}
+
+function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(code).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const normalizedLang = lang.trim().toLowerCase();
+  const trimmedCode = code.trim();
+  const isJson =
+    normalizedLang === "json" ||
+    normalizedLang === "jsonc" ||
+    (!normalizedLang && (trimmedCode.startsWith("{") || trimmedCode.startsWith("[")));
+
+  return (
+    <div
+      style={{
+        margin: "0.6rem 0",
+        borderRadius: "0.65rem",
+        border: "1px solid var(--border-card)",
+        backgroundColor: "var(--bg-card)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0.35rem 0.7rem",
+          borderBottom: "1px solid var(--border-subtle)",
+          backgroundColor: "var(--bg-subtle)",
+          fontSize: "0.7rem",
+          color: "var(--text-muted)",
+        }}
+      >
+        <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontWeight: 600 }}>
+          {normalizedLang || (isJson ? "json" : "code")}
+        </span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.25rem",
+            background: "transparent",
+            border: "none",
+            color: copied ? "var(--success, #10b981)" : "var(--text-muted)",
+            fontSize: "0.7rem",
+            cursor: "pointer",
+            padding: "2px 4px",
+          }}
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          <span>{copied ? "已复制" : "复制"}</span>
+        </button>
+      </div>
+      <pre
+        style={{
+          margin: 0,
+          padding: "0.7rem 0.85rem",
+          overflowX: "auto",
+          maxHeight: "360px",
+          overflowY: "auto",
+          fontSize: "0.76rem",
+          lineHeight: 1.55,
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          color: "var(--text-main)",
+        }}
+      >
+        <code>{isJson ? highlightJSON(code) : code}</code>
+      </pre>
+    </div>
+  );
 }
 
 /**
@@ -103,6 +243,22 @@ export function MarkdownView({ content }: MarkdownViewProps) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
+
+    // Fenced code blocks (```json ... ```)
+    if (trimmed.startsWith("```")) {
+      flushList();
+      const lang = trimmed.slice(3).trim();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      elements.push(
+        <CodeBlock key={`cb_${i}_${elements.length}`} lang={lang} code={codeLines.join("\n")} />
+      );
+      continue;
+    }
 
     // 标题 H1, H2, H3
     if (trimmed.startsWith("### ")) {

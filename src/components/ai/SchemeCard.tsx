@@ -18,6 +18,7 @@ import {
   RotateCcw,
   ArrowRightLeft,
   Layers,
+  LayoutGrid,
 } from "lucide-react";
 
 interface SchemeCardProps {
@@ -27,6 +28,7 @@ interface SchemeCardProps {
   onApply: (scheme: ReorganizationScheme) => void;
   onTweak: (scheme: ReorganizationScheme) => void;
   onChangeScheme?: (updatedScheme: ReorganizationScheme) => void;
+  onOpenBlueprint?: (scheme: ReorganizationScheme) => void;
 }
 
 export function SchemeCard({
@@ -36,6 +38,7 @@ export function SchemeCard({
   onApply,
   onTweak,
   onChangeScheme,
+  onOpenBlueprint,
 }: SchemeCardProps) {
   const [activeClusterInfo, setActiveClusterInfo] = useState<{
     clusterId: string;
@@ -196,6 +199,20 @@ export function SchemeCard({
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          {onOpenBlueprint && clusterReport && (
+            <Button
+              variant="outline"
+              size="xs"
+              pill
+              onClick={() => onOpenBlueprint(scheme)}
+              title="打开拖拽式蓝图画布微调微簇分配"
+              style={{ fontSize: "0.72rem" }}
+            >
+              <LayoutGrid size={12} />
+              <span>蓝图画布</span>
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="xs"

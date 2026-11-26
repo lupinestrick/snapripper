@@ -233,12 +233,20 @@ export interface ReorganizationScheme {
   targetMode?: "tree" | "panel";
 }
 
+export interface ArchitectDirectionChip {
+  id: string;
+  label: string;
+  prompt: string;
+  description?: string;
+}
+
 export interface AIChatMessage {
   id: string;
   sender: "user" | "assistant" | "system";
   timestamp: number;
   text: string;
   schemes?: ReorganizationScheme[];
+  directionChips?: ArchitectDirectionChip[];
   clusterReport?: ClusterCompressionReport;
   appliedSchemeId?: string;
 }
