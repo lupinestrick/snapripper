@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
+import { fetchAvailableModels } from "@/services/aiService";
 import { AIProtocolType } from "@/types/ai";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Plus, Check } from "lucide-react";
+import { X, Plus, Check, RefreshCw, Loader2 } from "lucide-react";
 
 interface AddProviderModalProps {
   isOpen: boolean;
@@ -37,6 +38,51 @@ export function AddProviderModal({ isOpen, onClose }: AddProviderModalProps) {
   const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
   const [apiKey, setApiKey] = useState("");
   const [model, setModel] = useState("gpt-4o-mini");
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [fetchHint, setFetchHint] = useState<string | null>(null);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+
+  const runFetchModels = useCallback(async (targetType: AIProtocolType, targetBaseUrl: string, targetApiKey: string) => {
+    const cleanUrl = targetBaseUrl.trim();
+    const cleanKey = targetApiKey.trim();
+    const isLocalhost = cleanUrl.includes("localhost") || cleanUrl.includes("127.0.0.1");
+    if (!/^https?:\/\/.+/i.test(cleanUrl)) return;
+    if (!cleanKey && !isLocalhost) return;
+
+    setIsFetchingModels(true);
+    setFetchHint(null);
+    try {
+      const models = await fetchAvailableModels({
+        provider: "custom",
+        type: targetType,
+        baseURL: cleanUrl,
+        apiKey: cleanKey,
+        model: "",
+      });
+      setFetchedModels(models);
+      setFetchHint(`已自动获取 ${models.length} 个模型`);
+      setModel((prev) => (prev.trim() ? prev : models[0] || prev));
+    } catch (err: any) {
+      setFetchHint(err?.message || "获取模型失败");
+    } finally {
+      setIsFetchingModels(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const cleanUrl = baseUrl.trim();
+    const cleanKey = apiKey.trim();
+    const isLocalhost = cleanUrl.includes("localhost") || cleanUrl.includes("127.0.0.1");
+    if (!/^https?:\/\/.+/i.test(cleanUrl) || (!cleanKey && !isLocalhost)) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      runFetchModels(type, cleanUrl, cleanKey);
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [isOpen, type, baseUrl, apiKey, runFetchModels]);
 
   if (!isOpen) return null;
 
@@ -76,18 +122,49 @@ export function AddProviderModal({ isOpen, onClose }: AddProviderModalProps) {
       return;
     }
 
-    addCustomProvider(
+    const cleanUrl = baseUrl.trim();
+    const cleanKey = apiKey.trim();
+    const newId = addCustomProvider(
       {
         name: name.trim(),
         type,
-        baseUrl: baseUrl.trim(),
-        model: model.trim() || "gpt-4o-mini",
+        baseUrl: cleanUrl,
+        model: model.trim() || fetchedModels[0] || "gpt-4o-mini",
       },
-      apiKey.trim()
+      cleanKey,
+      fetchedModels
     );
+
+    // 若添加时尚未拉取到模型列表，则在后台自动补拉并缓存到新供应商槽位
+    if (fetchedModels.length === 0 && /^https?:\/\/.+/i.test(cleanUrl)) {
+      const isLocalhost = cleanUrl.includes("localhost") || cleanUrl.includes("127.0.0.1");
+      if (cleanKey || isLocalhost) {
+        fetchAvailableModels({
+          provider: newId,
+          type,
+          baseURL: cleanUrl,
+          apiKey: cleanKey,
+          model: model.trim(),
+        })
+          .then((models) => {
+            if (models.length > 0) {
+              const curr = useConfigStore.getState().aiConfig;
+              useConfigStore.getState().setAIConfig({
+                cachedModels: {
+                  ...(curr.cachedModels || {}),
+                  [newId]: models,
+                },
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    }
 
     setName("");
     setApiKey("");
+    setFetchedModels([]);
+    setFetchHint(null);
     onClose();
   };
 
@@ -222,16 +299,105 @@ export function AddProviderModal({ isOpen, onClose }: AddProviderModalProps) {
               />
             </div>
 
-            <div>
-              <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.25rem" }}>
-                默认模型
-              </label>
+            <div style={{ position: "relative" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                <label style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                  默认模型
+                </label>
+                <button
+                  type="button"
+                  onClick={() => runFetchModels(type, baseUrl, apiKey)}
+                  disabled={isFetchingModels}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.25rem",
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--accent-text)",
+                    fontSize: "0.7rem",
+                    cursor: isFetchingModels ? "not-allowed" : "pointer",
+                    padding: 0,
+                  }}
+                >
+                  {isFetchingModels ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                  <span>{isFetchingModels ? "获取中..." : "获取模型列表"}</span>
+                </button>
+              </div>
               <Input
                 type="text"
                 value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="gpt-4o-mini"
+                onFocus={() => fetchedModels.length > 0 && setIsModelDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setIsModelDropdownOpen(false), 150)}
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  if (fetchedModels.length > 0) setIsModelDropdownOpen(true);
+                }}
+                placeholder="输入或从下方已获取列表选择模型"
               />
+              {fetchHint && (
+                <div style={{ fontSize: "0.68rem", color: fetchedModels.length > 0 ? "var(--success, #10b981)" : "var(--text-muted)", marginTop: "0.25rem" }}>
+                  {fetchHint}
+                </div>
+              )}
+              {isModelDropdownOpen && fetchedModels.length > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top: "100%",
+                    marginTop: "4px",
+                    maxHeight: "150px",
+                    overflowY: "auto",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-card)",
+                    borderRadius: "0.55rem",
+                    boxShadow: "0 10px 24px rgba(0,0,0,0.3)",
+                    zIndex: 30,
+                    padding: "0.25rem",
+                  }}
+                >
+                  {fetchedModels
+                    .filter((m) => !model.trim() || m.toLowerCase().includes(model.trim().toLowerCase()))
+                    .slice(0, 30)
+                    .map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setModel(m);
+                          setIsModelDropdownOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "0.35rem 0.5rem",
+                          borderRadius: "0.4rem",
+                          border: "none",
+                          backgroundColor: m === model ? "var(--accent-subtle)" : "transparent",
+                          color: m === model ? "var(--accent-text)" : "var(--text-main)",
+                          fontSize: "0.74rem",
+                          fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                          cursor: "pointer",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
 

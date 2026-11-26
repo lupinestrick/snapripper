@@ -1,66 +1,208 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
+import { flattenTabTree, isGroupTab } from "@/services/snapshotParser";
+import { previewRulesOnTabs } from "@/services/ruleEngine";
+import { clusterSnapshotTabs } from "@/services/tabClusterEngine";
+import { extractDomain, isExemptUrl } from "@/utils/urlHelper";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { extractDomain } from "@/utils/urlHelper";
-import { matchTabWithRule } from "@/services/ruleEngine";
-import { X, Layers, Globe, BarChart3, Sparkles } from "lucide-react";
+import {
+  X,
+  BarChart3,
+  Globe,
+  Layers,
+  Sparkles,
+  CopyCheck,
+  SlidersHorizontal,
+  ArrowRight,
+  FolderTree,
+  Shield,
+} from "lucide-react";
 
 interface OverviewHopupProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+type OverviewTab = "overview" | "domains" | "rules_clusters";
+
 export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
-  const { rawSnapshot, aiProcessedCache, proportionReport } = useSnapshotStore();
-  const { rulesSettings } = useConfigStore();
+  const {
+    rawSnapshot,
+    rootNodes,
+    duplicateUrls,
+    setActivePanelId,
+    setSearchQuery,
+    setContainerFilter,
+    setOnlyDuplicates,
+  } = useSnapshotStore();
+  const { rulesSettings, setActivePage } = useConfigStore();
+  const rules = rulesSettings?.rules || [];
+  const [activeTab, setActiveTab] = useState<OverviewTab>("overview");
+
+  const analytics = useMemo(() => {
+    if (!rawSnapshot) return null;
+
+    const allTabs = flattenTabTree(rootNodes);
+    const panels = rawSnapshot.panels || {};
+    const panelEntriesList = Object.values(panels) as any[];
+
+    const panelCounts = new Map<string, number>();
+    const domainCounts = new Map<string, number>();
+    const containerCounts = new Map<string, number>();
+
+    let groupCount = 0;
+    let pinnedCount = 0;
+    let exemptCount = 0;
+    let duplicateTabCount = 0;
+
+    for (const t of allTabs) {
+      const pId = t.panelId || "main";
+      panelCounts.set(pId, (panelCounts.get(pId) || 0) + 1);
+
+      if (isGroupTab(t)) groupCount++;
+      if (t.pinned) pinnedCount++;
+      if (isExemptUrl(t.url, t.pinned)) exemptCount++;
+      if (duplicateUrls.has(t.url)) duplicateTabCount++;
+
+      const d = extractDomain(t.url);
+      if (d) {
+        domainCounts.set(d, (domainCounts.get(d) || 0) + 1);
+      }
+
+      const cId = t.containerId || "firefox-default";
+      containerCounts.set(cId, (containerCounts.get(cId) || 0) + 1);
+    }
+
+    const panelRows = panelEntriesList.map((p) => {
+      const count = panelCounts.get(p.id) || 0;
+      const pct = allTabs.length > 0 ? Math.round((count / allTabs.length) * 100) : 0;
+      return {
+        id: p.id,
+        name: p.name || p.id,
+        count,
+        pct,
+      };
+    });
+
+    const emptyPanels = panelRows.filter((p) => p.count === 0);
+
+    const topDomains = Array.from(domainCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([domain, count]) => ({
+        domain,
+        count,
+        pct: allTabs.length > 0 ? ((count / allTabs.length) * 100).toFixed(1) : "0",
+      }));
+
+    const containersMap = (rawSnapshot.containers || {}) as Record<string, any>;
+    const containerRows = Array.from(containerCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, count]) => {
+        const meta = containersMap[id];
+        return {
+          id,
+          name: meta?.name || (id === "firefox-default" ? "默认容器" : id),
+          count,
+          pct: allTabs.length > 0 ? Math.round((count / allTabs.length) * 100) : 0,
+        };
+      });
+
+    const clusterReport = clusterSnapshotTabs(allTabs, panels, "balanced");
+
+    const ruleStatsMap = previewRulesOnTabs(allTabs, rules);
+    let ruleMatchedTotal = 0;
+    const ruleHits = rules
+      .map((r) => {
+        const st = ruleStatsMap.get(r.id);
+        const hits = st?.effectiveHits || 0;
+        const shadowed = st?.shadowedHits || 0;
+        ruleMatchedTotal += hits;
+        return {
+          id: r.id,
+          name: r.name,
+          enabled: r.enabled,
+          hits,
+          shadowed,
+        };
+      })
+      .filter((r) => r.hits > 0 || r.shadowed > 0)
+      .sort((a, b) => b.hits - a.hits);
+
+    const ruleEligibleCount = clusterReport.nonExemptCount;
+    const ruleCoveragePct =
+      ruleEligibleCount > 0 ? Math.min(100, Math.round((ruleMatchedTotal / ruleEligibleCount) * 100)) : 0;
+
+    return {
+      totalTabs: allTabs.length,
+      panelCount: panelEntriesList.length,
+      groupCount,
+      pinnedCount,
+      exemptCount,
+      duplicateTabCount,
+      emptyPanels,
+      panelRows,
+      topDomains,
+      containerRows,
+      clusterReport,
+      ruleMatchedTotal,
+      ruleEligibleCount,
+      ruleCoveragePct,
+      ruleHits,
+    };
+  }, [rawSnapshot, rootNodes, duplicateUrls, rules]);
 
   if (!isOpen) return null;
 
-  if (!rawSnapshot) {
+  const jumpToWorkbench = (opts: {
+    panelId?: string | null;
+    query?: string;
+    container?: string | null;
+    onlyDup?: boolean;
+  }) => {
+    setActivePanelId(opts.panelId ?? null);
+    setSearchQuery(opts.query ?? "");
+    setContainerFilter(opts.container ?? null);
+    setOnlyDuplicates(Boolean(opts.onlyDup));
+    setActivePage("workbench");
+    onClose();
+  };
+
+  if (!rawSnapshot || !analytics) {
     return (
       <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content style={{ maxWidth: "480px", padding: "2rem", textAlign: "center" }}>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.5rem" }}>
-              <Button
-                variant="ghost"
-                size="xs"
-                pill
-                onClick={onClose}
-                style={{ width: "32px", height: "32px", padding: 0, color: "var(--text-muted)" }}
-                title="关闭"
-              >
-                <X size={16} />
+        <Dialog.Backdrop style={{ zIndex: 110 }} />
+        <Dialog.Positioner style={{ zIndex: 120 }}>
+          <Dialog.Content
+            style={{
+              maxWidth: "420px",
+              width: "92vw",
+              padding: "1.5rem",
+              textAlign: "center",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-card)",
+              borderRadius: "1rem",
+              color: "var(--text-main)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button variant="ghost" size="xs" pill onClick={onClose} style={{ padding: "4px" }}>
+                <X size={15} />
               </Button>
             </div>
-            <div
-              style={{
-                width: "48px",
-                height: "48px",
-                borderRadius: "50%",
-                backgroundColor: "var(--accent-subtle)",
-                color: "var(--accent)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                margin: "0 auto 1.25rem",
-              }}
-            >
-              <BarChart3 size={24} />
-            </div>
-            <Dialog.Title style={{ fontSize: "1.1rem", fontWeight: 700 }}>暂未载入快照数据</Dialog.Title>
-            <Dialog.Description style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "var(--text-muted)", lineHeight: 1.5 }}>
-              请先在工作台拖入或载入 Sidebery 快照 JSON 文件，即可在此查看完整的标签统计分布、面板结构与分类比例分析。
+            <BarChart3 size={28} style={{ color: "var(--accent)", margin: "0.25rem auto 0.75rem" }} />
+            <Dialog.Title style={{ fontSize: "1rem", fontWeight: 700 }}>暂无快照数据</Dialog.Title>
+            <Dialog.Description style={{ marginTop: "0.4rem", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+              请先导入 Sidebery 快照 JSON 文件。
             </Dialog.Description>
-            <div style={{ marginTop: "1.5rem" }}>
-              <Button variant="solid" size="sm" pill onClick={onClose}>
-                知道了
+            <div style={{ marginTop: "1.1rem" }}>
+              <Button variant="solid" size="xs" pill onClick={onClose}>
+                关闭
               </Button>
             </div>
           </Dialog.Content>
@@ -69,409 +211,523 @@ export function OverviewHopup({ isOpen, onClose }: OverviewHopupProps) {
     );
   }
 
-  const primaryWinId = Object.keys(rawSnapshot.windows)[0] || "1";
-  const tabs = rawSnapshot.windows[primaryWinId]?.tabs || [];
-  const panels = rawSnapshot.panels || {};
-
-  // Count by panel
-  const panelCounts = new Map<string, number>();
-  for (const t of tabs) {
-    const pId = t.panelId || "main";
-    panelCounts.set(pId, (panelCounts.get(pId) || 0) + 1);
-  }
-
-  // Count top domains
-  const domainCounts = new Map<string, number>();
-  for (const t of tabs) {
-    const d = extractDomain(t.url);
-    if (d) {
-      domainCounts.set(d, (domainCounts.get(d) || 0) + 1);
-    }
-  }
-
-  const sortedDomains = Array.from(domainCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
-
-  const groupCount = tabs.filter((t) => t.isGroup).length;
-  const pinnedCount = tabs.filter((t) => t.pinned).length;
-
-  // Classification breakdown calculation
-  interface BreakdownItem {
-    name: string;
-    count: number;
-    pct: string;
-    pctNum: number;
-    color: string;
-  }
-
-  const PRESET_COLORS = [
-    "#3b82f6", "#10b981", "#ef4444", "#06b6d4",
-    "#8b5cf6", "#f59e0b", "#ec4899", "#64748b", "#f97316"
-  ];
-
-  let breakdownBadge = "";
-  let categorizedList: BreakdownItem[] = [];
-  let uncategorizedItem: BreakdownItem | null = null;
-
-  if (aiProcessedCache) {
-    breakdownBadge = "AI 归类缓存";
-    const total = tabs.length;
-    categorizedList = aiProcessedCache.categoryNames.map((name, i) => {
-      const cnt = aiProcessedCache.summary.categoryCounts[name] || 0;
-      const pctNum = total > 0 ? (cnt / total) * 100 : 0;
-      return {
-        name,
-        count: cnt,
-        pct: pctNum.toFixed(1),
-        pctNum,
-        color: PRESET_COLORS[i % PRESET_COLORS.length],
-      };
-    }).filter((it) => it.count > 0);
-
-    const uncatCount = aiProcessedCache.summary.uncategorizedCount;
-    const uncatPct = total > 0 ? (uncatCount / total) * 100 : 0;
-    uncategorizedItem = {
-      name: "未分类 (Uncategorized)",
-      count: uncatCount,
-      pct: uncatPct.toFixed(1),
-      pctNum: uncatPct,
-      color: "#94a3b8",
-    };
-  } else if (proportionReport && proportionReport.categories.length > 0) {
-    breakdownBadge = "AI 比例分析预测";
-    const total = tabs.length;
-    categorizedList = proportionReport.categories.map((c, i) => {
-      const estimatedCount = Math.round((c.ratio / 100) * proportionReport.totalAnalyzed);
-      const pctNum = total > 0 ? (estimatedCount / total) * 100 : c.ratio;
-      return {
-        name: c.name,
-        count: estimatedCount,
-        pct: pctNum.toFixed(1),
-        pctNum,
-        color: c.color || PRESET_COLORS[i % PRESET_COLORS.length],
-      };
-    });
-    const categorizedTotal = categorizedList.reduce((acc, it) => acc + it.count, 0);
-    const uncatCount = Math.max(0, total - categorizedTotal);
-    const uncatPct = total > 0 ? (uncatCount / total) * 100 : 0;
-    uncategorizedItem = {
-      name: "未分类 / 豁免保护",
-      count: uncatCount,
-      pct: uncatPct.toFixed(1),
-      pctNum: uncatPct,
-      color: "#94a3b8",
-    };
-  } else {
-    const activeRules = (rulesSettings?.rules || []).filter((r) => r.enabled);
-    if (activeRules.length > 0) {
-      breakdownBadge = "规则引擎匹配";
-      const ruleCounts = new Map<string, number>();
-      let matchedTotal = 0;
-
-      for (const t of tabs) {
-        if (t.pinned || t.url?.startsWith("about:")) continue;
-        for (const rule of activeRules) {
-          if (matchTabWithRule(t, rule)) {
-            ruleCounts.set(rule.name, (ruleCounts.get(rule.name) || 0) + 1);
-            matchedTotal++;
-            break;
-          }
-        }
-      }
-
-      categorizedList = activeRules.map((rule, i) => {
-        const cnt = ruleCounts.get(rule.name) || 0;
-        const pctNum = tabs.length > 0 ? (cnt / tabs.length) * 100 : 0;
-        return {
-          name: rule.name,
-          count: cnt,
-          pct: pctNum.toFixed(1),
-          pctNum,
-          color: rule.color || PRESET_COLORS[i % PRESET_COLORS.length],
-        };
-      }).filter((it) => it.count > 0);
-
-      const uncatCount = Math.max(0, tabs.length - matchedTotal);
-      const uncatPct = tabs.length > 0 ? (uncatCount / tabs.length) * 100 : 0;
-      uncategorizedItem = {
-        name: "未分类 (未匹配既有规则)",
-        count: uncatCount,
-        pct: uncatPct.toFixed(1),
-        pctNum: uncatPct,
-        color: "#94a3b8",
-      };
-    }
-  }
-
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Backdrop />
-      <Dialog.Positioner>
-        <Dialog.Content style={{ maxWidth: "680px", maxHeight: "85vh", overflowY: "auto", padding: "1.75rem" }}>
+      <Dialog.Backdrop style={{ zIndex: 110 }} />
+      <Dialog.Positioner style={{ zIndex: 120 }}>
+        <Dialog.Content
+          style={{
+            maxWidth: "760px",
+            width: "94vw",
+            maxHeight: "86vh",
+            backgroundColor: "var(--bg-card)",
+            border: "1px solid var(--border-card)",
+            borderRadius: "1rem",
+            color: "var(--text-main)",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            boxShadow: "0 20px 44px rgba(0,0,0,0.4)",
+          }}
+        >
           {/* Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-            <div>
-              <Dialog.Title>快照总览数据分析</Dialog.Title>
-              <Dialog.Description>
-                快照 ID: {rawSnapshot.id || "未命名"} · 共 {tabs.length.toLocaleString()} 个标签页
-              </Dialog.Description>
+          <div
+            style={{
+              padding: "0.8rem 1.2rem",
+              borderBottom: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--bg-surface)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.75rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <BarChart3 size={16} style={{ color: "var(--accent)" }} />
+              <Dialog.Title style={{ fontSize: "0.95rem", fontWeight: 700 }}>
+                快照多维分析
+              </Dialog.Title>
+              <Badge variant="subtle" size="sm" style={{ fontSize: "0.68rem" }}>
+                {analytics.totalTabs} 标签 · {analytics.panelCount} 面板
+              </Badge>
             </div>
+
             <Dialog.CloseTrigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                pill
-                onClick={onClose}
-                style={{
-                  width: "32px",
-                  height: "32px",
-                  padding: 0,
-                  color: "var(--text-muted)",
-                }}
-                title="关闭"
-              >
-                <X size={16} />
+              <Button variant="ghost" size="xs" pill onClick={onClose} style={{ padding: "4px" }}>
+                <X size={15} />
               </Button>
             </Dialog.CloseTrigger>
           </div>
 
-          {/* 4 Summary Cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
-            <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>总标签</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{tabs.length}</div>
-            </div>
-            <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>面板数</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{panelCounts.size}</div>
-            </div>
-            <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>已有 Group</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{groupCount}</div>
-            </div>
-            <div style={{ backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", padding: "0.875rem", borderRadius: "0.875rem", textAlign: "center" }}>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>固定标签</div>
-              <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--accent)", marginTop: "0.25rem" }}>{pinnedCount}</div>
-            </div>
-          </div>
-
-          {/* Panels Breakdown */}
-          <div style={{ marginBottom: "1.5rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-main)" }}>
-              <Layers size={16} style={{ color: "var(--accent)" }} />
-              <span>面板分布</span>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-              {Array.from(panelCounts.entries()).map(([pId, count]) => {
-                const pName = panels[pId]?.name || (pId === "main" ? "主面板" : pId);
-                const pct = tabs.length > 0 ? ((count / tabs.length) * 100).toFixed(1) : "0";
-                return (
-                  <div key={pId}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
-                      <span style={{ color: "var(--text-main)" }}>{pName}</span>
-                      <span style={{ color: "var(--text-muted)" }}>
-                        {count} ({pct}%)
-                      </span>
-                    </div>
-                    <div style={{ height: "6px", backgroundColor: "var(--bg-subtle)", border: "1px solid var(--border-subtle)", borderRadius: "9999px", overflow: "hidden" }}>
-                      <div
-                        style={{
-                          height: "100%",
-                          width: `${pct}%`,
-                          backgroundColor: "var(--accent-solid)",
-                          borderRadius: "9999px",
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Classification Breakdown (AI or Rules + Uncategorized) */}
-          <div style={{ marginBottom: "1.5rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", fontWeight: 600, color: "var(--text-main)" }}>
-                <Sparkles size={16} style={{ color: "var(--accent)" }} />
-                <span>分类比例分布与未分类</span>
-              </div>
-              {breakdownBadge && (
-                <Badge variant="subtle" size="sm" style={{ backgroundColor: "var(--accent-subtle)", color: "var(--accent-text)", fontSize: "0.72rem" }}>
-                  来源: {breakdownBadge}
-                </Badge>
-              )}
-            </div>
-
-            {categorizedList.length > 0 || (uncategorizedItem && uncategorizedItem.count > 0) ? (
-              <div>
-                {/* Segmented bar */}
-                <div
-                  style={{
-                    height: "10px",
-                    borderRadius: "9999px",
-                    overflow: "hidden",
-                    display: "flex",
-                    backgroundColor: "var(--bg-subtle)",
-                    border: "1px solid var(--border-subtle)",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  {categorizedList.map((item) => (
-                    <div
-                      key={item.name}
-                      title={`${item.name}: ${item.count} (${item.pct}%)`}
-                      style={{
-                        width: `${item.pctNum}%`,
-                        backgroundColor: item.color,
-                        height: "100%",
-                      }}
-                    />
-                  ))}
-                  {uncategorizedItem && uncategorizedItem.count > 0 && (
-                    <div
-                      title={`${uncategorizedItem.name}: ${uncategorizedItem.count} (${uncategorizedItem.pct}%)`}
-                      style={{
-                        width: `${uncategorizedItem.pctNum}%`,
-                        backgroundColor: uncategorizedItem.color,
-                        height: "100%",
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Items grid */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.5rem" }}>
-                  {categorizedList.map((item) => (
-                    <div
-                      key={item.name}
-                      style={{
-                        backgroundColor: "var(--bg-subtle)",
-                        border: "1px solid var(--border-subtle)",
-                        padding: "0.5rem 0.75rem",
-                        borderRadius: "0.5rem",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
-                        <span
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            backgroundColor: item.color,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-main)" }}>
-                          {item.name}
-                        </span>
-                      </div>
-                      <span style={{ color: "var(--text-muted)", fontWeight: 600, flexShrink: 0, marginLeft: "0.5rem" }}>
-                        {item.count} ({item.pct}%)
-                      </span>
-                    </div>
-                  ))}
-
-                  {/* Explicit Uncategorized item */}
-                  {uncategorizedItem && (
-                    <div
-                      style={{
-                        backgroundColor: "var(--bg-subtle)",
-                        border: "1px dashed var(--border-subtle)",
-                        padding: "0.5rem 0.75rem",
-                        borderRadius: "0.5rem",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        fontSize: "0.8rem",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
-                        <span
-                          style={{
-                            width: "8px",
-                            height: "8px",
-                            borderRadius: "50%",
-                            backgroundColor: uncategorizedItem.color,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-muted)", fontWeight: 500 }}>
-                          {uncategorizedItem.name}
-                        </span>
-                      </div>
-                      <span style={{ color: "var(--text-muted)", fontWeight: 600, flexShrink: 0, marginLeft: "0.5rem" }}>
-                        {uncategorizedItem.count} ({uncategorizedItem.pct}%)
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div
-                style={{
-                  padding: "0.85rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: "var(--bg-subtle)",
-                  border: "1px dashed var(--border-subtle)",
-                  fontSize: "0.78rem",
-                  color: "var(--text-muted)",
-                  textAlign: "center",
-                }}
+          {/* Segmented Tabs */}
+          <div
+            style={{
+              padding: "0.55rem 1.2rem",
+              borderBottom: "1px solid var(--border-subtle)",
+              backgroundColor: "var(--bg-surface)",
+              display: "flex",
+              gap: "0.4rem",
+            }}
+          >
+            {(
+              [
+                { id: "overview", label: "概览与健康", icon: <Layers size={13} /> },
+                { id: "domains", label: "域名与容器", icon: <Globe size={13} /> },
+                { id: "rules_clusters", label: "规则与聚类", icon: <SlidersHorizontal size={13} /> },
+              ] as const
+            ).map((t) => (
+              <Button
+                key={t.id}
+                type="button"
+                variant={activeTab === t.id ? "subtle" : "ghost"}
+                size="xs"
+                pill
+                onClick={() => setActiveTab(t.id)}
               >
-                尚未进行 AI 分类或规则匹配。前往「AI 比例」分析后，将自动在此展示精确的类别与未分类比例。
-              </div>
-            )}
+                {t.icon}
+                <span>{t.label}</span>
+              </Button>
+            ))}
           </div>
 
-          {/* Top Domains */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", color: "var(--text-main)" }}>
-              <Globe size={16} style={{ color: "var(--accent)" }} />
-              <span>顶级域名分布 (Top 8)</span>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.5rem" }}>
-              {sortedDomains.map(([domain, count]) => {
-                const pct = tabs.length > 0 ? ((count / tabs.length) * 100).toFixed(1) : "0";
-                return (
+          {/* Body */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "1.05rem 1.2rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1rem",
+            }}
+          >
+            {activeTab === "overview" && (
+              <>
+                {/* 4 KPI Cards */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: "0.6rem" }}>
                   <div
-                    key={domain}
                     style={{
-                      backgroundColor: "var(--bg-subtle)",
+                      padding: "0.7rem 0.85rem",
+                      borderRadius: "0.65rem",
+                      backgroundColor: "var(--bg-surface)",
                       border: "1px solid var(--border-subtle)",
-                      padding: "0.6rem 0.75rem",
-                      borderRadius: "0.75rem",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      fontSize: "0.8rem",
                     }}
                   >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "180px", color: "var(--text-main)" }}>
-                      {domain}
-                    </span>
-                    <span style={{ color: "var(--text-muted)", fontWeight: 600 }}>{count} ({pct}%)</span>
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>可整理 / 总标签</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 700, marginTop: "0.15rem" }}>
+                      {analytics.clusterReport.nonExemptCount}{" "}
+                      <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>
+                        / {analytics.totalTabs}
+                      </span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Complete button */}
-          <div style={{ marginTop: "1.75rem", display: "flex", justifyContent: "flex-end" }}>
-            <Button
-              variant="solid"
-              size="sm"
-              pill
-              onClick={onClose}
-            >
-              完成
-            </Button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      analytics.duplicateTabCount > 0 && jumpToWorkbench({ onlyDup: true })
+                    }
+                    style={{
+                      padding: "0.7rem 0.85rem",
+                      borderRadius: "0.65rem",
+                      backgroundColor: "var(--bg-surface)",
+                      border: "1px solid",
+                      borderColor: analytics.duplicateTabCount > 0 ? "rgba(245, 158, 11, 0.4)" : "var(--border-subtle)",
+                      textAlign: "left",
+                      cursor: analytics.duplicateTabCount > 0 ? "pointer" : "default",
+                      color: "var(--text-main)",
+                    }}
+                    title={analytics.duplicateTabCount > 0 ? "点击前往工作台筛选重复标签" : undefined}
+                  >
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>重复 URL 标签</div>
+                    <div
+                      style={{
+                        fontSize: "1.15rem",
+                        fontWeight: 700,
+                        marginTop: "0.15rem",
+                        color: analytics.duplicateTabCount > 0 ? "#f59e0b" : "var(--text-main)",
+                      }}
+                    >
+                      {analytics.duplicateTabCount}
+                    </div>
+                  </button>
+
+                  <div
+                    style={{
+                      padding: "0.7rem 0.85rem",
+                      borderRadius: "0.65rem",
+                      backgroundColor: "var(--bg-surface)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>原生 Group 组</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 700, marginTop: "0.15rem" }}>
+                      {analytics.groupCount}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: "0.7rem 0.85rem",
+                      borderRadius: "0.65rem",
+                      backgroundColor: "var(--bg-surface)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <div style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>固定 / 内部豁免</div>
+                    <div style={{ fontSize: "1.15rem", fontWeight: 700, marginTop: "0.15rem" }}>
+                      {analytics.pinnedCount}{" "}
+                      <span style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--text-muted)" }}>
+                        / {analytics.exemptCount}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Health Check Strip */}
+                {(analytics.duplicateTabCount > 0 || analytics.emptyPanels.length > 0) && (
+                  <div
+                    style={{
+                      padding: "0.65rem 0.85rem",
+                      borderRadius: "0.65rem",
+                      backgroundColor: "var(--bg-surface)",
+                      border: "1px solid var(--border-subtle)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontSize: "0.76rem", flexWrap: "wrap" }}>
+                      {analytics.duplicateTabCount > 0 && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", color: "#f59e0b" }}>
+                          <CopyCheck size={13} />
+                          <span>{analytics.duplicateTabCount} 个重复标签待清理</span>
+                        </span>
+                      )}
+                      {analytics.emptyPanels.length > 0 && (
+                        <span style={{ color: "var(--text-muted)" }}>
+                          · {analytics.emptyPanels.length} 个空面板
+                        </span>
+                      )}
+                    </div>
+
+                    {analytics.duplicateTabCount > 0 && (
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        pill
+                        onClick={() => {
+                          setActivePage("process");
+                          onClose();
+                        }}
+                      >
+                        <span>前往处理中心去重</span>
+                        <ArrowRight size={12} />
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* Panel Load Distribution (Clickable) */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
+                    <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>面板负载分布</span>
+                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>点击面板跳转工作台</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                    {analytics.panelRows.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => jumpToWorkbench({ panelId: p.id })}
+                        style={{
+                          width: "100%",
+                          padding: "0.45rem 0.65rem",
+                          borderRadius: "0.55rem",
+                          border: "1px solid var(--border-subtle)",
+                          backgroundColor: "var(--bg-surface)",
+                          color: "var(--text-main)",
+                          cursor: "pointer",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "0.3rem",
+                          textAlign: "left",
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.76rem", width: "100%" }}>
+                          <span style={{ fontWeight: 500 }}>{p.name}</span>
+                          <span style={{ color: "var(--text-muted)", fontSize: "0.72rem" }}>
+                            {p.count} ({p.pct}%)
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "5px",
+                            borderRadius: "9999px",
+                            backgroundColor: "var(--bg-card)",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${Math.max(p.count > 0 ? 2 : 0, p.pct)}%`,
+                              height: "100%",
+                              backgroundColor: "var(--accent-solid)",
+                              borderRadius: "9999px",
+                            }}
+                          />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === "domains" && (
+              <>
+                {/* Top Domains */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.45rem" }}>
+                    <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>Top 12 高频域名</span>
+                    <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>点击域名筛选</span>
+                  </div>
+                  {analytics.topDomains.length === 0 ? (
+                    <div style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>暂无有效域名数据</div>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "0.4rem" }}>
+                      {analytics.topDomains.map((d) => (
+                        <button
+                          key={d.domain}
+                          type="button"
+                          onClick={() => jumpToWorkbench({ query: d.domain })}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.5rem",
+                            padding: "0.45rem 0.65rem",
+                            borderRadius: "0.55rem",
+                            border: "1px solid var(--border-subtle)",
+                            backgroundColor: "var(--bg-surface)",
+                            color: "var(--text-main)",
+                            fontSize: "0.75rem",
+                            cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: 500 }}>
+                            {d.domain}
+                          </span>
+                          <span style={{ color: "var(--accent-text)", fontWeight: 600, flexShrink: 0 }}>
+                            {d.count} <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>({d.pct}%)</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Container Breakdown */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.78rem", fontWeight: 600, marginBottom: "0.45rem" }}>
+                    <Shield size={13} style={{ color: "var(--accent)" }} />
+                    <span>容器分布</span>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                    {analytics.containerRows.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => jumpToWorkbench({ container: c.id })}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.4rem",
+                          padding: "0.35rem 0.7rem",
+                          borderRadius: "9999px",
+                          border: "1px solid var(--border-subtle)",
+                          backgroundColor: "var(--bg-surface)",
+                          color: "var(--text-main)",
+                          fontSize: "0.74rem",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <span>{c.name}</span>
+                        <span style={{ color: "var(--accent-text)", fontWeight: 600 }}>
+                          {c.count} ({c.pct}%)
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tree Depth Distribution */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", fontSize: "0.78rem", fontWeight: 600, marginBottom: "0.45rem" }}>
+                    <FolderTree size={13} style={{ color: "var(--accent)" }} />
+                    <span>树状嵌套深度分布</span>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                    {Object.entries(analytics.clusterReport.treeDepthDistribution)
+                      .sort((a, b) => Number(a[0]) - Number(b[0]))
+                      .map(([depth, count]) => (
+                        <div
+                          key={depth}
+                          style={{
+                            padding: "0.35rem 0.7rem",
+                            borderRadius: "0.5rem",
+                            backgroundColor: "var(--bg-surface)",
+                            border: "1px solid var(--border-subtle)",
+                            fontSize: "0.74rem",
+                          }}
+                        >
+                          <span style={{ color: "var(--text-muted)" }}>第 {depth} 层：</span>
+                          <strong>{count}</strong>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === "rules_clusters" && (
+              <>
+                {/* Rule DSL Coverage */}
+                <div
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "0.7rem",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-subtle)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.6rem",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                        规则引擎实时覆盖率：{analytics.ruleCoveragePct}%
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "0.1rem" }}>
+                        {analytics.ruleMatchedTotal} / {analytics.ruleEligibleCount} 可整理标签已被现有 {rules.length} 条规则命中
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      pill
+                      onClick={() => {
+                        setActivePage("rules");
+                        onClose();
+                      }}
+                    >
+                      <span>管理规则</span>
+                      <ArrowRight size={12} />
+                    </Button>
+                  </div>
+
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "6px",
+                      borderRadius: "9999px",
+                      backgroundColor: "var(--bg-card)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${analytics.ruleCoveragePct}%`,
+                        height: "100%",
+                        backgroundColor: analytics.ruleCoveragePct >= 60 ? "var(--success, #10b981)" : "var(--accent-solid)",
+                      }}
+                    />
+                  </div>
+
+                  {analytics.ruleHits.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginTop: "0.15rem" }}>
+                      {analytics.ruleHits.slice(0, 8).map((rh) => (
+                        <span
+                          key={rh.id}
+                          style={{
+                            fontSize: "0.7rem",
+                            padding: "2px 8px",
+                            borderRadius: "9999px",
+                            backgroundColor: "var(--bg-card)",
+                            border: "1px solid var(--border-subtle)",
+                          }}
+                        >
+                          {rh.name}: <strong>{rh.hits}</strong>
+                          {rh.shadowed > 0 && (
+                            <span style={{ color: "#f59e0b", marginLeft: "4px" }}>
+                              (冲突 {rh.shadowed})
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Micro-Cluster Preview */}
+                <div
+                  style={{
+                    padding: "0.85rem 1rem",
+                    borderRadius: "0.7rem",
+                    backgroundColor: "var(--bg-surface)",
+                    border: "1px solid var(--border-subtle)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.6rem",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
+                    <div>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                        本地微簇聚类：{analytics.clusterReport.clusters.length} 簇
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "0.1rem" }}>
+                        压缩率 {analytics.clusterReport.compressionRatio}% · 100% 覆盖非豁免标签
+                      </div>
+                    </div>
+                    <Button
+                      variant="solid"
+                      size="xs"
+                      pill
+                      onClick={() => {
+                        setActivePage("ai");
+                        onClose();
+                      }}
+                    >
+                      <Sparkles size={12} />
+                      <span>前往 AI 架构师</span>
+                    </Button>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                    {analytics.clusterReport.clusters.slice(0, 12).map((c) => (
+                      <span
+                        key={c.id}
+                        style={{
+                          fontSize: "0.71rem",
+                          padding: "3px 8px",
+                          borderRadius: "9999px",
+                          backgroundColor: "var(--bg-card)",
+                          border: "1px solid var(--border-subtle)",
+                        }}
+                      >
+                        {c.labelHint} <span style={{ color: "var(--accent-text)", fontWeight: 600 }}>({c.tabCount})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Positioner>

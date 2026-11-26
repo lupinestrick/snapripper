@@ -16,6 +16,7 @@ export type ProcessScope = "current" | "all" | "selected";
 
 export type WorkbenchPanelLayout = "vertical" | "horizontal" | "dropdown" | "sidebar";
 export type AIChatHistoryLayout = "dropdown" | "sidebar";
+export type RulesLayoutMode = "list" | "grid";
 
 export interface UISettings {
   hideFileName: boolean;
@@ -23,6 +24,10 @@ export interface UISettings {
   hideEmptyPanels: boolean;
   workbenchPanelLayout?: WorkbenchPanelLayout;
   aiChatHistoryLayout?: AIChatHistoryLayout;
+  rulesLayoutMode?: RulesLayoutMode;
+  rulesHideDisabled?: boolean;
+  rulesOnlyWithHits?: boolean;
+  rulesShowSampleTitles?: boolean;
 }
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
@@ -31,6 +36,10 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   hideEmptyPanels: false,
   workbenchPanelLayout: "vertical",
   aiChatHistoryLayout: "dropdown",
+  rulesLayoutMode: "list",
+  rulesHideDisabled: false,
+  rulesOnlyWithHits: false,
+  rulesShowSampleTitles: false,
 };
 
 export const DEFAULT_AI_DROPDOWN_SETTINGS: AIDropdownSettings = {
@@ -124,7 +133,7 @@ interface ConfigState {
   resetTodayAIUsage: () => void;
   togglePinnedModel: (slot: string, modelName: string) => void;
   switchAIProvider: (key: AIProviderKey, protocolOverride?: AIProtocolType) => void;
-  addCustomProvider: (provider: Omit<CustomAIProvider, "id">, apiKey?: string) => string;
+  addCustomProvider: (provider: Omit<CustomAIProvider, "id">, apiKey?: string, initialCachedModels?: string[]) => string;
   updateCustomProvider: (id: string, partial: Partial<CustomAIProvider>) => void;
   deleteCustomProvider: (id: string) => void;
 
@@ -331,7 +340,7 @@ export const useConfigStore = create<ConfigState>()(
           };
         }),
 
-      addCustomProvider: (providerData, apiKey = "") => {
+      addCustomProvider: (providerData, apiKey = "", initialCachedModels) => {
         const id = `custom_${Date.now()}`;
         set((state) => {
           const aiConfig = state.aiConfig;
@@ -339,6 +348,10 @@ export const useConfigStore = create<ConfigState>()(
           const apiKeysPool = { ...(aiConfig.apiKeys || {}), [currentSlot]: aiConfig.apiKey, [id]: apiKey.trim() };
           const baseURLsPool = { ...(aiConfig.baseURLs || {}), [currentSlot]: aiConfig.baseURL, [id]: providerData.baseUrl.trim() };
           const modelsPool = { ...(aiConfig.models || {}), [currentSlot]: aiConfig.model, [id]: providerData.model.trim() };
+          const cachedPool =
+            initialCachedModels && initialCachedModels.length > 0
+              ? { ...(aiConfig.cachedModels || {}), [id]: initialCachedModels }
+              : aiConfig.cachedModels;
 
           const newProvider: CustomAIProvider = {
             id,
@@ -363,6 +376,7 @@ export const useConfigStore = create<ConfigState>()(
               apiKeys: apiKeysPool,
               baseURLs: baseURLsPool,
               models: modelsPool,
+              cachedModels: cachedPool,
             },
             aiDropdownSettings: {
               ...existingDropdown,

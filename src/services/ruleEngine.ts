@@ -190,6 +190,7 @@ export function explainTabMatch(
 export interface RulePreviewStats {
   ruleId: string;
   effectiveHits: number;
+  potentialHits: number;
   shadowedHits: number;
   sampleTitles: string[];
 }
@@ -206,10 +207,13 @@ export function previewRulesOnTabs(
     statsMap.set(r.id, {
       ruleId: r.id,
       effectiveHits: 0,
+      potentialHits: 0,
       shadowedHits: 0,
       sampleTitles: [],
     });
   }
+
+  const disabledRules = rules.filter((r) => !r.enabled);
 
   for (const tab of tabs) {
     if (tab.pinned || isExemptUrl(tab.url, tab.pinned) || isGroupTab(tab)) continue;
@@ -219,11 +223,24 @@ export function previewRulesOnTabs(
       if (!entry) continue;
       if (matchedRule && matchedRule.id === r.id) {
         entry.effectiveHits++;
+        entry.potentialHits++;
         if (entry.sampleTitles.length < 3 && tab.title) {
           entry.sampleTitles.push(tab.title.trim().slice(0, 40));
         }
       } else {
         entry.shadowedHits++;
+      }
+    }
+
+    for (const dr of disabledRules) {
+      if (matchTabWithRule(tab, { ...dr, enabled: true })) {
+        const entry = statsMap.get(dr.id);
+        if (entry) {
+          entry.potentialHits++;
+          if (entry.sampleTitles.length < 3 && tab.title) {
+            entry.sampleTitles.push(tab.title.trim().slice(0, 40));
+          }
+        }
       }
     }
   }
@@ -400,5 +417,129 @@ export function applyRulesToTreeNodes(
     newNodes: resultNodes,
     matchedCount,
     groupsCreated,
+  };
+}
+
+/**
+ * 解析 AI 返回的 Rule DSL JSON（兼容新版 conditions/action DSL 与旧版 matchDomain/matchKeyword，并剥离 <think>）
+ */
+export function parseAIRulesFromResponse(rawResponse: string): {
+  rules?: Omit<CategorizationRule, "id">[];
+  cleanedText: string;
+} {
+  const withoutThink = rawResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  const fencedMatch = withoutThink.match(/```(?:json)?\s*(\[\s*\{[\s\S]*?\}\s*\])\s*```/);
+  const candidateJson = fencedMatch?.[1] || withoutThink.match(/(\[\s*\{[\s\S]*\}\s*\])/)?.[1];
+
+  let rules: Omit<CategorizationRule, "id">[] | undefined;
+  if (candidateJson) {
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(candidateJson);
+    } catch {
+      try {
+        const cleanedJson = candidateJson
+          .replace(/[“”]/g, '"')
+          .replace(/,\s*([\]}])/g, "$1");
+        parsed = JSON.parse(cleanedJson);
+      } catch {
+        parsed = null;
+      }
+    }
+
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      rules = parsed.map((item: any, idx: number) => {
+        const normalized = normalizeRuleToDSL({
+          id: `ai_tmp_${idx}`,
+          name: String(item.name || `AI 规则 ${idx + 1}`),
+          enabled: true,
+          matchMode: item.matchMode === "any" ? "any" : item.matchMode === "all" ? "all" : undefined,
+          conditions: Array.isArray(item.conditions) ? item.conditions : undefined,
+          action: item.action && typeof item.action === "object" ? item.action : undefined,
+          scope: item.scope || "all",
+          targetScopeId: item.targetScopeId || "",
+          matchDomain: item.matchDomain ? String(item.matchDomain) : "",
+          matchKeyword: item.matchKeyword ? String(item.matchKeyword) : "",
+          minThreshold: Math.max(1, Number(item.minThreshold) || 2),
+          color: String(item.color || "#3b82f6"),
+        });
+        const { id: _ignored, ...rest } = normalized;
+        return rest;
+      });
+    }
+  }
+
+  const cleanedText = withoutThink
+    .replace(/```(?:json)?\s*\[\s*\{[\s\S]*?\}\s*\]\s*```/g, "")
+    .trim();
+
+  return { rules, cleanedText };
+}
+
+/**
+ * 0-Token 统计当前快照中尚未被任何已启用规则命中的高频域名、可用面板与容器上下文
+ */
+export function buildUnmatchedSnapshotContext(
+  tabs: SideberyTab[],
+  rules: CategorizationRule[],
+  panels: Record<string, any> = {},
+  containers: Record<string, any> = {}
+): {
+  eligibleCount: number;
+  unmatchedCount: number;
+  topUnmatchedDomains: { domain: string; count: number; samples: string[] }[];
+  contextText: string;
+} {
+  const domainMap = new Map<string, { count: number; samples: string[] }>();
+  let eligibleCount = 0;
+  let unmatchedCount = 0;
+
+  for (const tab of tabs) {
+    if (tab.pinned || isExemptUrl(tab.url, tab.pinned) || isGroupTab(tab)) continue;
+    eligibleCount++;
+    const { matchedRule } = explainTabMatch(tab, rules);
+    if (!matchedRule) {
+      unmatchedCount++;
+      const d = extractDomain(tab.url);
+      if (d) {
+        const entry = domainMap.get(d) || { count: 0, samples: [] };
+        entry.count++;
+        if (entry.samples.length < 2 && tab.title) {
+          entry.samples.push(tab.title.trim().slice(0, 32));
+        }
+        domainMap.set(d, entry);
+      }
+    }
+  }
+
+  const topUnmatchedDomains = Array.from(domainMap.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 15)
+    .map(([domain, info]) => ({ domain, count: info.count, samples: info.samples }));
+
+  const panelList = Object.values(panels).map((p: any) => `${p.id} (${p.name || p.id})`);
+  const containerList = Object.values(containers).map((c: any) => `${c.id} (${c.name || c.id})`);
+
+  const lines: string[] = [
+    `当前快照统计：可整理标签 ${eligibleCount} 个，其中尚未被现有规则命中 ${unmatchedCount} 个。`,
+  ];
+  if (topUnmatchedDomains.length > 0) {
+    lines.push("未命中高频域名 (Top 15)：");
+    for (const d of topUnmatchedDomains) {
+      lines.push(`- ${d.domain} (${d.count}个) 示例: ${d.samples.join(" / ") || "无标题"}`);
+    }
+  }
+  if (panelList.length > 0) {
+    lines.push(`可用目标面板 (targetPanelId)：${panelList.join("，")}`);
+  }
+  if (containerList.length > 0) {
+    lines.push(`可用容器 (container)：${containerList.join("，")}`);
+  }
+
+  return {
+    eligibleCount,
+    unmatchedCount,
+    topUnmatchedDomains,
+    contextText: lines.join("\n"),
   };
 }

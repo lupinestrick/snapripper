@@ -7,6 +7,8 @@ import {
   normalizeRuleToDSL,
   previewRulesOnTabs,
   applyRulesToTreeNodes,
+  parseAIRulesFromResponse,
+  buildUnmatchedSnapshotContext,
 } from "../src/services/ruleEngine";
 import { buildTabTree } from "../src/services/snapshotParser";
 import { determineTargetPanelForCategory } from "../src/services/treeOperations";
@@ -1098,6 +1100,52 @@ Based on your tabs, here is the distribution:
   assert(
     diagFallback.chips.length === 4,
     "extractDiagnosisChipsFromResponse falls back to default direction chips when JSON is absent"
+  );
+
+  const parsedDslRules = parseAIRulesFromResponse(
+    `<think>thinking</think>\n推荐规则：\n\`\`\`json\n[{"name":"GitHub PR","matchMode":"all","conditions":[{"field":"domain","operator":"contains","value":"github.com"},{"field":"urlPath","operator":"contains","value":"/pull"}],"action":{"type":"group","createGroup":true},"minThreshold":2}]\n\`\`\``
+  );
+  assert(
+    parsedDslRules.rules?.length === 1 &&
+      parsedDslRules.rules[0].conditions?.length === 2 &&
+      parsedDslRules.rules[0].matchMode === "all",
+    "parseAIRulesFromResponse parses Rule DSL conditions and strips think block"
+  );
+
+  const parsedLegacyRules = parseAIRulesFromResponse(
+    `\`\`\`json\n[{"name":"Old Style","matchDomain":"github.com","matchKeyword":"issue","minThreshold":2}]\n\`\`\``
+  );
+  assert(
+    parsedLegacyRules.rules?.length === 1 &&
+      (parsedLegacyRules.rules[0].conditions?.length || 0) >= 2,
+    "parseAIRulesFromResponse normalizes legacy matchDomain/matchKeyword rules to DSL"
+  );
+
+  const unmatchedCtx = buildUnmatchedSnapshotContext(
+    [
+      { id: 1, title: "Open Issue", url: "https://github.com/org/repo/issues/1", panelId: "p1", lvl: 0 } as any,
+      { id: 2, title: "Unmatched News", url: "https://news.ycombinator.com/", panelId: "p1", lvl: 0 } as any,
+    ],
+    [
+      {
+        id: "r1",
+        name: "GH",
+        enabled: true,
+        matchMode: "all",
+        conditions: [{ id: "c1", field: "domain", operator: "contains", value: "github.com" }],
+        action: { type: "group" },
+        scope: "all",
+        minThreshold: 1,
+        color: "#3b82f6",
+      },
+    ],
+    { p1: { id: "p1", name: "Main" } }
+  );
+  assert(
+    unmatchedCtx.eligibleCount === 2 &&
+      unmatchedCtx.unmatchedCount === 1 &&
+      unmatchedCtx.topUnmatchedDomains[0]?.domain === "news.ycombinator.com",
+    "buildUnmatchedSnapshotContext identifies unmatched domains accurately"
   );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);

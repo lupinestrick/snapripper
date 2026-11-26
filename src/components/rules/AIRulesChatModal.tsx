@@ -1,11 +1,27 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
-import { sendAIChatRequest } from "@/services/aiService";
-import { CategorizationRule } from "@/types/sidebery";
+import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { CategorizationRule, RuleActionType } from "@/types/sidebery";
+import { flattenTabTree } from "@/services/snapshotParser";
+import {
+  buildUnmatchedSnapshotContext,
+  formatRuleConditionsCompact,
+  matchTabWithRule,
+  parseAIRulesFromResponse,
+} from "@/services/ruleEngine";
+import {
+  checkAICallLimits,
+  getProviderMeta,
+  sendAIConversationRequest,
+} from "@/services/aiService";
 import { DEFAULT_RULES_GENERATOR_PROMPT } from "@/constants/aiPrompts";
+import { MarkdownView } from "@/components/ai/MarkdownView";
+import { RuleEditorModal } from "./RuleEditorModal";
+import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   X,
   Sparkles,
@@ -15,7 +31,9 @@ import {
   Plus,
   Bot,
   User,
-  ExternalLink,
+  Edit3,
+  RotateCcw,
+  Layers,
 } from "lucide-react";
 
 interface AIRulesChatModalProps {
@@ -30,26 +48,72 @@ interface ChatMessage {
   suggestedRules?: Omit<CategorizationRule, "id">[];
 }
 
-const QUICK_PROMPTS = [
-  "🎨 二次元同人与画师社区 (Pixiv/ArtStation)",
-  "📈 金融投资与加密货币 (Binance/TradingView)",
-  "🎮 主机与 Steam 游戏资讯 (IGN/Steam/Metacritic)",
-  "🧪 前端工程与开源库文档 (Tailwind/Vite/Bun)",
+const ACTION_LABELS: Record<RuleActionType, string> = {
+  group: "建组",
+  moveToPanel: "移面板",
+  groupAndMove: "建组+移面板",
+  exempt: "跳过保护",
+};
+
+const CURATED_PROMPTS = [
+  {
+    label: "GitHub Issues / PR 分组",
+    prompt: "帮我生成两条规则：把 github.com 下路径包含 /issues 或 /pull 的页面分别归组，并排除 /settings 页面。",
+  },
+  {
+    label: "视频与播客媒体",
+    prompt: "帮我生成视频与播客媒体规则（如 B站、YouTube、Twitch），按 OR 匹配并自动建组。",
+  },
+  {
+    label: "前端文档与开源库",
+    prompt: "帮我生成前端技术文档与开源库规则（React、Next.js、Tailwind、MDN、Vite 等），合并为技术文档组。",
+  },
 ];
 
 export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
-  const { aiConfig, addRule, aiPrompts } = useConfigStore();
+  const {
+    aiConfig,
+    aiCallSettings,
+    aiUsageStats,
+    recordAIUsage,
+    aiPrompts,
+    rulesSettings,
+    addRule,
+  } = useConfigStore();
+  const { rawSnapshot, rootNodes } = useSnapshotStore();
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       sender: "assistant",
-      text: "你好！我是规则生成助手。请用自然语言告诉我你想整理哪些类型的网站或主题，我会为你提炼精准的域名与关键词匹配规则。",
+      text: "描述你想整理的标签主题或域名条件，我将生成新版 **Rule DSL** 规则（支持组合条件、排除项与动作），并实时试算当前快照的命中数量。",
     },
   ]);
   const [inputPrompt, setInputPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [includeSnapshotContext, setIncludeSnapshotContext] = useState(true);
   const [addedRuleKeys, setAddedRuleKeys] = useState<Set<string>>(new Set());
+  const [editingDraft, setEditingDraft] = useState<{
+    key: string;
+    rule: Omit<CategorizationRule, "id">;
+  } | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const allTabs = useMemo(
+    () => (rawSnapshot ? flattenTabTree(rootNodes) : []),
+    [rawSnapshot, rootNodes]
+  );
+
+  const snapshotContext = useMemo(() => {
+    if (!rawSnapshot || allTabs.length === 0) return null;
+    return buildUnmatchedSnapshotContext(
+      allTabs,
+      rulesSettings.rules,
+      rawSnapshot.panels || {},
+      rawSnapshot.containers || {}
+    );
+  }, [rawSnapshot, allTabs, rulesSettings.rules]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,64 +121,110 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
 
   if (!isOpen) return null;
 
+  const providerMeta = getProviderMeta(aiConfig, aiConfig.provider);
+  const activeModel = aiConfig.model || providerMeta.model;
+
+  const computePreviewHits = (rule: Omit<CategorizationRule, "id">): number => {
+    if (allTabs.length === 0) return 0;
+    const previewRule: CategorizationRule = {
+      ...rule,
+      id: "__preview__",
+      enabled: true,
+    };
+    let count = 0;
+    for (const tab of allTabs) {
+      if (matchTabWithRule(tab, previewRule)) count++;
+    }
+    return count;
+  };
+
+  const handleResetChat = () => {
+    setMessages([
+      {
+        id: "welcome",
+        sender: "assistant",
+        text: "已开启新对话。描述你想整理的标签主题或域名条件，我将为你生成可试算的 **Rule DSL** 规则。",
+      },
+    ]);
+    setAddedRuleKeys(new Set());
+    setInputPrompt("");
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const prompt = (textToSend || inputPrompt).trim();
     if (!prompt || isGenerating) return;
 
-    const userMsgId = `user_${Date.now()}`;
-    const newMessages: ChatMessage[] = [
-      ...messages,
-      { id: userMsgId, sender: "user", text: prompt },
-    ];
-    setMessages(newMessages);
+    const limitCheck = checkAICallLimits(aiCallSettings, aiUsageStats);
+    if (!limitCheck.ok) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai_limit_${Date.now()}`,
+          sender: "assistant",
+          text: `⏳ **已触发调用限制**：${limitCheck.reason}`,
+        },
+      ]);
+      return;
+    }
+
+    const userMsg: ChatMessage = { id: `user_${Date.now()}`, sender: "user", text: prompt };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
     setInputPrompt("");
     setIsGenerating(true);
 
+    let usageRecorded = false;
     try {
-      const systemPrompt = aiPrompts?.rulesGeneratorPrompt || DEFAULT_RULES_GENERATOR_PROMPT;
+      const baseSystemPrompt = aiPrompts?.rulesGeneratorPrompt || DEFAULT_RULES_GENERATOR_PROMPT;
+      const systemPrompt =
+        includeSnapshotContext && snapshotContext
+          ? `${baseSystemPrompt}\n\n【当前快照上下文（未命中高频域名与可用面板/容器）】:\n${snapshotContext.contextText}`
+          : baseSystemPrompt;
 
-      const aiResponse = await sendAIChatRequest(aiConfig, systemPrompt, prompt);
+      const turns = nextMessages
+        .filter((m) => m.id !== "welcome")
+        .map((m) => ({
+          role: m.sender as "user" | "assistant",
+          content: m.text,
+        }));
 
-      // Extract JSON rules from response
-      let suggestedRules: Omit<CategorizationRule, "id">[] | undefined = undefined;
-      const jsonMatch = aiResponse.match(/```(?:json)?\s*(\[\s*\{[\s\S]*\}\s*\])\s*```/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[1]);
-          if (Array.isArray(parsed)) {
-            suggestedRules = parsed.map((item: any) => ({
-              name: String(item.name || "未命名分类"),
-              enabled: true,
-              scope: (item.scope as any) || "all",
-              targetScopeId: item.targetScopeId || "",
-              matchDomain: String(item.matchDomain || ""),
-              matchKeyword: String(item.matchKeyword || ""),
-              minThreshold: Number(item.minThreshold) || 2,
-              color: String(item.color || "#38bdf8"),
-            }));
-          }
-        } catch {}
+      const rawResponse = await sendAIConversationRequest(
+        { ...aiConfig, callSettings: aiCallSettings },
+        systemPrompt,
+        turns,
+        {
+          onUsage: (u) => {
+            usageRecorded = true;
+            recordAIUsage(u);
+          },
+        }
+      );
+      if (!usageRecorded) {
+        recordAIUsage({ promptTokens: 0, completionTokens: 0 });
       }
 
-      // Clean message text by removing raw json code block for better chat presentation
-      const cleanedText = aiResponse.replace(/```(?:json)?\s*\[\s*\{[\s\S]*\}\s*\]\s*```/, "").trim();
+      const { rules: suggestedRules, cleanedText } = parseAIRulesFromResponse(rawResponse);
 
-      setMessages([
-        ...newMessages,
+      setMessages((prev) => [
+        ...prev,
         {
           id: `ai_${Date.now()}`,
           sender: "assistant",
-          text: cleanedText || "我已经为你提炼了以下分类规则，你可以点击直接应用：",
+          text:
+            cleanedText ||
+            (suggestedRules?.length
+              ? `已为你生成 **${suggestedRules.length}** 条 Rule DSL 规则，可直接试算并添加：`
+              : "未能解析出规则 JSON，请尝试更具体地描述域名、路径或关键词条件。"),
           suggestedRules,
         },
       ]);
     } catch (err: any) {
-      setMessages([
-        ...newMessages,
+      setMessages((prev) => [
+        ...prev,
         {
-          id: `ai_${Date.now()}`,
+          id: `ai_err_${Date.now()}`,
           sender: "assistant",
-          text: `生成失败: ${err.message || "请检查系统设置中的 AI 接口与 API Key 是否配置正确。"}`,
+          text: `⚠️ **生成失败**：${err.message || "请检查模型接口与 API Key 配置。"}`,
         },
       ]);
     } finally {
@@ -127,294 +237,414 @@ export function AIRulesChatModal({ isOpen, onClose }: AIRulesChatModalProps) {
     setAddedRuleKeys((prev) => new Set([...prev, key]));
   };
 
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
-        backdropFilter: "blur(4px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 100,
-        padding: "1rem",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "680px",
-          height: "80vh",
-          maxHeight: "720px",
-          backgroundColor: "var(--bg-card)",
-          border: "1px solid var(--border-card)",
-          borderRadius: "1rem",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Hop-up Header */}
-        <div
-          style={{
-            padding: "1rem 1.25rem",
-            borderBottom: "1px solid var(--border-subtle)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            backgroundColor: "var(--bg-surface)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <Sparkles size={18} style={{ color: "var(--accent)" }} />
-            <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--text-main)" }}>
-              AI 智能生成规则助手
-            </h3>
-          </div>
-          <Button
-            variant="ghost"
-            size="xs"
-            pill
-            onClick={onClose}
-            style={{ color: "var(--text-muted)", padding: "4px" }}
-            title="关闭"
-          >
-            <X size={18} />
-          </Button>
-        </div>
+  const handleAddAllInMessage = (msgId: string, list: Omit<CategorizationRule, "id">[]) => {
+    const nextKeys = new Set(addedRuleKeys);
+    list.forEach((rule, idx) => {
+      const key = `${msgId}_${idx}`;
+      if (!nextKeys.has(key)) {
+        addRule(rule);
+        nextKeys.add(key);
+      }
+    });
+    setAddedRuleKeys(nextKeys);
+  };
 
-        {/* Chat Messages Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "1.25rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "1rem",
-            backgroundColor: "var(--bg-canvas)",
-          }}
-        >
-          {messages.map((msg) => {
-            const isUser = msg.sender === "user";
-            return (
-              <div
-                key={msg.id}
-                style={{
-                  display: "flex",
-                  gap: "0.6rem",
-                  alignSelf: isUser ? "flex-end" : "flex-start",
-                  maxWidth: "85%",
-                }}
-              >
-                {!isUser && (
-                  <div
+  return (
+    <>
+      <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <Dialog.Backdrop style={{ zIndex: 110 }} />
+        <Dialog.Positioner style={{ zIndex: 120 }}>
+          <Dialog.Content
+            style={{
+              maxWidth: "740px",
+              width: "94vw",
+              height: "84vh",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-card)",
+              borderRadius: "1rem",
+              color: "var(--text-main)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 24px 48px rgba(0, 0, 0, 0.45)",
+            }}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: "0.75rem 1.15rem",
+                borderBottom: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-surface)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "0.6rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                <Sparkles size={16} style={{ color: "var(--accent)" }} />
+                <Dialog.Title style={{ fontSize: "0.94rem", fontWeight: 700 }}>
+                  AI 规则生成助手
+                </Dialog.Title>
+                <Badge variant="subtle" size="sm" style={{ fontSize: "0.68rem" }}>
+                  {providerMeta.name} · {activeModel}
+                </Badge>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                {snapshotContext && (
+                  <button
+                    type="button"
+                    onClick={() => setIncludeSnapshotContext((prev) => !prev)}
+                    title="开启后将自动注入当前快照未命中域名、可用面板与容器列表"
                     style={{
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "9999px",
-                      backgroundColor: "var(--bg-subtle)",
-                      border: "1px solid var(--border-subtle)",
-                      display: "flex",
+                      display: "inline-flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
+                      gap: "0.3rem",
+                      padding: "0.24rem 0.65rem",
+                      borderRadius: "9999px",
+                      border: "1px solid",
+                      borderColor: includeSnapshotContext ? "var(--accent-border)" : "var(--border-subtle)",
+                      backgroundColor: includeSnapshotContext ? "var(--accent-subtle)" : "var(--bg-card)",
+                      color: includeSnapshotContext ? "var(--accent-text)" : "var(--text-muted)",
+                      fontSize: "0.7rem",
+                      fontWeight: 500,
+                      cursor: "pointer",
                     }}
                   >
-                    <Bot size={15} style={{ color: "var(--accent)" }} />
-                  </div>
+                    <Layers size={11} />
+                    <span>结合快照 (未命中 {snapshotContext.unmatchedCount})</span>
+                  </button>
                 )}
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <Button variant="ghost" size="xs" pill onClick={handleResetChat} title="新对话">
+                  <RotateCcw size={13} />
+                </Button>
+
+                <Dialog.CloseTrigger asChild>
+                  <Button variant="ghost" size="xs" pill onClick={onClose} style={{ padding: "4px" }}>
+                    <X size={15} />
+                  </Button>
+                </Dialog.CloseTrigger>
+              </div>
+            </div>
+
+            {/* Message Stream */}
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "1rem 1.15rem",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.95rem",
+              }}
+            >
+              {messages.map((msg) => {
+                const isUser = msg.sender === "user";
+                return (
                   <div
+                    key={msg.id}
                     style={{
-                      padding: "0.75rem 1rem",
-                      borderRadius: "0.75rem",
-                      backgroundColor: isUser ? "var(--accent-solid)" : "var(--bg-card)",
-                      color: isUser ? "#ffffff" : "var(--text-main)",
-                      fontSize: "0.85rem",
-                      lineHeight: "1.5",
-                      border: isUser ? "none" : "1px solid var(--border-card)",
-                      whiteSpace: "pre-wrap",
+                      display: "flex",
+                      flexDirection: isUser ? "row-reverse" : "row",
+                      alignItems: "flex-start",
+                      gap: "0.65rem",
                     }}
                   >
-                    {msg.text}
-                  </div>
+                    <div
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        backgroundColor: isUser ? "var(--accent-solid)" : "var(--bg-surface)",
+                        border: isUser ? "none" : "1px solid var(--border-card)",
+                        color: isUser ? "#fff" : "var(--accent)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isUser ? <User size={14} /> : <Bot size={14} />}
+                    </div>
 
-                  {/* Render Suggested Rule Cards */}
-                  {msg.suggestedRules && msg.suggestedRules.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginTop: "0.25rem" }}>
-                      {msg.suggestedRules.map((rule, idx) => {
-                        const ruleKey = `${msg.id}_rule_${idx}`;
-                        const isAdded = addedRuleKeys.has(ruleKey);
-                        return (
+                    <div
+                      style={{
+                        maxWidth: isUser ? "78%" : "100%",
+                        flex: isUser ? "none" : 1,
+                        minWidth: 0,
+                        backgroundColor: isUser ? "var(--bg-surface)" : "transparent",
+                        border: isUser ? "1px solid var(--border-card)" : "none",
+                        borderRadius: isUser ? "1rem 1rem 0.25rem 1rem" : "0",
+                        padding: isUser ? "0.55rem 0.9rem" : "0",
+                      }}
+                    >
+                      <MarkdownView content={msg.text} />
+
+                      {/* Suggested Rule DSL Cards */}
+                      {msg.suggestedRules && msg.suggestedRules.length > 0 && (
+                        <div style={{ marginTop: "0.7rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                           <div
-                            key={ruleKey}
                             style={{
-                              padding: "0.85rem",
-                              borderRadius: "0.6rem",
-                              backgroundColor: "var(--bg-subtle)",
-                              border: "1px solid var(--border-subtle)",
                               display: "flex",
-                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "space-between",
                               gap: "0.5rem",
                             }}
                           >
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <span
-                                  style={{
-                                    width: "10px",
-                                    height: "10px",
-                                    borderRadius: "50%",
-                                    backgroundColor: rule.color,
-                                  }}
-                                />
-                                <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-main)" }}>
-                                  {rule.name}
-                                </span>
-                              </div>
-
+                            <span style={{ fontSize: "0.74rem", fontWeight: 600, color: "var(--text-muted)" }}>
+                              已生成 {msg.suggestedRules.length} 条规则
+                            </span>
+                            {msg.suggestedRules.length > 1 && (
                               <Button
-                                onClick={() => handleAddRule(rule, ruleKey)}
-                                disabled={isAdded}
-                                variant={isAdded ? "outline" : "solid"}
+                                variant="outline"
                                 size="xs"
                                 pill
-                                style={
-                                  isAdded
-                                    ? {
-                                        borderColor: "var(--border-subtle)",
-                                        backgroundColor: "var(--accent-subtle)",
-                                        color: "var(--accent-text)",
-                                      }
-                                    : undefined
-                                }
+                                onClick={() => handleAddAllInMessage(msg.id, msg.suggestedRules!)}
                               >
-                                {isAdded ? <Check size={13} /> : <Plus size={13} />}
-                                <span>{isAdded ? "已添加" : "添加此规则"}</span>
+                                <Plus size={12} />
+                                <span>一键全部添加</span>
                               </Button>
-                            </div>
-
-                            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                              <div><strong>匹配域名:</strong> {rule.matchDomain || "无"}</div>
-                              <div><strong>关键词:</strong> {rule.matchKeyword || "无"}</div>
-                            </div>
+                            )}
                           </div>
-                        );
-                      })}
+
+                          {msg.suggestedRules.map((rule, rIdx) => {
+                            const key = `${msg.id}_${rIdx}`;
+                            const isAdded = addedRuleKeys.has(key);
+                            const hitCount = computePreviewHits(rule);
+                            const chips = formatRuleConditionsCompact({ ...rule, id: key });
+                            const actionType: RuleActionType = rule.action?.type || "group";
+
+                            return (
+                              <div
+                                key={key}
+                                style={{
+                                  padding: "0.75rem 0.9rem",
+                                  borderRadius: "0.75rem",
+                                  border: "1px solid var(--border-card)",
+                                  backgroundColor: "var(--bg-surface)",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  gap: "0.75rem",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.35rem" }}>
+                                    <span
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: "50%",
+                                        backgroundColor: rule.color || "var(--accent)",
+                                        flexShrink: 0,
+                                      }}
+                                    />
+                                    <span style={{ fontWeight: 600, fontSize: "0.84rem" }}>{rule.name}</span>
+                                    <Badge variant="subtle" size="sm" style={{ fontSize: "0.64rem" }}>
+                                      {ACTION_LABELS[actionType]}
+                                    </Badge>
+                                    <Badge variant="outline" size="sm" style={{ fontSize: "0.63rem" }}>
+                                      {rule.matchMode === "all" ? "AND" : "OR"}
+                                    </Badge>
+                                    {allTabs.length > 0 && (
+                                      <Badge
+                                        variant="subtle"
+                                        size="sm"
+                                        style={{
+                                          fontSize: "0.64rem",
+                                          backgroundColor:
+                                            hitCount > 0 ? "var(--accent-subtle)" : "var(--bg-card)",
+                                          color: hitCount > 0 ? "var(--accent-text)" : "var(--text-muted)",
+                                        }}
+                                      >
+                                        预计命中 {hitCount}
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {chips.length > 0 && (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.25rem", marginTop: "0.35rem" }}>
+                                      {chips.slice(0, 4).map((chip, cIdx) => (
+                                        <span
+                                          key={cIdx}
+                                          style={{
+                                            fontSize: "0.66rem",
+                                            padding: "1px 6px",
+                                            borderRadius: "4px",
+                                            backgroundColor: "var(--bg-card)",
+                                            color: "var(--text-muted)",
+                                            border: "1px solid var(--border-subtle)",
+                                          }}
+                                        >
+                                          {chip}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}>
+                                  {!isAdded && (
+                                    <Button
+                                      variant="ghost"
+                                      size="xs"
+                                      pill
+                                      onClick={() => setEditingDraft({ key, rule })}
+                                      title="编辑后添加"
+                                    >
+                                      <Edit3 size={12} />
+                                      <span>编辑</span>
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant={isAdded ? "subtle" : "solid"}
+                                    size="xs"
+                                    pill
+                                    disabled={isAdded}
+                                    onClick={() => handleAddRule(rule, key)}
+                                  >
+                                    {isAdded ? <Check size={12} /> : <Plus size={12} />}
+                                    <span>{isAdded ? "已添加" : "添加"}</span>
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-
-                {isUser && (
-                  <div
-                    style={{
-                      width: "28px",
-                      height: "28px",
-                      borderRadius: "9999px",
-                      backgroundColor: "var(--accent-solid)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <User size={15} color="#fff" />
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
 
-          {isGenerating && (
-            <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", color: "var(--accent)", fontSize: "0.8rem" }}>
-              <Loader2 size={16} className="animate-spin" />
-              <span>AI 正在思考并提取规则模式...</span>
+              {/* Quick Prompts on Empty Conversation */}
+              {messages.length <= 1 && !isGenerating && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", paddingLeft: "2.35rem" }}>
+                  {snapshotContext && snapshotContext.unmatchedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSendMessage(
+                          `请根据当前快照中尚未被命中的高频域名（共 ${snapshotContext.unmatchedCount} 个未命中标签），为我提炼 3~5 条最实用的自动化归类规则。`
+                        )
+                      }
+                      style={{
+                        padding: "0.42rem 0.8rem",
+                        borderRadius: "9999px",
+                        border: "1px solid var(--accent-border)",
+                        backgroundColor: "var(--accent-subtle)",
+                        color: "var(--accent-text)",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ✨ 为当前 {snapshotContext.unmatchedCount} 个未命中标签推荐规则
+                    </button>
+                  )}
+
+                  {CURATED_PROMPTS.map((item) => (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => handleSendMessage(item.prompt)}
+                      style={{
+                        padding: "0.4rem 0.75rem",
+                        borderRadius: "9999px",
+                        border: "1px solid var(--border-subtle)",
+                        backgroundColor: "var(--bg-surface)",
+                        color: "var(--text-muted)",
+                        fontSize: "0.74rem",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {isGenerating && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", paddingLeft: "2.35rem", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>正在生成 Rule DSL 规则...</span>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
-          )}
 
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Quick Prompts */}
-        <div
-          style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "var(--bg-subtle)",
-            borderTop: "1px solid var(--border-subtle)",
-            display: "flex",
-            gap: "0.5rem",
-            overflowX: "auto",
-          }}
-        >
-          {QUICK_PROMPTS.map((promptText) => (
-            <Button
-              key={promptText}
-              type="button"
-              variant="outline"
-              size="xs"
-              pill
-              onClick={() => handleSendMessage(promptText)}
-              disabled={isGenerating}
-              style={{ whiteSpace: "nowrap" }}
+            {/* Bottom Input Bar */}
+            <div
+              style={{
+                padding: "0.75rem 1.15rem",
+                borderTop: "1px solid var(--border-subtle)",
+                backgroundColor: "var(--bg-surface)",
+                display: "flex",
+                alignItems: "flex-end",
+                gap: "0.55rem",
+              }}
             >
-              {promptText}
-            </Button>
-          ))}
-        </div>
+              <textarea
+                rows={2}
+                value={inputPrompt}
+                onChange={(e) => setInputPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                placeholder="描述你的分类规则需求，支持多轮追问调整（Enter 发送，Shift+Enter 换行）..."
+                style={{
+                  flex: 1,
+                  resize: "none",
+                  padding: "0.55rem 0.8rem",
+                  borderRadius: "0.75rem",
+                  border: "1px solid var(--border-card)",
+                  backgroundColor: "var(--bg-card)",
+                  color: "var(--text-main)",
+                  fontSize: "0.82rem",
+                  lineHeight: 1.45,
+                  outline: "none",
+                }}
+              />
+              <Button
+                variant="solid"
+                size="sm"
+                pill
+                disabled={isGenerating || !inputPrompt.trim()}
+                onClick={() => handleSendMessage()}
+                style={{ height: "38px", padding: "0 1rem" }}
+              >
+                <Send size={14} />
+                <span>生成</span>
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
 
-        {/* Chat Input Bar */}
-        <div
-          style={{
-            padding: "0.85rem 1.25rem",
-            backgroundColor: "var(--bg-surface)",
-            borderTop: "1px solid var(--border-subtle)",
-            display: "flex",
-            gap: "0.6rem",
-            alignItems: "center",
-          }}
-        >
-          <input
-            type="text"
-            placeholder="描述你想分类的网站或主题（如：添加动漫、论文或海淘购物分类）..."
-            value={inputPrompt}
-            onChange={(e) => setInputPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
-            disabled={isGenerating}
-            style={{
-              flex: 1,
-              padding: "0.45rem 0.85rem",
-              borderRadius: "0.5rem",
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--border-card)",
-              color: "var(--text-main)",
-              fontSize: "0.8rem",
-              outline: "none",
-            }}
-          />
-
-          <Button
-            onClick={() => handleSendMessage()}
-            disabled={!inputPrompt.trim() || isGenerating}
-            variant="solid"
-            size="xs"
-            pill
-          >
-            {isGenerating ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-            <span>发送</span>
-          </Button>
-        </div>
-      </div>
-    </div>
+      {/* Edit Before Adding */}
+      <RuleEditorModal
+        isOpen={Boolean(editingDraft)}
+        initialRule={editingDraft?.rule || null}
+        isNew
+        panels={rawSnapshot?.panels || {}}
+        containers={rawSnapshot?.containers || {}}
+        snapshotTabs={allTabs}
+        onClose={() => setEditingDraft(null)}
+        onSave={(saved) => {
+          if (editingDraft) {
+            handleAddRule(saved as Omit<CategorizationRule, "id">, editingDraft.key);
+            setEditingDraft(null);
+          }
+        }}
+      />
+    </>
   );
 }
