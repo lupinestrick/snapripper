@@ -531,7 +531,8 @@ export function clusterSnapshotTabs(
 }
 
 /**
- * 将压缩后的微簇报告格式化为极省 Token 的 LLM Prompt 上下文摘要
+ * 将压缩后的微簇报告格式化为极省 Token 的 LLM Prompt 上下文摘要，
+ * 同时注入 0-Token 预计算的跨面板割裂域名与树深度摘要信号。
  */
 export function formatClusterReportForPrompt(report: ClusterCompressionReport): string {
   const compactClusters = report.clusters.map((c) => ({
@@ -544,6 +545,49 @@ export function formatClusterReportForPrompt(report: ClusterCompressionReport): 
     samples: c.sampleTitles.slice(0, 3),
   }));
 
+  // Precompute domains fragmented across 2+ panels so LLM spots split topics immediately
+  const domainMap = new Map<
+    string,
+    { clusterIds: Set<string>; panels: Set<string>; tabCount: number }
+  >();
+  for (const c of report.clusters) {
+    if (c.cohesionReason === "tail_misc") continue;
+    for (const d of c.domains) {
+      if (!d || d === "group" || d === "other") continue;
+      const entry = domainMap.get(d) || {
+        clusterIds: new Set<string>(),
+        panels: new Set<string>(),
+        tabCount: 0,
+      };
+      entry.clusterIds.add(c.id);
+      c.sourcePanelNames.forEach((p) => entry.panels.add(p));
+      entry.tabCount += c.tabCount;
+      domainMap.set(d, entry);
+    }
+  }
+
+  const crossPanelDomains = Array.from(domainMap.entries())
+    .filter(([, v]) => v.panels.size >= 2 && v.clusterIds.size >= 2)
+    .sort((a, b) => b[1].tabCount - a[1].tabCount)
+    .slice(0, 8)
+    .map(([domain, v]) => ({
+      domain,
+      tabCount: v.tabCount,
+      clusterIds: Array.from(v.clusterIds),
+      panels: Array.from(v.panels),
+    }));
+
+  const depthEntries = Object.entries(report.treeDepthDistribution || {});
+  let maxDepth = 0;
+  let deepTabCount = 0;
+  for (const [lvlStr, count] of depthEntries) {
+    const lvl = Number(lvlStr);
+    if (!Number.isNaN(lvl)) {
+      if (lvl > maxDepth) maxDepth = lvl;
+      if (lvl >= 2) deepTabCount += count;
+    }
+  }
+
   return JSON.stringify(
     {
       overview: {
@@ -552,11 +596,14 @@ export function formatClusterReportForPrompt(report: ClusterCompressionReport): 
         exemptProtectedCount: report.exemptProtectedCount,
         clusterCount: report.clusters.length,
         compressionRatioPct: report.compressionRatio,
+        maxTreeDepth: maxDepth,
+        deepNestedTabs: deepTabCount,
       },
       panels: {
         activePanels: report.activePanels,
         emptyPanelNames: report.emptyPanelNames,
       },
+      ...(crossPanelDomains.length > 0 ? { crossPanelDomains } : {}),
       microClusters: compactClusters,
     },
     null,

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
+import { confirmAction, toast } from "@/store/useFeedbackStore";
 import { THEME_DEFINITIONS } from "@/constants/themes";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { testAIConnection, fetchAvailableModels, getAPIKeySlot, getOrderedModelsForSlot, getProviderMeta } from "@/services/aiService";
@@ -36,6 +37,8 @@ import {
 import {
   DEFAULT_RULES_GENERATOR_PROMPT,
   DEFAULT_AI_ARCHITECT_PROMPT,
+  DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT,
+  DEFAULT_ARCHITECT_REFINEMENT_PROMPT,
 } from "@/constants/aiPrompts";
 
 export function SettingsPage() {
@@ -198,18 +201,24 @@ export function SettingsPage() {
       const content = event.target?.result as string;
       const success = importRulesJSON(content);
       if (success) {
-        alert("配置导入成功！");
+        toast.success("配置导入成功");
       } else {
-        alert("导入失败：无效的配置文件格式");
+        toast.error("导入失败：无效的配置文件格式");
       }
     };
     reader.readAsText(file);
   };
 
-  const handleClearCache = () => {
-    if (window.confirm("确定要清除导入的标签和编辑记录吗？此操作将重置当前工作台数据并清除本地 Cookie 缓存。")) {
+  const handleClearCache = async () => {
+    const confirmed = await confirmAction({
+      title: "清除本地缓存",
+      message: "确定要清除导入的标签和编辑记录吗？此操作将重置当前工作台数据并清除本地 Cookie 缓存。",
+      confirmLabel: "确认清除",
+      destructive: true,
+    });
+    if (confirmed) {
       clearAllCache();
-      alert("已成功清除缓存！");
+      toast.success("已成功清除缓存");
     }
   };
 
@@ -391,29 +400,15 @@ export function SettingsPage() {
             {(aiConfig.customProviders || []).map((cp) => {
               const isSelected = aiConfig.provider === cp.id;
               return (
-                <div key={cp.id} style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
-                  <Button
-                    type="button"
-                    variant={isSelected ? "solid" : "outline"}
-                    size="xs"
-                    onClick={() => handleSelectProvider(cp.id)}
-                  >
-                    {cp.name}
-                  </Button>
-                  {isSelected && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      pill
-                      onClick={() => deleteCustomProvider(cp.id)}
-                      title="删除此自定义供应商"
-                      style={{ padding: "3px", color: "var(--danger)" }}
-                    >
-                      <Trash2 size={12} />
-                    </Button>
-                  )}
-                </div>
+                <Button
+                  key={cp.id}
+                  type="button"
+                  variant={isSelected ? "solid" : "outline"}
+                  size="xs"
+                  onClick={() => handleSelectProvider(cp.id)}
+                >
+                  {cp.name}
+                </Button>
               );
             })}
 
@@ -1031,60 +1026,104 @@ export function SettingsPage() {
           </div>
         </div>
 
-        {/* Actions: Save & Test Connection */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "1.25rem", flexWrap: "wrap" }}>
-          <Button
-            type="button"
-            onClick={handleSaveAIConfig}
-            variant="solid"
-            size="xs"
-            pill
-          >
-            <Save size={13} />
-            <span>保存</span>
-          </Button>
-
-          <Button
-            type="button"
-            onClick={handleTestConnection}
-            disabled={isTesting}
-            variant="outline"
-            size="xs"
-            pill
-          >
-            {isTesting ? <Loader2 size={13} className="animate-spin" /> : null}
-            <span>测试连接</span>
-          </Button>
-
-          {saveSuccess && (
-            <span
-              style={{
-                fontSize: "0.8rem",
-                color: "#34d399",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.3rem",
-              }}
+        {/* Actions: Save, Test Connection & Delete Custom Provider */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.75rem",
+            marginTop: "1.25rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+            <Button
+              type="button"
+              onClick={handleSaveAIConfig}
+              variant="solid"
+              size="xs"
+              pill
             >
-              <Check size={14} />
-              已保存
-            </span>
-          )}
+              <Save size={13} />
+              <span>保存</span>
+            </Button>
 
-          {testResult && (
-            <span
-              style={{
-                fontSize: "0.8rem",
-                color: testResult.success ? "#34d399" : "#f87171",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.3rem",
-              }}
+            <Button
+              type="button"
+              onClick={handleTestConnection}
+              disabled={isTesting}
+              variant="outline"
+              size="xs"
+              pill
             >
-              {testResult.success ? <Check size={14} /> : <AlertCircle size={14} />}
-              {testResult.message}
-            </span>
-          )}
+              {isTesting ? <Loader2 size={13} className="animate-spin" /> : null}
+              <span>测试连接</span>
+            </Button>
+
+            {saveSuccess && (
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: "#34d399",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                }}
+              >
+                <Check size={14} />
+                已保存
+              </span>
+            )}
+
+            {testResult && (
+              <span
+                style={{
+                  fontSize: "0.8rem",
+                  color: testResult.success ? "#34d399" : "#f87171",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
+                }}
+              >
+                {testResult.success ? <Check size={14} /> : <AlertCircle size={14} />}
+                {testResult.message}
+              </span>
+            )}
+          </div>
+
+          {(() => {
+            const activeCustom = (aiConfig.customProviders || []).find((c) => c.id === aiConfig.provider);
+            if (!activeCustom) return null;
+            return (
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                pill
+                onClick={async () => {
+                  const ok = await confirmAction({
+                    title: "删除自定义供应商",
+                    message: `确定要删除「${activeCustom.name}」吗？其对应的 API Key 与缓存模型也将一并移除。`,
+                    confirmLabel: "删除",
+                    destructive: true,
+                  });
+                  if (ok) {
+                    deleteCustomProvider(activeCustom.id);
+                    toast.info(`已删除供应商「${activeCustom.name}」`);
+                  }
+                }}
+                title="删除此自定义供应商"
+                style={{
+                  color: "var(--danger)",
+                  borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)",
+                }}
+              >
+                <Trash2 size={13} />
+                <span>删除供应商</span>
+              </Button>
+            );
+          })()}
         </div>
       </div>
 
@@ -1104,107 +1143,89 @@ export function SettingsPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-          {/* Prompt 1: Categorization Rules Generator */}
-          <div
-            style={{
-              padding: "0.85rem 1rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.55rem",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-              <div style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--text-main)" }}>
-                1. 规则生成助手 (System Prompt)
+          {(
+            [
+              {
+                key: "rulesGeneratorPrompt",
+                title: "1. 规则生成助手 (System Prompt)",
+                defaultVal: DEFAULT_RULES_GENERATOR_PROMPT,
+                placeholder: "规则生成助手提示词...",
+                rows: 6,
+              },
+              {
+                key: "architectPrompt",
+                title: "2. AI 架构师 - 全量方案 (System Prompt)",
+                defaultVal: DEFAULT_AI_ARCHITECT_PROMPT,
+                placeholder: "AI 架构师全量方案提示词...",
+                rows: 6,
+              },
+              {
+                key: "architectDiagnosisPrompt",
+                title: "3. AI 架构师 - 前置轻诊断与方向反问",
+                defaultVal: DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT,
+                placeholder: "AI 架构师轻诊断提示词...",
+                rows: 5,
+              },
+              {
+                key: "architectRefinementPrompt",
+                title: "4. AI 架构师 - 多轮精准微调",
+                defaultVal: DEFAULT_ARCHITECT_REFINEMENT_PROMPT,
+                placeholder: "AI 架构师多轮微调提示词...",
+                rows: 5,
+              },
+            ] as const
+          ).map((item) => (
+            <div
+              key={item.key}
+              style={{
+                padding: "0.85rem 1rem",
+                borderRadius: "var(--radius-btn, 6px)",
+                backgroundColor: "var(--bg-subtle)",
+                border: "1px solid var(--border-subtle)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.55rem",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--text-main)" }}>
+                  {item.title}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  pill
+                  onClick={() => resetAIPrompt(item.key)}
+                  title="恢复默认"
+                >
+                  <RotateCcw size={12} />
+                  <span>恢复默认</span>
+                </Button>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                pill
-                onClick={() => resetAIPrompt("rulesGeneratorPrompt")}
-                title="恢复默认"
-              >
-                <RotateCcw size={12} />
-                <span>恢复默认</span>
-              </Button>
+              <textarea
+                rows={item.rows}
+                value={aiPrompts?.[item.key] || item.defaultVal}
+                onChange={(e) => setAIPrompt(item.key, e.target.value)}
+                placeholder={item.placeholder}
+                style={{
+                  width: "100%",
+                  padding: "0.55rem 0.75rem",
+                  borderRadius: "var(--radius-btn, 6px)",
+                  backgroundColor: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
+                  color: "var(--text-main)",
+                  fontSize: "0.78rem",
+                  lineHeight: "1.45",
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  outline: "none",
+                  resize: "vertical",
+                }}
+              />
             </div>
-
-            <textarea
-              rows={6}
-              value={aiPrompts?.rulesGeneratorPrompt || DEFAULT_RULES_GENERATOR_PROMPT}
-              onChange={(e) => setAIPrompt("rulesGeneratorPrompt", e.target.value)}
-              placeholder="规则生成助手提示词..."
-              style={{
-                width: "100%",
-                padding: "0.55rem 0.75rem",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-main)",
-                fontSize: "0.78rem",
-                lineHeight: "1.45",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                outline: "none",
-                resize: "vertical",
-              }}
-            />
-          </div>
-
-          {/* Prompt 2: AI Architect Reorganization Prompt */}
-          <div
-            style={{
-              padding: "0.85rem 1rem",
-              borderRadius: "var(--radius-btn, 6px)",
-              backgroundColor: "var(--bg-subtle)",
-              border: "1px solid var(--border-subtle)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.55rem",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-              <div style={{ fontSize: "0.84rem", fontWeight: 600, color: "var(--text-main)" }}>
-                2. AI 架构师 (System Prompt)
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                pill
-                onClick={() => resetAIPrompt("architectPrompt")}
-                title="恢复默认"
-              >
-                <RotateCcw size={12} />
-                <span>恢复默认</span>
-              </Button>
-            </div>
-
-            <textarea
-              rows={6}
-              value={aiPrompts?.architectPrompt || DEFAULT_AI_ARCHITECT_PROMPT}
-              onChange={(e) => setAIPrompt("architectPrompt", e.target.value)}
-              placeholder="AI 架构师提示词..."
-              style={{
-                width: "100%",
-                padding: "0.55rem 0.75rem",
-                borderRadius: "var(--radius-btn, 6px)",
-                backgroundColor: "var(--bg-card)",
-                border: "1px solid var(--border-subtle)",
-                color: "var(--text-main)",
-                fontSize: "0.78rem",
-                lineHeight: "1.45",
-                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                outline: "none",
-                resize: "vertical",
-              }}
-            />
-          </div>
+          ))}
         </div>
       </div>
 

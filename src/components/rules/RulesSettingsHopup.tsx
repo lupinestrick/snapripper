@@ -5,6 +5,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useConfigStore, RulesLayoutMode } from "@/store/useConfigStore";
+import { confirmAction, toast } from "@/store/useFeedbackStore";
 import { DEFAULT_RULES_SETTINGS, RulePreviewStats } from "@/services/ruleEngine";
 import {
   X,
@@ -62,9 +63,16 @@ export function RulesSettingsHopup({
     setRulesSettings({ rules: updated });
   };
 
-  const handleResetDefaultRules = () => {
-    if (confirm("确定恢复为默认预设规则列表？当前自定义规则将被替换。")) {
+  const handleResetDefaultRules = async () => {
+    const confirmed = await confirmAction({
+      title: "恢复默认规则",
+      message: "确定恢复为默认预设规则列表？当前自定义规则将被替换。",
+      confirmLabel: "恢复默认",
+      destructive: true,
+    });
+    if (confirmed) {
       setRulesSettings({ rules: DEFAULT_RULES_SETTINGS.rules });
+      toast.success("已恢复默认预设规则");
     }
   };
 

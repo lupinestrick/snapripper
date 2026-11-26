@@ -8,6 +8,9 @@ import {
   ReorganizationCategory,
   TabMicroCluster,
   ArchitectDirectionChip,
+  AIMergeReport,
+  AIMergeReportItem,
+  AIMergeCategorySummary,
 } from "@/types/ai";
 import { extractDomain, isExemptUrl } from "@/utils/urlHelper";
 import {
@@ -16,7 +19,11 @@ import {
   sendAIConversationRequest,
   repairJSONString,
 } from "./aiService";
-import { DEFAULT_AI_ARCHITECT_PROMPT } from "@/constants/aiPrompts";
+import {
+  DEFAULT_AI_ARCHITECT_PROMPT,
+  DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT,
+  DEFAULT_ARCHITECT_REFINEMENT_PROMPT,
+} from "@/constants/aiPrompts";
 import {
   reorganizeTreeIntoCategories,
   reorganizeTabsIntoPanels,
@@ -50,39 +57,76 @@ export function generateSnapshotDiagnosticSummary(
   return formatClusterReportForPrompt(report);
 }
 
-function extractSchemesFromAIResponse(rawResponse: string): {
+function tryParseSchemesCandidate(rawJson: string): ReorganizationScheme[] | undefined {
+  const attempt = (input: string): ReorganizationScheme[] | undefined => {
+    const parsed = JSON.parse(input);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return normalizeSchemes(parsed);
+    }
+    if (parsed && typeof parsed === "object") {
+      if (Array.isArray(parsed.schemes) && parsed.schemes.length > 0) {
+        return normalizeSchemes(parsed.schemes);
+      }
+      if (Array.isArray(parsed.data) && parsed.data.length > 0) {
+        return normalizeSchemes(parsed.data);
+      }
+      if (Array.isArray(parsed.categories) && parsed.categories.length > 0) {
+        return normalizeSchemes([parsed]);
+      }
+    }
+    return undefined;
+  };
+
+  try {
+    return attempt(rawJson);
+  } catch {
+    try {
+      return attempt(repairJSONString(rawJson));
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+export function extractSchemesFromAIResponse(rawResponse: string): {
   schemes?: ReorganizationScheme[];
   cleanedText: string;
 } {
-  // 剥离推理模型 <think>...</think> 避免干扰 JSON 匹配
+  // Strip <think>...</think> reasoning blocks (DeepSeek-R1 / Qwen-QwQ / Gemini Thinking)
   const withoutThink = rawResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
-  const fencedMatch = withoutThink.match(/```(?:json)?\s*(\[\s*\{[\s\S]*?\}\s*\])\s*```/);
-  const candidateJson = fencedMatch?.[1] || withoutThink.match(/(\[\s*\{[\s\S]*\}\s*\])/)?.[1];
+  const fenceMatches = Array.from(
+    withoutThink.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/gi)
+  );
 
   let schemes: ReorganizationScheme[] | undefined;
-  if (candidateJson) {
-    try {
-      const parsed = JSON.parse(candidateJson);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        schemes = normalizeSchemes(parsed);
-      }
-    } catch {
-      try {
-        const repaired = repairJSONString(candidateJson);
-        const parsed = JSON.parse(repaired);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          schemes = normalizeSchemes(parsed);
-        }
-      } catch {
-        // ignore malformed fallback
-      }
+  let matchedRawBlock: string | null = null;
+
+  // Prefer the last valid JSON code fence (prompt requires JSON block at the end)
+  for (let i = fenceMatches.length - 1; i >= 0; i--) {
+    const candidate = fenceMatches[i][1]?.trim();
+    if (!candidate) continue;
+    const parsed = tryParseSchemesCandidate(candidate);
+    if (parsed) {
+      schemes = parsed;
+      matchedRawBlock = fenceMatches[i][0];
+      break;
     }
   }
 
-  const cleanedText = withoutThink
-    .replace(/```(?:json)?\s*\[\s*\{[\s\S]*?\}\s*\]\s*```/g, "")
-    .trim();
+  if (!schemes) {
+    const fallbackMatch =
+      withoutThink.match(/(\[\s*\{[\s\S]*\}\s*\])/) ||
+      withoutThink.match(/(\{\s*"schemes"\s*:[\s\S]*\})/);
+    if (fallbackMatch?.[1]) {
+      schemes = tryParseSchemesCandidate(fallbackMatch[1]);
+      if (schemes) matchedRawBlock = fallbackMatch[1];
+    }
+  }
+
+  const cleanedText = matchedRawBlock
+    ? withoutThink.replace(matchedRawBlock, "").trim()
+    : withoutThink.replace(/```(?:json)?\s*\[\s*\{[\s\S]*?\}\s*\]\s*```/g, "").trim();
 
   return { schemes, cleanedText };
 }
@@ -114,22 +158,7 @@ export const DEFAULT_ARCHITECT_DIRECTION_CHIPS: ArchitectDirectionChip[] = [
   },
 ];
 
-export const ARCHITECT_DIAGNOSIS_PROMPT = `你是一位资深的浏览器标签页信息架构师。现在请先对用户的 Sidebery 快照微簇聚类摘要进行【轻量诊断与反问引导】，暂不生成完整重构方案 JSON。
-
-请输出：
-1. 用 3~5 条简明要点总结当前标签库的分布特征、主要冗余/混乱点。
-2. 提出 1~2 个关键反问，帮助用户明确整理方向。
-3. 在回复末尾附带一个 \`\`\`json 代码块，包含 3~4 个贴合当前快照内容的可选整理方向数组，格式严格如下：
-\`\`\`json
-[
-  {
-    "id": "dir_1",
-    "label": "简短方向名称(4~8字)",
-    "description": "一句话说明效果",
-    "prompt": "用户点击该方向后发送给 AI 生成完整重构方案的明确指令"
-  }
-]
-\`\`\``;
+export const ARCHITECT_DIAGNOSIS_PROMPT = DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT;
 
 export function extractDiagnosisChipsFromResponse(rawResponse: string): {
   chips: ArchitectDirectionChip[];
@@ -190,14 +219,15 @@ export function extractDiagnosisChipsFromResponse(rawResponse: string): {
 export async function sendArchitectDiagnosisRequest(
   config: AIConfig,
   contextData: ClusterCompressionReport,
-  options?: AICallOptions
+  options?: AICallOptions & { customSystemPrompt?: string }
 ): Promise<{ text: string; chips: ArchitectDirectionChip[] }> {
   const clusterDigest = formatClusterReportForPrompt(contextData);
-  const fullSystemPrompt = `${ARCHITECT_DIAGNOSIS_PROMPT}\n\n【当前 Sidebery 快照微簇聚类摘要 (JSON)】:\n${clusterDigest}`;
+  const basePrompt = options?.customSystemPrompt?.trim() || DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT;
+  const fullSystemPrompt = `${basePrompt}\n\n【当前 Sidebery 快照微簇聚类摘要 (JSON)】:\n${clusterDigest}`;
   const rawResponse = await sendAIConversationRequest(
     config,
     fullSystemPrompt,
-    [{ role: "user", content: "请先帮我诊断当前快照的主要结构问题，并给出可选的整理方向。" }],
+    [{ role: "user", content: "请极简犀利地诊断当前快照主要结构痛点，并给出可选整理方向。" }],
     options
   );
   const { chips, cleanedText } = extractDiagnosisChipsFromResponse(rawResponse);
@@ -205,16 +235,61 @@ export async function sendArchitectDiagnosisRequest(
 }
 
 /**
- * 与 AI 智能架构师进行原生多轮对话交互：发送全量微簇摘要与历史消息，返回回复与微簇映射方案
+ * 构建用于多轮微调的轻量方案状态骨架（还原被剥离 JSON 后的当前方案状态）
+ */
+export function buildSchemeStateDigest(
+  schemes: ReorganizationScheme[],
+  clusterReport?: ClusterCompressionReport
+): string {
+  const allClusterIds = new Set(clusterReport?.clusters.map((c) => c.id) || []);
+
+  const compactSchemes = schemes.map((s) => {
+    const assigned = new Set<string>();
+    const categories = s.categories.map((c) => {
+      const cids = c.clusterIds || [];
+      cids.forEach((id) => assigned.add(id));
+      return {
+        name: c.name,
+        clusterIds: cids,
+      };
+    });
+    const excluded = s.excludedClusterIds || [];
+    excluded.forEach((id) => assigned.add(id));
+    const unassignedClusterIds = Array.from(allClusterIds).filter((id) => !assigned.has(id));
+
+    return {
+      id: s.id,
+      name: s.name,
+      targetMode: s.targetMode || "tree",
+      categories,
+      ...(excluded.length > 0 ? { excludedClusterIds: excluded } : {}),
+      ...(unassignedClusterIds.length > 0 ? { unassignedClusterIds } : {}),
+    };
+  });
+
+  return JSON.stringify(compactSchemes, null, 2);
+}
+
+export interface ArchitectChatOptions extends AICallOptions {
+  mode?: "architect" | "refine";
+  activeSchemes?: ReorganizationScheme[];
+  customRefinementPrompt?: string;
+}
+
+/**
+ * 与 AI 智能架构师进行原生多轮对话交互：发送全量微簇摘要、当前方案骨架（微调模式）与历史消息
  */
 export async function sendArchitectChatRequest(
   config: AIConfig,
   messages: { role: "user" | "assistant" | "system"; content: string }[],
   contextData?: ClusterCompressionReport | string,
   customSystemPrompt?: string,
-  options?: AICallOptions
+  options?: ArchitectChatOptions
 ): Promise<{ text: string; schemes?: ReorganizationScheme[] }> {
-  const baseSystemPrompt = customSystemPrompt?.trim() || DEFAULT_AI_ARCHITECT_PROMPT;
+  const isRefine = options?.mode === "refine" && (options.activeSchemes?.length || 0) > 0;
+  const baseSystemPrompt = isRefine
+    ? options?.customRefinementPrompt?.trim() || DEFAULT_ARCHITECT_REFINEMENT_PROMPT
+    : customSystemPrompt?.trim() || DEFAULT_AI_ARCHITECT_PROMPT;
 
   const clusterDigest =
     typeof contextData === "string"
@@ -223,9 +298,17 @@ export async function sendArchitectChatRequest(
         ? formatClusterReportForPrompt(contextData)
         : undefined;
 
+  const stateSection =
+    isRefine && options?.activeSchemes
+      ? `\n\n【当前方案状态骨架 (JSON)】:\n${buildSchemeStateDigest(
+          options.activeSchemes,
+          typeof contextData === "object" ? contextData : undefined
+        )}`
+      : "";
+
   const fullSystemPrompt = clusterDigest
-    ? `${baseSystemPrompt}\n\n【当前 Sidebery 快照全量微簇聚类摘要 (JSON)】:\n${clusterDigest}`
-    : baseSystemPrompt;
+    ? `${baseSystemPrompt}${stateSection}\n\n【当前 Sidebery 快照全量微簇聚类摘要 (JSON)】:\n${clusterDigest}`
+    : `${baseSystemPrompt}${stateSection}`;
 
   const turns: AIChatTurn[] = messages
     .filter((m) => m.role === "user" || m.role === "assistant")
@@ -238,7 +321,7 @@ export async function sendArchitectChatRequest(
   const { schemes, cleanedText } = extractSchemesFromAIResponse(rawResponse);
 
   return {
-    text: cleanedText || "已完成全量微簇诊断并生成重构方案，请在下方卡片勾选调整微簇后预览 DIFF：",
+    text: cleanedText || "已完成微簇架构生成，请查看下方方案或微调微簇后预览 DIFF：",
     schemes,
   };
 }
@@ -384,6 +467,7 @@ export function applySchemeToSnapshot(
   const categoriesDef = scheme.categories.map((c, i) => ({
     id: `cat_${i}_${Date.now()}`,
     name: c.name,
+    panelName: c.targetPanelName || c.name,
     color: c.color || CATEGORY_PALETTE[i % CATEGORY_PALETTE.length],
   }));
 
@@ -715,4 +799,115 @@ export function getFallbackSchemes(
       targetMode: "tree",
     },
   ];
+}
+
+/**
+ * 对比 AIProcessedCache 的前后快照，生成结构化合并变更报告（含每个标签的原面板 -> 目标面板/分类索引）
+ */
+export function buildAIMergeReport(cache: AIProcessedCache): AIMergeReport {
+  const origPanels = cache.originalSnapshot.panels || {};
+  const procPanels = cache.processedSnapshot.panels || {};
+  const getPanelName = (pId: string, panelsObj: Record<string, any>) =>
+    panelsObj[pId]?.name || (pId === "main" ? "主面板" : pId);
+
+  const origTabPanelMap = new Map<string, string>();
+  for (const win of Object.values(cache.originalSnapshot.windows || {})) {
+    for (const tab of win.tabs || []) {
+      origTabPanelMap.set(String(tab.id), tab.panelId || "main");
+    }
+  }
+
+  const items: AIMergeReportItem[] = [];
+  const catMap = new Map<
+    string,
+    {
+      categoryName: string;
+      targetPanelId: string;
+      targetPanelName: string;
+      tabCount: number;
+      movedAcrossPanelsCount: number;
+      sampleTitles: string[];
+    }
+  >();
+
+  let movedAcrossPanelsCount = 0;
+  let categorizedCount = 0;
+
+  for (const win of Object.values(cache.processedSnapshot.windows || {})) {
+    const tabs = win.tabs || [];
+    const tabById = new Map<string, SideberyTab>();
+    for (const t of tabs) {
+      tabById.set(String(t.id), t);
+    }
+
+    for (const tab of tabs) {
+      const idStr = String(tab.id);
+      // 跳过新合成的分类/Group 占位标题节点
+      if (idStr.startsWith("group_") || idStr.startsWith("cat_header_")) continue;
+
+      const fromPanelId = origTabPanelMap.get(idStr) || tab.panelId || "main";
+      const toPanelId = tab.panelId || "main";
+      const fromPanelName = getPanelName(fromPanelId, origPanels);
+      const toPanelName = getPanelName(toPanelId, procPanels);
+
+      let toCategoryName = cache.classificationMap[idStr] || "";
+      if (!toCategoryName && tab.parentId !== undefined && tab.parentId !== -1) {
+        const parent = tabById.get(String(tab.parentId));
+        if (parent && (parent.isGroup || String(parent.id).startsWith("cat_header_"))) {
+          toCategoryName = parent.title || "";
+        }
+      }
+      if (!toCategoryName) {
+        toCategoryName = "保持原位";
+      } else {
+        categorizedCount++;
+      }
+
+      const moved = fromPanelId !== toPanelId;
+      if (moved) movedAcrossPanelsCount++;
+
+      items.push({
+        tabId: tab.id,
+        title: tab.title || tab.url,
+        url: tab.url,
+        domain: extractDomain(tab.url),
+        fromPanelId,
+        fromPanelName,
+        toPanelId,
+        toPanelName,
+        toCategoryName,
+      });
+
+      const catKey = `${toCategoryName}::${toPanelId}`;
+      const existing = catMap.get(catKey) || {
+        categoryName: toCategoryName,
+        targetPanelId: toPanelId,
+        targetPanelName: toPanelName,
+        tabCount: 0,
+        movedAcrossPanelsCount: 0,
+        sampleTitles: [],
+      };
+      existing.tabCount++;
+      if (moved) existing.movedAcrossPanelsCount++;
+      if (existing.sampleTitles.length < 3 && tab.title) {
+        existing.sampleTitles.push(tab.title.trim().slice(0, 40));
+      }
+      catMap.set(catKey, existing);
+    }
+  }
+
+  const categories: AIMergeCategorySummary[] = Array.from(catMap.values()).sort(
+    (a, b) => b.tabCount - a.tabCount
+  );
+
+  return {
+    id: `merge_report_${Date.now()}`,
+    timestamp: Date.now(),
+    totalTabs: items.length,
+    categorizedCount,
+    movedAcrossPanelsCount,
+    unchangedCount: Math.max(0, items.length - categorizedCount),
+    categories,
+    items,
+  };
 }

@@ -18,7 +18,8 @@ import {
   getOrderedModelsForSlot,
   getProviderMeta,
 } from "@/services/aiService";
-import { AddProviderModal } from "./AddProviderModal";
+import { confirmAction, toast } from "@/store/useFeedbackStore";
+import { AddProviderForm } from "./AddProviderModal";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import {
   ChevronDown,
   ChevronRight,
   RotateCcw,
+  ArrowLeft,
 } from "lucide-react";
 
 export type AIModelSettingsTab = "dropdown" | "api" | "architect" | "limits";
@@ -72,6 +74,7 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
   useEffect(() => {
     if (isOpen) {
       setActiveTab(initialTab);
+      setAddProviderOpen(false);
     }
   }, [isOpen, initialTab]);
   const [customPinInput, setCustomPinInput] = useState("");
@@ -92,7 +95,6 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
   const visibleProviders = dropdownCfg.visibleProviders?.length
     ? dropdownCfg.visibleProviders.filter((id) => allProviderIds.includes(id))
     : allProviderIds;
-  const maxDropdownModels = dropdownCfg.maxDropdownModels || 8;
 
   const slot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
   const activeMeta = getProviderMeta(aiConfig, aiConfig.provider);
@@ -188,10 +190,32 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                <SlidersHorizontal size={15} style={{ color: "var(--accent)" }} />
-                <Dialog.Title style={{ fontSize: "0.94rem", fontWeight: 600 }}>
-                  AI 架构师与模型设置
-                </Dialog.Title>
+                {addProviderOpen ? (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      pill
+                      onClick={() => setAddProviderOpen(false)}
+                      style={{ padding: "4px 6px" }}
+                      title="返回模型设置"
+                    >
+                      <ArrowLeft size={14} />
+                    </Button>
+                    <Plus size={15} style={{ color: "var(--accent)" }} />
+                    <Dialog.Title style={{ fontSize: "0.94rem", fontWeight: 600 }}>
+                      添加自定义供应商
+                    </Dialog.Title>
+                  </>
+                ) : (
+                  <>
+                    <SlidersHorizontal size={15} style={{ color: "var(--accent)" }} />
+                    <Dialog.Title style={{ fontSize: "0.94rem", fontWeight: 600 }}>
+                      AI 架构师与模型设置
+                    </Dialog.Title>
+                  </>
+                )}
               </div>
               <Dialog.CloseTrigger asChild>
                 <Button variant="ghost" size="xs" pill onClick={onClose} style={{ padding: "4px" }}>
@@ -200,16 +224,30 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
               </Dialog.CloseTrigger>
             </div>
 
-            {/* Segmented Tab Switcher */}
-            <div
-              style={{
-                padding: "0.6rem 1.2rem",
-                borderBottom: "1px solid var(--border-subtle)",
-                backgroundColor: "var(--bg-surface)",
-                display: "flex",
-                gap: "0.4rem",
-              }}
-            >
+            {addProviderOpen ? (
+              <AddProviderForm
+                isActive={isOpen && addProviderOpen}
+                onCancel={() => setAddProviderOpen(false)}
+                onSuccess={() => {
+                  setAddProviderOpen(false);
+                  setActiveTab("api");
+                  setTestResult(null);
+                  setFetchStatus(null);
+                  setIsSearchingApiModels(false);
+                }}
+              />
+            ) : (
+              <>
+                {/* Segmented Tab Switcher */}
+                <div
+                  style={{
+                    padding: "0.6rem 1.2rem",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-surface)",
+                    display: "flex",
+                    gap: "0.4rem",
+                  }}
+                >
               <Button
                 type="button"
                 variant={activeTab === "dropdown" ? "subtle" : "ghost"}
@@ -297,60 +335,7 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
                     </div>
                   </div>
 
-                  {/* 2. Max Dropdown Models Count */}
-                  <div
-                    style={{
-                      borderTop: "1px solid var(--border-subtle)",
-                      paddingTop: "0.95rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: "0.75rem",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>下拉菜单显示模型数量</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      {[5, 8, 12, 20].map((num) => (
-                        <button
-                          key={num}
-                          type="button"
-                          onClick={() => setAIDropdownSettings({ maxDropdownModels: num })}
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: "9999px",
-                            fontSize: "0.72rem",
-                            border: "1px solid",
-                            borderColor:
-                              maxDropdownModels === num
-                                ? "var(--accent-border)"
-                                : "var(--border-subtle)",
-                            backgroundColor:
-                              maxDropdownModels === num ? "var(--accent-subtle)" : "transparent",
-                            color:
-                              maxDropdownModels === num ? "var(--accent-text)" : "var(--text-muted)",
-                            cursor: "pointer",
-                          }}
-                        >
-                          {num}
-                        </button>
-                      ))}
-                      <Input
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={maxDropdownModels}
-                        onChange={(e) =>
-                          setAIDropdownSettings({
-                            maxDropdownModels: Math.max(1, Math.min(50, parseInt(e.target.value) || 8)),
-                          })
-                        }
-                        style={{ width: "58px", textAlign: "center", fontSize: "0.75rem", padding: "0.2rem" }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 3. Pinned Models Management */}
+                  {/* 2. Pinned Models Management */}
                   <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "0.95rem" }}>
                     <div
                       style={{
@@ -486,37 +471,22 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
                       {allProviderIds.map((pKey) => {
                         const active = aiConfig.provider === pKey;
                         const meta = getProviderMeta(aiConfig, pKey);
-                        const isCustomItem = (aiConfig.customProviders || []).some((c) => c.id === pKey);
                         return (
-                          <div key={pKey} style={{ display: "inline-flex", alignItems: "center", gap: "2px" }}>
-                            <Button
-                              type="button"
-                              variant={active ? "solid" : "outline"}
-                              size="xs"
-                              pill
-                              onClick={() => {
-                                switchAIProvider(pKey);
-                                setTestResult(null);
-                                setFetchStatus(null);
-                                setIsSearchingApiModels(false);
-                              }}
-                            >
-                              {meta.name}
-                            </Button>
-                            {isCustomItem && active && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="xs"
-                                pill
-                                onClick={() => deleteCustomProvider(pKey)}
-                                title="删除自定义供应商"
-                                style={{ padding: "3px", color: "var(--danger)" }}
-                              >
-                                <Trash2 size={12} />
-                              </Button>
-                            )}
-                          </div>
+                          <Button
+                            key={pKey}
+                            type="button"
+                            variant={active ? "solid" : "outline"}
+                            size="xs"
+                            pill
+                            onClick={() => {
+                              switchAIProvider(pKey);
+                              setTestResult(null);
+                              setFetchStatus(null);
+                              setIsSearchingApiModels(false);
+                            }}
+                          >
+                            {meta.name}
+                          </Button>
                         );
                       })}
                       <Button
@@ -655,31 +625,62 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      pill
-                      onClick={handleTestConnection}
-                      disabled={isTesting}
-                    >
-                      {isTesting && <Loader2 size={12} className="animate-spin" />}
-                      <span>测试连接</span>
-                    </Button>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        pill
+                        onClick={handleTestConnection}
+                        disabled={isTesting}
+                      >
+                        {isTesting && <Loader2 size={12} className="animate-spin" />}
+                        <span>测试连接</span>
+                      </Button>
 
-                    {testResult && (
-                      <span
+                      {testResult && (
+                        <span
+                          style={{
+                            fontSize: "0.74rem",
+                            color: testResult.success ? "var(--success)" : "var(--danger)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.25rem",
+                          }}
+                        >
+                          {testResult.success ? <Check size={12} /> : <AlertCircle size={12} />}
+                          {testResult.message}
+                        </span>
+                      )}
+                    </div>
+
+                    {activeCustom && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        pill
+                        onClick={async () => {
+                          const ok = await confirmAction({
+                            title: "删除自定义供应商",
+                            message: `确定要删除「${activeCustom.name}」吗？其对应的 API Key 与缓存模型也将一并移除。`,
+                            confirmLabel: "删除",
+                            destructive: true,
+                          });
+                          if (ok) {
+                            deleteCustomProvider(activeCustom.id);
+                            toast.info(`已删除供应商「${activeCustom.name}」`);
+                          }
+                        }}
+                        title="删除此自定义供应商"
                         style={{
-                          fontSize: "0.74rem",
-                          color: testResult.success ? "var(--success)" : "var(--danger)",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "0.25rem",
+                          color: "var(--danger)",
+                          borderColor: "color-mix(in srgb, var(--danger) 40%, transparent)",
                         }}
                       >
-                        {testResult.success ? <Check size={12} /> : <AlertCircle size={12} />}
-                        {testResult.message}
-                      </span>
+                        <Trash2 size={12} />
+                        <span>删除供应商</span>
+                      </Button>
                     )}
                   </div>
                 </>
@@ -1027,25 +1028,25 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
               )}
             </div>
 
-            {/* Footer */}
-            <div
-              style={{
-                padding: "0.75rem 1.2rem",
-                borderTop: "1px solid var(--border-subtle)",
-                backgroundColor: "var(--bg-surface)",
-                display: "flex",
-                justifyContent: "flex-end",
-              }}
-            >
-              <Button variant="solid" size="xs" pill onClick={onClose}>
-                完成
-              </Button>
-            </div>
+                {/* Footer */}
+                <div
+                  style={{
+                    padding: "0.75rem 1.2rem",
+                    borderTop: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-surface)",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <Button variant="solid" size="xs" pill onClick={onClose}>
+                    完成
+                  </Button>
+                </div>
+              </>
+            )}
           </Dialog.Content>
         </Dialog.Positioner>
       </Dialog.Root>
-
-      <AddProviderModal isOpen={addProviderOpen} onClose={() => setAddProviderOpen(false)} />
     </>
   );
 }

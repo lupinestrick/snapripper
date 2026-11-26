@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { toast } from "@/store/useFeedbackStore";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +66,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
         const content = event.target?.result as string;
         loadSnapshot(content, file.name);
       } catch (err: any) {
-        alert(err.message || "读取文件失败");
+        toast.error(err.message || "读取文件失败");
       }
     };
     reader.readAsText(file);

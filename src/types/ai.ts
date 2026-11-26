@@ -240,6 +240,38 @@ export interface ArchitectDirectionChip {
   description?: string;
 }
 
+export interface AIMergeReportItem {
+  tabId: string | number;
+  title: string;
+  url: string;
+  domain: string;
+  fromPanelId: string;
+  fromPanelName: string;
+  toPanelId: string;
+  toPanelName: string;
+  toCategoryName: string;
+}
+
+export interface AIMergeCategorySummary {
+  categoryName: string;
+  targetPanelId: string;
+  targetPanelName: string;
+  tabCount: number;
+  movedAcrossPanelsCount: number;
+  sampleTitles: string[];
+}
+
+export interface AIMergeReport {
+  id: string;
+  timestamp: number;
+  totalTabs: number;
+  categorizedCount: number;
+  movedAcrossPanelsCount: number;
+  unchangedCount: number;
+  categories: AIMergeCategorySummary[];
+  items: AIMergeReportItem[];
+}
+
 export interface AIChatMessage {
   id: string;
   sender: "user" | "assistant" | "system";
@@ -247,6 +279,7 @@ export interface AIChatMessage {
   text: string;
   schemes?: ReorganizationScheme[];
   directionChips?: ArchitectDirectionChip[];
+  mergeReport?: AIMergeReport;
   clusterReport?: ClusterCompressionReport;
   appliedSchemeId?: string;
 }

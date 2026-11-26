@@ -10,7 +10,10 @@ import { AIPage } from "@/components/ai/AIPage";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import { ExportDialog } from "@/components/export/ExportDialog";
 import { AIDiffModal } from "@/components/ai/AIDiffModal";
+import { AIMergeReportModal } from "@/components/ai/AIMergeReportModal";
 import { OverviewHopup } from "@/components/layout/OverviewHopup";
+import { FeedbackHost } from "@/components/ui/FeedbackHost";
+import { toast } from "@/store/useFeedbackStore";
 import { Button } from "@/components/ui/button";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
@@ -23,6 +26,8 @@ export default function WorkbenchPage() {
     loadSnapshot,
     isAIDiffModalOpen,
     setIsAIDiffModalOpen,
+    activeMergeReport,
+    setActiveMergeReport,
     isOverviewHopupOpen,
     setIsOverviewHopupOpen,
   } = useSnapshotStore();
@@ -73,7 +78,7 @@ export default function WorkbenchPage() {
         const content = event.target?.result as string;
         loadSnapshot(content, file.name);
       } catch (err: any) {
-        alert(err.message || "读取文件失败");
+        toast.error(err.message || "读取文件失败");
       }
     };
     reader.readAsText(file);
@@ -166,7 +171,13 @@ export default function WorkbenchPage() {
 
       <ExportDialog isOpen={exportDialogOpen} onClose={() => setExportDialogOpen(false)} />
       <AIDiffModal isOpen={isAIDiffModalOpen} onClose={() => setIsAIDiffModalOpen(false)} />
+      <AIMergeReportModal
+        isOpen={Boolean(activeMergeReport)}
+        report={activeMergeReport}
+        onClose={() => setActiveMergeReport(null)}
+      />
       <OverviewHopup isOpen={isOverviewHopupOpen} onClose={() => setIsOverviewHopupOpen(false)} />
+      <FeedbackHost />
     </div>
   );
 }

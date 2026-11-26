@@ -10,6 +10,7 @@ import {
   parseAIRulesFromResponse,
   buildUnmatchedSnapshotContext,
 } from "../src/services/ruleEngine";
+import { buildAIMergeReport } from "../src/services/aiArchitectEngine";
 import { buildTabTree } from "../src/services/snapshotParser";
 import { determineTargetPanelForCategory } from "../src/services/treeOperations";
 import { isGroupTab, getGroupTitle } from "../src/services/snapshotParser";
@@ -20,10 +21,13 @@ import {
   getFallbackSchemes,
   computeSchemeCoverage,
   extractDiagnosisChipsFromResponse,
+  extractSchemesFromAIResponse,
+  buildSchemeStateDigest,
 } from "../src/services/aiArchitectEngine";
 import {
   clusterSnapshotTabs,
   tokenizeTabText,
+  formatClusterReportForPrompt,
 } from "../src/services/tabClusterEngine";
 import { INITIAL_ARCHITECT_ANALYSIS_PROMPT, DEFAULT_AI_ARCHITECT_PROMPT } from "../src/constants/aiPrompts";
 import {
@@ -1146,6 +1150,187 @@ Based on your tabs, here is the distribution:
       unmatchedCtx.unmatchedCount === 1 &&
       unmatchedCtx.topUnmatchedDomains[0]?.domain === "news.ycombinator.com",
     "buildUnmatchedSnapshotContext identifies unmatched domains accurately"
+  );
+
+  const mergeReport = buildAIMergeReport({
+    originalSnapshot: {
+      windows: {
+        "1": {
+          id: "1",
+          tabs: [
+            { id: 10, title: "Repo", url: "https://github.com/a/b", panelId: "p1", lvl: 0 } as any,
+          ],
+        },
+      },
+      panels: {
+        p1: { id: "p1", name: "收件箱" } as any,
+        p2: { id: "p2", name: "开发" } as any,
+      },
+    } as any,
+    processedSnapshot: {
+      windows: {
+        "1": {
+          id: "1",
+          tabs: [
+            { id: "group_1", title: "开发组", url: "about:blank", isGroup: true, panelId: "p2", lvl: 0 } as any,
+            { id: 10, title: "Repo", url: "https://github.com/a/b", panelId: "p2", parentId: "group_1", lvl: 1 } as any,
+          ],
+        },
+      },
+      panels: {
+        p1: { id: "p1", name: "收件箱" } as any,
+        p2: { id: "p2", name: "开发" } as any,
+      },
+    } as any,
+    timestamp: Date.now(),
+    categoryNames: ["开发组"],
+    classificationMap: { "10": "开发组" },
+    summary: { total: 1, categorizedCount: 1, uncategorizedCount: 0, categoryCounts: { 开发组: 1 } },
+    targetMode: "panel",
+  });
+  assert(
+    mergeReport.totalTabs === 1 &&
+      mergeReport.categorizedCount === 1 &&
+      mergeReport.movedAcrossPanelsCount === 1 &&
+      mergeReport.items[0].fromPanelName === "收件箱" &&
+      mergeReport.items[0].toPanelName === "开发" &&
+      mergeReport.items[0].toCategoryName === "开发组",
+    "buildAIMergeReport tracks before/after panels and category destination accurately"
+  );
+
+  // --- Test Set 15: Option D Prompt Signals, Robust JSON Extraction & Refinement State Digest ---
+  const promptDigestRaw = formatClusterReportForPrompt({
+    totalTabs: 12,
+    nonExemptCount: 12,
+    exemptProtectedCount: 0,
+    granularity: "balanced",
+    compressionRatio: 75,
+    emptyPanelNames: ["闲置面板"],
+    activePanels: [
+      { id: "p1", name: "工作", count: 7, pct: "58.3%" },
+      { id: "p2", name: "日常", count: 5, pct: "41.7%" },
+    ],
+    treeDepthDistribution: { 0: 8, 1: 2, 2: 2 },
+    clusters: [
+      {
+        id: "c1",
+        labelHint: "GitHub PR",
+        tabIds: ["1", "2", "3"],
+        tabCount: 3,
+        domains: ["github.com"],
+        sampleTitles: ["PR #1"],
+        sourcePanelIds: ["p1"],
+        sourcePanelNames: ["工作"],
+        cohesionReason: "domain_path",
+        keywords: ["pr"],
+      },
+      {
+        id: "c2",
+        labelHint: "GitHub Issues",
+        tabIds: ["4", "5"],
+        tabCount: 2,
+        domains: ["github.com"],
+        sampleTitles: ["Issue #2"],
+        sourcePanelIds: ["p2"],
+        sourcePanelNames: ["日常"],
+        cohesionReason: "domain_path",
+        keywords: ["issue"],
+      },
+      {
+        id: "c3",
+        labelHint: "长尾零散",
+        tabIds: ["6"],
+        tabCount: 1,
+        domains: ["example.org"],
+        sampleTitles: ["Note"],
+        sourcePanelIds: ["p2"],
+        sourcePanelNames: ["日常"],
+        cohesionReason: "tail_misc",
+        keywords: [],
+      },
+    ],
+  });
+  const promptDigest = JSON.parse(promptDigestRaw);
+  assert(
+    promptDigest.overview?.maxTreeDepth === 2 &&
+      promptDigest.overview?.deepNestedTabs === 2 &&
+      promptDigest.crossPanelDomains?.[0]?.domain === "github.com" &&
+      promptDigest.crossPanelDomains?.[0]?.clusterIds?.length === 2,
+    "formatClusterReportForPrompt precomputes crossPanelDomains and tree depth summary"
+  );
+
+  const wrappedSchemesParsed = extractSchemesFromAIResponse(
+    `<think>analyzing clusters</think>\n诊断：\`c1\` 与 \`c2\` 跨面板割裂。\n\`\`\`json\n{"schemes":[{"id":"s1","name":"方案 A：合并开发","targetMode":"panel","categories":[{"name":"💻 GitHub 专题","clusterIds":["c1","c2"]}]}]}\n\`\`\``
+  );
+  assert(
+    wrappedSchemesParsed.schemes?.length === 1 &&
+      wrappedSchemesParsed.schemes[0].targetMode === "panel" &&
+      !wrappedSchemesParsed.cleanedText.includes("<think>") &&
+      wrappedSchemesParsed.cleanedText.includes("跨面板割裂"),
+    "extractSchemesFromAIResponse strips <think>, unwraps {schemes} object, and cleans markdown"
+  );
+
+  const singleSchemeParsed = extractSchemesFromAIResponse(
+    `已将 c3 移至归档。\n\`\`\`json\n{"id":"s1","name":"修订方案","targetMode":"tree","categories":[{"name":"归档","clusterIds":["c3"]}]}\n\`\`\``
+  );
+  assert(
+    singleSchemeParsed.schemes?.length === 1 &&
+      singleSchemeParsed.schemes[0].categories[0].clusterIds?.[0] === "c3",
+    "extractSchemesFromAIResponse wraps single scheme object returned in refinement mode"
+  );
+
+  const stateDigest = JSON.parse(
+    buildSchemeStateDigest(wrappedSchemesParsed.schemes!, {
+      totalTabs: 6,
+      nonExemptCount: 6,
+      exemptProtectedCount: 0,
+      granularity: "balanced",
+      compressionRatio: 50,
+      emptyPanelNames: [],
+      activePanels: [],
+      treeDepthDistribution: { 0: 6 },
+      clusters: [
+        { id: "c1", labelHint: "A", tabIds: ["1"], tabCount: 1, domains: [], sampleTitles: [], sourcePanelIds: ["p1"], sourcePanelNames: ["P1"], cohesionReason: "domain_path", keywords: [] },
+        { id: "c2", labelHint: "B", tabIds: ["2"], tabCount: 1, domains: [], sampleTitles: [], sourcePanelIds: ["p1"], sourcePanelNames: ["P1"], cohesionReason: "domain_path", keywords: [] },
+        { id: "c3", labelHint: "C", tabIds: ["3"], tabCount: 1, domains: [], sampleTitles: [], sourcePanelIds: ["p1"], sourcePanelNames: ["P1"], cohesionReason: "tail_misc", keywords: [] },
+      ],
+    })
+  );
+  assert(
+    stateDigest[0]?.unassignedClusterIds?.includes("c3") && stateDigest[0]?.targetMode === "panel",
+    "buildSchemeStateDigest tracks current categories and unassignedClusterIds for multi-turn refinement"
+  );
+
+  const panelTargetCache = applySchemeToSnapshot(
+    {
+      id: "snap_panel_name",
+      time: Date.now(),
+      windows: { "1": { tabs: [{ id: 1, panelId: "main", parentId: -1, lvl: 0, title: "GH", url: "https://github.com/a" }] } },
+      panels: { main: { id: "main", name: "主面板", color: "toolbar" } },
+    },
+    {
+      id: "s_panel",
+      name: "Panel Scheme",
+      strategy: "test",
+      targetMode: "panel",
+      categories: [
+        {
+          name: "开发专题",
+          targetPanelName: "🔨 独立开发面板",
+          clusterIds: [],
+          matchDomains: ["github.com"],
+        },
+      ],
+    },
+    { targetMode: "panel" }
+  );
+  const newPanel = Object.values(panelTargetCache.processedSnapshot.panels || {}).find((p) =>
+    p.id.startsWith("panel_cat_")
+  );
+  assert(
+    newPanel?.name === "🔨 独立开发面板" &&
+      panelTargetCache.processedSnapshot.windows["1"].tabs[0].panelId === newPanel?.id,
+    "applySchemeToSnapshot honors targetPanelName while preserving classificationMap category matching"
   );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);

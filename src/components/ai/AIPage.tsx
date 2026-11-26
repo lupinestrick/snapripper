@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useConfigStore, DEFAULT_AI_DROPDOWN_SETTINGS } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { toast } from "@/store/useFeedbackStore";
 import { flattenTabTree } from "@/services/snapshotParser";
 import { clusterSnapshotTabs } from "@/services/tabClusterEngine";
 import { getAPIKeySlot, getOrderedModelsForSlot, getProviderMeta, checkAICallLimits } from "@/services/aiService";
@@ -253,6 +254,7 @@ export function AIPage() {
     deleteAiChatSession,
     setAiProcessedCache,
     setIsAIDiffModalOpen,
+    setActiveMergeReport,
   } = useSnapshotStore();
 
   const [inputPrompt, setInputPrompt] = useState("");
@@ -291,13 +293,12 @@ export function AIPage() {
   const visibleProviders = dropdownCfg.visibleProviders?.length
     ? dropdownCfg.visibleProviders.filter((id) => allProviderKeys.includes(id))
     : allProviderKeys;
-  const maxDropdownModels = dropdownCfg.maxDropdownModels || 8;
   const currentSlot = getAPIKeySlot(aiConfig.provider, aiConfig.type);
   const pinnedModels = aiConfig.pinnedModels?.[currentSlot] || [];
   const pinnedSet = useMemo(() => new Set(pinnedModels), [pinnedModels]);
   const dropdownModels = useMemo(
-    () => getOrderedModelsForSlot(aiConfig).slice(0, maxDropdownModels),
-    [aiConfig, maxDropdownModels]
+    () => getOrderedModelsForSlot(aiConfig),
+    [aiConfig]
   );
 
   useEffect(() => {
@@ -361,7 +362,7 @@ export function AIPage() {
   const handleRunDiagnosis = async () => {
     if (isGenerating) return;
     if (!rawSnapshot || allTabs.length === 0 || !clusterReport) {
-      alert("请先在工作台导入或加载 Sidebery 快照");
+      toast.warning("请先在工作台导入或加载 Sidebery 快照");
       return;
     }
 
@@ -394,6 +395,7 @@ export function AIPage() {
         { ...aiConfig, callSettings: aiCallSettings },
         scopedReport,
         {
+          customSystemPrompt: aiPrompts?.architectDiagnosisPrompt,
           onUsage: (u) => {
             usageRecorded = true;
             recordAIUsage(u);
@@ -429,7 +431,7 @@ export function AIPage() {
 
   const handleInstantLocalSchemes = () => {
     if (!rawSnapshot || allTabs.length === 0 || !clusterReport) {
-      alert("请先在工作台导入或加载 Sidebery 快照");
+      toast.warning("请先在工作台导入或加载 Sidebery 快照");
       return;
     }
     const localSchemes = getFallbackSchemes(allTabs, clusterReport, granularity);
@@ -449,7 +451,7 @@ export function AIPage() {
     if (isGenerating) return;
 
     if (!rawSnapshot || allTabs.length === 0 || !clusterReport) {
-      alert("请先在工作台导入或加载 Sidebery 快照");
+      toast.warning("请先在工作台导入或加载 Sidebery 快照");
       return;
     }
 
@@ -491,6 +493,15 @@ export function AIPage() {
 
     let usageRecorded = false;
     try {
+      const latestSchemesMsg = [...aiChatMessages]
+        .reverse()
+        .find((m) => m.schemes && m.schemes.length > 0);
+      const isFreshGeneration =
+        !latestSchemesMsg ||
+        rawPromptOverride === INITIAL_ARCHITECT_ANALYSIS_PROMPT ||
+        Boolean(displayLabel?.startsWith("按「")) ||
+        /重(新)?生成|全部方案|3\s*套|三套/.test(promptForAI);
+
       const historyForAI = [
         ...aiChatMessages.map((m) => ({
           role: m.sender as "user" | "assistant" | "system",
@@ -505,6 +516,9 @@ export function AIPage() {
         scopedReport,
         aiPrompts?.architectPrompt,
         {
+          mode: isFreshGeneration ? "architect" : "refine",
+          activeSchemes: latestSchemesMsg?.schemes,
+          customRefinementPrompt: aiPrompts?.architectRefinementPrompt,
           onUsage: (u) => {
             usageRecorded = true;
             recordAIUsage(u);
@@ -574,7 +588,7 @@ export function AIPage() {
         appliedSchemeId: scheme.id,
       });
     } catch (err: any) {
-      alert(`生成差分失败: ${err.message || "处理异常"}`);
+      toast.error(`生成差分失败: ${err.message || "处理异常"}`);
     } finally {
       setApplyingSchemeId(null);
     }
@@ -720,7 +734,7 @@ export function AIPage() {
                   </div>
                 </div>
 
-                {/* Models List (Pinned first, capped at maxDropdownModels) */}
+                {/* Models List (Pinned first) */}
                 <div
                   style={{
                     padding: "0.45rem 0.5rem",
@@ -742,7 +756,7 @@ export function AIPage() {
                       padding: "0.15rem 0.3rem",
                     }}
                   >
-                    <span>模型 (最多 {maxDropdownModels} 个)</span>
+                    <span>模型 ({dropdownModels.length})</span>
                   </div>
 
                   {dropdownModels.map((m) => {
@@ -1536,6 +1550,22 @@ export function AIPage() {
                       onChangeScheme={(updated) => updateSchemeInChat(msg.id, updated)}
                       onOpenBlueprint={(s) => setBlueprintTarget({ messageId: msg.id, scheme: s })}
                     />
+                  )}
+
+                  {msg.mergeReport && (
+                    <div style={{ marginTop: "0.6rem" }}>
+                      <Button
+                        variant="outline"
+                        size="xs"
+                        pill
+                        onClick={() => setActiveMergeReport(msg.mergeReport!)}
+                      >
+                        <Compass size={12} />
+                        <span>
+                          查看合并变更报告 ({msg.mergeReport.categorizedCount}/{msg.mergeReport.totalTabs})
+                        </span>
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>

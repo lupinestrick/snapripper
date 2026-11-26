@@ -3,6 +3,7 @@
 import React, { useState, useRef, useMemo } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { toast } from "@/store/useFeedbackStore";
 import { CategorizationRule, RuleActionType } from "@/types/sidebery";
 import { flattenTabTree } from "@/services/snapshotParser";
 import {
@@ -97,7 +98,11 @@ export function RulesPage() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const success = importRulesJSON(event.target?.result as string);
-      alert(success ? "规则导入成功" : "导入失败：无效的配置文件");
+      if (success) {
+        toast.success("规则导入成功");
+      } else {
+        toast.error("导入失败：无效的配置文件");
+      }
     };
     reader.readAsText(file);
     e.target.value = "";

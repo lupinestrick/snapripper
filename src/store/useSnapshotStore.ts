@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SideberySnapshot, SideberyTab, TabTreeNode, CategorizationRule } from "@/types/sidebery";
-import { ProportionReport, AIProcessedCache, CategoryProportion, AIChatMessage, AIChatSession } from "@/types/ai";
+import { ProportionReport, AIProcessedCache, CategoryProportion, AIChatMessage, AIChatSession, AIMergeReport } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
 import { useConfigStore } from "./useConfigStore";
 import { syncSnapshotCookie, clearSnapshotCookies } from "@/utils/cookieHelper";
@@ -120,6 +120,7 @@ interface SnapshotStoreState {
   aiChatSessions: AIChatSession[];
   activeChatSessionId: string | null;
   isAIDiffModalOpen: boolean;
+  activeMergeReport: AIMergeReport | null;
   isOverviewHopupOpen: boolean;
 
   undoStack: SideberySnapshot[];
@@ -176,6 +177,7 @@ interface SnapshotStoreState {
   renameAiChatSession: (sessionId: string, newTitle: string) => void;
   deleteAiChatSession: (sessionId: string) => void;
   setIsAIDiffModalOpen: (open: boolean) => void;
+  setActiveMergeReport: (report: AIMergeReport | null) => void;
   setIsOverviewHopupOpen: (open: boolean) => void;
   updateProcessedTreeTarget: (targetMode: "tree" | "panel", targetPanelId?: string) => void;
   clearAllCache: () => void;
@@ -209,6 +211,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   aiChatSessions: [],
   activeChatSessionId: null,
   isAIDiffModalOpen: false,
+  activeMergeReport: null,
   isOverviewHopupOpen: false,
 
   undoStack: [],
@@ -243,6 +246,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       proportionReport: null,
       aiProcessedCache: null,
       isAIDiffModalOpen: false,
+  activeMergeReport: null,
     });
   },
 
@@ -739,6 +743,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       };
     }),
   setIsAIDiffModalOpen: (open) => set({ isAIDiffModalOpen: open }),
+  setActiveMergeReport: (report: AIMergeReport | null) => set({ activeMergeReport: report }),
   setIsOverviewHopupOpen: (open) => set({ isOverviewHopupOpen: open }),
 
   updateProcessedTreeTarget: (targetMode, targetPanelId) => {
@@ -801,6 +806,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       aiChatSessions: [],
       activeChatSessionId: null,
       isAIDiffModalOpen: false,
+  activeMergeReport: null,
       isOverviewHopupOpen: false,
       undoStack: [],
       redoStack: [],

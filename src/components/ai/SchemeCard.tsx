@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   ClusterCompressionReport,
   ReorganizationScheme,
@@ -43,7 +43,28 @@ export function SchemeCard({
   const [activeClusterInfo, setActiveClusterInfo] = useState<{
     clusterId: string;
     categoryIndex: number | null; // null = unassigned or excluded
+    anchorRect: { top: number; bottom: number; left: number; width: number };
   } | null>(null);
+
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!activeClusterInfo) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setActiveClusterInfo(null);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveClusterInfo(null);
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [activeClusterInfo]);
 
   const clusterById = useMemo(() => {
     const map = new Map<string, TabMicroCluster>();
@@ -367,11 +388,24 @@ export function SchemeCard({
                         <button
                           key={cid}
                           type="button"
-                          onClick={() =>
-                            setActiveClusterInfo(
-                              isSelected ? null : { clusterId: cid, categoryIndex: idx }
-                            )
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isSelected) {
+                              setActiveClusterInfo(null);
+                              return;
+                            }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setActiveClusterInfo({
+                              clusterId: cid,
+                              categoryIndex: idx,
+                              anchorRect: {
+                                top: rect.top,
+                                bottom: rect.bottom,
+                                left: rect.left,
+                                width: rect.width,
+                              },
+                            });
+                          }}
                           title={`${clu.labelHint} (${clu.tabCount} 标签)\n样本: ${clu.sampleTitles.join(" | ")}`}
                           style={{
                             display: "inline-flex",
@@ -446,98 +480,6 @@ export function SchemeCard({
           })}
         </div>
 
-        {/* Inline Micro-Cluster Inspector & Zero-Token Reassignment Drawer */}
-        {activeCluster && onChangeScheme && (
-          <div
-            style={{
-              marginTop: "0.65rem",
-              padding: "0.65rem 0.85rem",
-              borderRadius: "0.65rem",
-              backgroundColor: "var(--bg-card)",
-              border: "1px solid var(--accent-border)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "0.5rem",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.76rem", fontWeight: 600 }}>
-                <Layers size={13} style={{ color: "var(--accent)" }} />
-                <span>
-                  [{activeCluster.id}] {activeCluster.labelHint} · {activeCluster.tabCount} 标签
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveClusterInfo(null)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  padding: "2px",
-                }}
-              >
-                <X size={13} />
-              </button>
-            </div>
-
-            {activeCluster.sampleTitles.length > 0 && (
-              <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
-                样本页面：{activeCluster.sampleTitles.join(" · ")}
-              </div>
-            )}
-
-            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.35rem" }}>
-              <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
-                <ArrowRightLeft size={11} />
-                移至分组：
-              </span>
-
-              {scheme.categories.map((targetCat, tIdx) => {
-                const isCurrent = activeClusterInfo?.categoryIndex === tIdx;
-                return (
-                  <Button
-                    key={tIdx}
-                    variant={isCurrent ? "subtle" : "outline"}
-                    size="xs"
-                    pill
-                    disabled={isCurrent}
-                    onClick={() => handleMoveCluster(activeCluster.id, tIdx)}
-                    style={{ fontSize: "0.68rem", padding: "0.15rem 0.55rem" }}
-                  >
-                    {targetCat.name}
-                  </Button>
-                );
-              })}
-
-              {!excludedSet.has(activeCluster.id) ? (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  pill
-                  onClick={() => handleExcludeCluster(activeCluster.id)}
-                  style={{ fontSize: "0.68rem", color: "var(--danger)", padding: "0.15rem 0.55rem" }}
-                >
-                  <X size={11} />
-                  <span>暂不整理此簇</span>
-                </Button>
-              ) : (
-                <Button
-                  variant="subtle"
-                  size="xs"
-                  pill
-                  onClick={() => handleRestoreCluster(activeCluster.id)}
-                  style={{ fontSize: "0.68rem", padding: "0.15rem 0.55rem" }}
-                >
-                  <RotateCcw size={11} />
-                  <span>恢复纳入方案</span>
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Unassigned & Excluded Strips */}
         {(unassignedClusters.length > 0 || excludedClusters.length > 0) && (
           <div
@@ -559,7 +501,20 @@ export function SchemeCard({
                   <button
                     key={clu.id}
                     type="button"
-                    onClick={() => setActiveClusterInfo({ clusterId: clu.id, categoryIndex: null })}
+                    onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setActiveClusterInfo({
+                      clusterId: clu.id,
+                      categoryIndex: null,
+                      anchorRect: {
+                        top: rect.top,
+                        bottom: rect.bottom,
+                        left: rect.left,
+                        width: rect.width,
+                      },
+                    });
+                  }}
                     style={{
                       fontSize: "0.64rem",
                       padding: "1px 6px",
@@ -633,6 +588,129 @@ export function SchemeCard({
           </div>
         )}
       </div>
+
+      {/* Floating Cluster Popover Card (no backdrop blur) */}
+      {activeCluster && activeClusterInfo && onChangeScheme && typeof window !== "undefined" && (() => {
+        const rect = activeClusterInfo.anchorRect;
+        const cardWidth = Math.min(360, window.innerWidth - 24);
+        const left = Math.min(Math.max(12, rect.left), window.innerWidth - cardWidth - 12);
+        const placeAbove = rect.bottom + 220 > window.innerHeight && rect.top > 200;
+        const top = placeAbove ? Math.max(12, rect.top - 8) : Math.min(window.innerHeight - 24, rect.bottom + 8);
+
+        return (
+          <div
+            ref={popoverRef}
+            onMouseDown={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              left,
+              top,
+              transform: placeAbove ? "translateY(-100%)" : undefined,
+              width: `${cardWidth}px`,
+              zIndex: 90,
+              padding: "0.75rem 0.9rem",
+              borderRadius: "0.75rem",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--accent-border)",
+              boxShadow: "0 12px 32px rgba(0, 0, 0, 0.28)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.76rem", fontWeight: 600, minWidth: 0 }}>
+                <Layers size={13} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  [{activeCluster.id}] {activeCluster.labelHint} · {activeCluster.tabCount} 标签
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveClusterInfo(null)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  padding: "2px",
+                  flexShrink: 0,
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+
+            {activeCluster.domains.length > 0 && (
+              <div style={{ fontSize: "0.68rem", color: "var(--accent-text)" }}>
+                域名：{activeCluster.domains.slice(0, 3).join(" · ")}
+              </div>
+            )}
+
+            {activeCluster.sampleTitles.length > 0 && (
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  color: "var(--text-muted)",
+                  lineHeight: 1.4,
+                  maxHeight: "64px",
+                  overflowY: "auto",
+                }}
+              >
+                样本：{activeCluster.sampleTitles.join(" · ")}
+              </div>
+            )}
+
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.3rem", paddingTop: "0.2rem", borderTop: "1px solid var(--border-subtle)" }}>
+              <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
+                <ArrowRightLeft size={11} />
+                移至：
+              </span>
+
+              {scheme.categories.map((targetCat, tIdx) => {
+                const isCurrent = activeClusterInfo.categoryIndex === tIdx;
+                return (
+                  <Button
+                    key={tIdx}
+                    variant={isCurrent ? "subtle" : "outline"}
+                    size="xs"
+                    pill
+                    disabled={isCurrent}
+                    onClick={() => handleMoveCluster(activeCluster.id, tIdx)}
+                    style={{ fontSize: "0.67rem", padding: "0.14rem 0.5rem" }}
+                  >
+                    {targetCat.name}
+                  </Button>
+                );
+              })}
+
+              {!excludedSet.has(activeCluster.id) ? (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  pill
+                  onClick={() => handleExcludeCluster(activeCluster.id)}
+                  style={{ fontSize: "0.67rem", color: "var(--danger)", padding: "0.14rem 0.5rem" }}
+                >
+                  <X size={11} />
+                  <span>暂不整理</span>
+                </Button>
+              ) : (
+                <Button
+                  variant="subtle"
+                  size="xs"
+                  pill
+                  onClick={() => handleRestoreCluster(activeCluster.id)}
+                  style={{ fontSize: "0.67rem", padding: "0.14rem 0.5rem" }}
+                >
+                  <RotateCcw size={11} />
+                  <span>恢复纳入</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

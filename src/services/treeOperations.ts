@@ -354,7 +354,7 @@ export function reorganizeTreeIntoCategories(
 export function reorganizeTabsIntoPanels(
   tabs: SideberyTab[],
   classificationMap: Map<string, string>,
-  categories: { id: string; name: string }[],
+  categories: { id: string; name: string; panelName?: string }[],
   existingPanels: Record<string, SideberyPanel> = {}
 ): { tabs: SideberyTab[]; panels: Record<string, SideberyPanel> } {
   const panels: Record<string, SideberyPanel> = { ...existingPanels };
@@ -366,7 +366,7 @@ export function reorganizeTabsIntoPanels(
     if (!panels[panelId]) {
       panels[panelId] = {
         id: panelId,
-        name: cat.name,
+        name: cat.panelName || cat.name,
         color: "toolbar",
       };
     }

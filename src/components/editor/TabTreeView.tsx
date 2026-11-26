@@ -13,6 +13,7 @@ import {
   Upload,
 } from "lucide-react";
 import { TabTreeNode } from "@/types/sidebery";
+import { toast } from "@/store/useFeedbackStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { filterTree } from "@/services/treeOperations";
 import { extractDomain, getFaviconUrl } from "@/utils/urlHelper";
@@ -56,7 +57,7 @@ export function TabTreeView() {
       try {
         loadSnapshot(event.target?.result as string, file.name);
       } catch (err: any) {
-        alert(err.message || "读取失败");
+        toast.error(err.message || "读取失败");
       }
     };
     reader.readAsText(file);

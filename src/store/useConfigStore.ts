@@ -358,7 +358,7 @@ export const useConfigStore = create<ConfigState>()(
             name: providerData.name.trim() || "自定义供应商",
             type: providerData.type || "openai",
             baseUrl: providerData.baseUrl.trim() || "https://api.openai.com/v1",
-            model: providerData.model.trim() || "gpt-4o-mini",
+            model: providerData.model.trim(),
           };
 
           const existingDropdown = state.aiDropdownSettings || DEFAULT_AI_DROPDOWN_SETTINGS;
@@ -657,6 +657,15 @@ export const useConfigStore = create<ConfigState>()(
             rulesGeneratorPrompt:
               persistedState?.aiPrompts?.rulesGeneratorPrompt ||
               DEFAULT_AI_PROMPTS.rulesGeneratorPrompt,
+            architectPrompt:
+              persistedState?.aiPrompts?.architectPrompt ||
+              DEFAULT_AI_PROMPTS.architectPrompt,
+            architectDiagnosisPrompt:
+              persistedState?.aiPrompts?.architectDiagnosisPrompt ||
+              DEFAULT_AI_PROMPTS.architectDiagnosisPrompt,
+            architectRefinementPrompt:
+              persistedState?.aiPrompts?.architectRefinementPrompt ||
+              DEFAULT_AI_PROMPTS.architectRefinementPrompt,
           },
         };
       },

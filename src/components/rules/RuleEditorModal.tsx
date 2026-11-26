@@ -12,6 +12,7 @@ import {
   SideberyTab,
 } from "@/types/sidebery";
 import { matchTabWithRule, normalizeRuleToDSL } from "@/services/ruleEngine";
+import { toast } from "@/store/useFeedbackStore";
 import { isExemptUrl } from "@/utils/urlHelper";
 import { isGroupTab } from "@/services/snapshotParser";
 import { Dialog } from "@/components/ui/dialog";
@@ -112,12 +113,12 @@ export function RuleEditorModal({
 
   const handleSubmit = () => {
     if (!draft.name.trim()) {
-      alert("请输入规则名称");
+      toast.warning("请输入规则名称");
       return;
     }
     const validConditions = conditions.filter((c) => c.value.trim().length > 0);
     if (validConditions.length === 0) {
-      alert("请至少填写一条有效条件");
+      toast.warning("请至少填写一条有效条件");
       return;
     }
 
