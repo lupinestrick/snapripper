@@ -47,7 +47,12 @@ export function WorkbenchView() {
       : list;
   }, [rawSnapshot?.panels, allTabs, uiSettings?.hideEmptyPanels]);
 
-  const showPanelBar = Boolean(rawSnapshot && panelEntries.length > 0 && panelLayout !== "dropdown");
+  const showPanelBar = Boolean(
+    rawSnapshot &&
+      panelEntries.length > 0 &&
+      panelLayout !== "dropdown" &&
+      panelLayout !== "sidebar"
+  );
   const renderHorizontal = panelLayout === "horizontal" || isNarrow;
 
   return (

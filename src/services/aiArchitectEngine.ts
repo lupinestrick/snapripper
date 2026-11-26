@@ -11,6 +11,7 @@ import {
 import { extractDomain, isExemptUrl } from "@/utils/urlHelper";
 import {
   AIChatTurn,
+  AICallOptions,
   sendAIConversationRequest,
   repairJSONString,
 } from "./aiService";
@@ -92,7 +93,8 @@ export async function sendArchitectChatRequest(
   config: AIConfig,
   messages: { role: "user" | "assistant" | "system"; content: string }[],
   contextData?: ClusterCompressionReport | string,
-  customSystemPrompt?: string
+  customSystemPrompt?: string,
+  options?: AICallOptions
 ): Promise<{ text: string; schemes?: ReorganizationScheme[] }> {
   const baseSystemPrompt = customSystemPrompt?.trim() || DEFAULT_AI_ARCHITECT_PROMPT;
 
@@ -114,7 +116,7 @@ export async function sendArchitectChatRequest(
       content: m.content,
     }));
 
-  const rawResponse = await sendAIConversationRequest(config, fullSystemPrompt, turns);
+  const rawResponse = await sendAIConversationRequest(config, fullSystemPrompt, turns, options);
   const { schemes, cleanedText } = extractSchemesFromAIResponse(rawResponse);
 
   return {

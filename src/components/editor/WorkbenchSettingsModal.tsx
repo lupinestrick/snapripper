@@ -5,7 +5,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useConfigStore, WorkbenchPanelLayout } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
-import { X, SlidersHorizontal, PanelLeft, PanelTop, ChevronDownSquare, RotateCcw } from "lucide-react";
+import { X, SlidersHorizontal, PanelLeft, PanelTop, ChevronDownSquare, LayoutList, RotateCcw } from "lucide-react";
 
 interface WorkbenchSettingsModalProps {
   isOpen: boolean;
@@ -20,6 +20,7 @@ const LAYOUT_OPTIONS: {
   { id: "vertical", label: "纵向排布", icon: <PanelLeft size={14} /> },
   { id: "horizontal", label: "横向排布", icon: <PanelTop size={14} /> },
   { id: "dropdown", label: "下拉菜单", icon: <ChevronDownSquare size={14} /> },
+  { id: "sidebar", label: "插入导航栏", icon: <LayoutList size={14} /> },
 ];
 
 export function WorkbenchSettingsModal({ isOpen, onClose }: WorkbenchSettingsModalProps) {
@@ -109,7 +110,7 @@ export function WorkbenchSettingsModal({ isOpen, onClose }: WorkbenchSettingsMod
               <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-main)", marginBottom: "0.5rem" }}>
                 面板排列方式
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.45rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.45rem" }}>
                 {LAYOUT_OPTIONS.map((opt) => {
                   const active = currentLayout === opt.id;
                   return (

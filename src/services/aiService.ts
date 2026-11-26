@@ -1,5 +1,7 @@
 import {
   AIConfig,
+  AICallSettings,
+  AIUsageStats,
   CategoryProportion,
   ProportionReport,
   AI_PROVIDERS,
@@ -317,23 +319,116 @@ function extractReadableAIError(status: number, rawText: string): string {
 /**
  * 统一多协议多轮对话模型通信驱动 (OpenAI Compatible, Anthropic Claude, Google Gemini)
  */
+export interface AICallOptions {
+  signal?: AbortSignal;
+  onUsage?: (usage: { promptTokens: number; completionTokens: number }) => void;
+}
+
+const DEFAULT_RESOLVED_CALL_SETTINGS: AICallSettings = {
+  preset: "balanced",
+  temperature: 0.2,
+  maxTokens: undefined,
+  timeoutSeconds: 90,
+  maxHistoryTurns: 6,
+  minIntervalSeconds: 2,
+  dailyCallLimit: 0,
+};
+
+export function resolveCallSettings(config?: AIConfig): AICallSettings {
+  const cs = config?.callSettings;
+  return {
+    preset: cs?.preset ?? DEFAULT_RESOLVED_CALL_SETTINGS.preset,
+    temperature: cs?.temperature ?? config?.temperature ?? DEFAULT_RESOLVED_CALL_SETTINGS.temperature,
+    maxTokens: cs?.maxTokens && cs.maxTokens > 0 ? cs.maxTokens : undefined,
+    timeoutSeconds: Math.min(Math.max(Number(cs?.timeoutSeconds) || 90, 10), 180),
+    maxHistoryTurns: Math.min(Math.max(Number(cs?.maxHistoryTurns ?? 6), 0), 30),
+    minIntervalSeconds: Math.min(Math.max(Number(cs?.minIntervalSeconds ?? 2), 0), 60),
+    dailyCallLimit: Math.max(Number(cs?.dailyCallLimit ?? 0), 0),
+  };
+}
+
+export function checkAICallLimits(
+  settings: AICallSettings,
+  usage?: AIUsageStats,
+  nowMs: number = Date.now()
+): { ok: boolean; reason?: string } {
+  if (settings.minIntervalSeconds > 0 && usage?.lastCallAt) {
+    const elapsedMs = nowMs - usage.lastCallAt;
+    const minMs = settings.minIntervalSeconds * 1000;
+    if (elapsedMs >= 0 && elapsedMs < minMs) {
+      const waitSec = Math.ceil((minMs - elapsedMs) / 1000);
+      return {
+        ok: false,
+        reason: `请求冷却中，请等待 ${waitSec} 秒后再试（可在设置「调用参数与限制」中调整）`,
+      };
+    }
+  }
+
+  if (settings.dailyCallLimit > 0 && usage) {
+    const now = new Date(nowMs);
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      now.getDate()
+    ).padStart(2, "0")}`;
+    const callsToday = usage.date === today ? usage.callsToday : 0;
+    if (callsToday >= settings.dailyCallLimit) {
+      return {
+        ok: false,
+        reason: `已达到今日调用上限 (${callsToday}/${settings.dailyCallLimit})，可在设置「调用参数与限制」中调整或重置计数`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+/**
+ * 按最大保留轮数裁剪对话历史，始终保留最后一条当前用户输入
+ */
+export function truncateChatTurns(turns: AIChatTurn[], maxHistoryTurns: number): AIChatTurn[] {
+  if (turns.length <= 1) return turns;
+  if (maxHistoryTurns <= 0) {
+    return [turns[turns.length - 1]];
+  }
+  // 每轮约 2 条消息（user + assistant），始终保留末尾当前轮
+  const maxMessages = maxHistoryTurns * 2 + 1;
+  if (turns.length <= maxMessages) return turns;
+  const sliced = turns.slice(turns.length - maxMessages);
+  // 确保首条是 user，符合 Anthropic / Gemini 对话规范
+  while (sliced.length > 1 && sliced[0].role !== "user") {
+    sliced.shift();
+  }
+  return sliced;
+}
+
 export async function sendAIConversationRequest(
   config: AIConfig,
   systemPrompt: string,
-  messages: AIChatTurn[]
+  messages: AIChatTurn[],
+  options?: AICallOptions
 ): Promise<string> {
   const providerMeta = getProviderMeta(config, config.provider);
   const protocol = config.type || providerMeta.type || "openai";
   const apiKey = resolveAPIKey(config);
   const model = resolveModel(config);
   const baseUrl = resolveBaseURL(config);
-  const turns = normalizeMultiTurnMessages(messages);
+  const callCfg = resolveCallSettings(config);
+  const normalizedTurns = normalizeMultiTurnMessages(messages);
+  const turns = truncateChatTurns(normalizedTurns, callCfg.maxHistoryTurns);
 
   const controller = new AbortController();
-  const timeoutMs = 90000;
+  const timeoutMs = callCfg.timeoutSeconds * 1000;
   const timeoutId = setTimeout(() => {
     controller.abort();
   }, timeoutMs);
+
+  const onExternalAbort = () => controller.abort();
+  if (options?.signal) {
+    if (options.signal.aborted) {
+      controller.abort();
+    } else {
+      options.signal.addEventListener("abort", onExternalAbort);
+    }
+  }
 
   let currentEndpoint = "";
 
@@ -356,12 +451,12 @@ export async function sendAIConversationRequest(
       const isThinking = model.includes("3-7") || model.includes("thinking");
       const requestBody: Record<string, any> = {
         model,
-        max_tokens: 4096,
+        max_tokens: callCfg.maxTokens ?? 4096,
         system: systemPrompt,
         messages: turns.map((t) => ({ role: t.role, content: t.content })),
       };
-      if (!isThinking && config.temperature !== undefined) {
-        requestBody.temperature = config.temperature;
+      if (!isThinking && callCfg.temperature !== undefined) {
+        requestBody.temperature = callCfg.temperature;
       }
 
       const res = await smartFetch(endpoint, {
@@ -378,6 +473,10 @@ export async function sendAIConversationRequest(
       }
 
       const data = await res.json();
+      options?.onUsage?.({
+        promptTokens: Number(data?.usage?.input_tokens) || 0,
+        completionTokens: Number(data?.usage?.output_tokens) || 0,
+      });
       if (Array.isArray(data.content)) {
         const textBlocks = data.content
           .filter((b: any) => b.type === "text" || (typeof b.text === "string" && b.type !== "thinking"))
@@ -401,6 +500,13 @@ export async function sendAIConversationRequest(
         headers["x-goog-api-key"] = apiKey;
       }
 
+      const generationConfig: Record<string, any> = {
+        temperature: callCfg.temperature ?? 0.2,
+      };
+      if (callCfg.maxTokens) {
+        generationConfig.maxOutputTokens = callCfg.maxTokens;
+      }
+
       const res = await smartFetch(endpoint, {
         method: "POST",
         headers,
@@ -410,9 +516,7 @@ export async function sendAIConversationRequest(
             role: t.role === "assistant" ? "model" : "user",
             parts: [{ text: t.content }],
           })),
-          generationConfig: {
-            temperature: config.temperature ?? 0.2,
-          },
+          generationConfig,
         }),
         signal: controller.signal,
         timeoutMs,
@@ -424,6 +528,10 @@ export async function sendAIConversationRequest(
       }
 
       const data = await res.json();
+      options?.onUsage?.({
+        promptTokens: Number(data?.usageMetadata?.promptTokenCount) || 0,
+        completionTokens: Number(data?.usageMetadata?.candidatesTokenCount) || 0,
+      });
       const parts = data.candidates?.[0]?.content?.parts || [];
       const textParts = parts
         .filter((p: any) => typeof p.text === "string" && !p.thought)
@@ -465,9 +573,12 @@ export async function sendAIConversationRequest(
       messages: openAiMessages,
     };
 
-    // 不强制传递 max_tokens，避免部分国内模型因上限低于 8192 而报错 400
-    if (!isReasoningModel && config.temperature !== undefined) {
-      requestBody.temperature = config.temperature;
+    // 若用户显式设置了 maxTokens 且非推理模型，则透传；默认不强制传递以避免部分国内模型 400
+    if (!isReasoningModel && callCfg.temperature !== undefined) {
+      requestBody.temperature = callCfg.temperature;
+    }
+    if (!isReasoningModel && callCfg.maxTokens) {
+      requestBody.max_tokens = callCfg.maxTokens;
     }
 
     let res = await smartFetch(endpoint, {
@@ -513,6 +624,10 @@ export async function sendAIConversationRequest(
     }
 
     const data = await res.json();
+    options?.onUsage?.({
+      promptTokens: Number(data?.usage?.prompt_tokens) || 0,
+      completionTokens: Number(data?.usage?.completion_tokens) || 0,
+    });
     const choice = data.choices?.[0];
     const message = choice?.message;
 
@@ -554,6 +669,9 @@ export async function sendAIConversationRequest(
     throw err;
   } finally {
     clearTimeout(timeoutId);
+    if (options?.signal) {
+      options.signal.removeEventListener("abort", onExternalAbort);
+    }
   }
 }
 

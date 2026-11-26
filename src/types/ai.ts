@@ -70,6 +70,27 @@ export const AI_PROVIDERS: Record<string, AIProviderPreset> = {
   },
 };
 
+export type AICallPreset = "eco" | "balanced" | "deep" | "custom";
+
+export interface AICallSettings {
+  preset: AICallPreset;
+  temperature: number;
+  maxTokens?: number;
+  timeoutSeconds: number;
+  maxHistoryTurns: number;
+  minIntervalSeconds: number;
+  dailyCallLimit: number;
+}
+
+export interface AIUsageStats {
+  date: string;
+  callsToday: number;
+  totalCalls: number;
+  promptTokensToday: number;
+  completionTokensToday: number;
+  lastCallAt?: number;
+}
+
 export interface AIConfig {
   provider: AIProviderKey;
   baseURL: string;
@@ -77,6 +98,7 @@ export interface AIConfig {
   model: string;
   temperature?: number;
   type?: AIProtocolType;
+  callSettings?: AICallSettings;
   /**
    * 各 API 选项独立的密钥映射池（如 deepseek, claude, openai, gemini, custom_openai, custom_anthropic）
    */

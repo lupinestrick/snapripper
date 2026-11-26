@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const headers: Record<string, string> =
       payload?.headers && typeof payload.headers === "object" ? payload.headers : {};
     const body = payload?.body;
-    const timeoutMs = Math.min(Math.max(Number(payload?.timeoutMs) || 90000, 3000), 120000);
+    const timeoutMs = Math.min(Math.max(Number(payload?.timeoutMs) || 90000, 3000), 180000);
 
     if (!targetUrl || (!targetUrl.startsWith("https://") && !targetUrl.startsWith("http://"))) {
       return NextResponse.json(

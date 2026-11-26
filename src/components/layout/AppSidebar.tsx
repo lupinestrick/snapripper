@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useConfigStore, AppPage } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { flattenTabTree } from "@/services/snapshotParser";
 import { OverviewHopup } from "./OverviewHopup";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,13 +15,32 @@ import {
   BarChart2,
   ChevronLeft,
   ChevronRight,
+  LayoutList,
+  History,
+  Edit3,
+  Check,
+  Trash2,
 } from "lucide-react";
 
 export function AppSidebar() {
-  const { activePage, setActivePage } = useConfigStore();
-  const { rawSnapshot, isOverviewHopupOpen, setIsOverviewHopupOpen } = useSnapshotStore();
+  const { activePage, setActivePage, uiSettings } = useConfigStore();
+  const {
+    rawSnapshot,
+    rootNodes,
+    panelFilter,
+    setActivePanelId,
+    aiChatSessions,
+    activeChatSessionId,
+    selectAiChatSession,
+    renameAiChatSession,
+    deleteAiChatSession,
+    isOverviewHopupOpen,
+    setIsOverviewHopupOpen,
+  } = useSnapshotStore();
   const [isCompact, setIsCompact] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitleValue, setEditingTitleValue] = useState("");
 
   // Responsive screen DPI / width listener
   useEffect(() => {
@@ -47,6 +67,42 @@ export function AppSidebar() {
     : 0;
 
   const panelCount = rawSnapshot?.panels ? Object.keys(rawSnapshot.panels).length : 0;
+
+  const isSidebarPanelMode =
+    uiSettings?.workbenchPanelLayout === "sidebar" && activePage === "workbench";
+  const isSidebarChatHistoryMode =
+    (uiSettings?.aiChatHistoryLayout || "dropdown") === "sidebar" && activePage === "ai";
+
+  const allTabs = useMemo(
+    () => (isSidebarPanelMode && rawSnapshot ? flattenTabTree(rootNodes) : []),
+    [isSidebarPanelMode, rawSnapshot, rootNodes]
+  );
+
+  const panelEntries = useMemo(() => {
+    if (!isSidebarPanelMode || !rawSnapshot?.panels) return [];
+    const counts = new Map<string, number>();
+    for (const t of allTabs) {
+      const pId = t.panelId || "main";
+      counts.set(pId, (counts.get(pId) || 0) + 1);
+    }
+
+    const list = Object.values(rawSnapshot.panels).map((p: any) => ({
+      id: p.id,
+      name: p.name || p.id,
+      count: counts.get(p.id) || 0,
+    }));
+
+    return uiSettings?.hideEmptyPanels
+      ? list.filter((p) => p.count > 0)
+      : list;
+  }, [isSidebarPanelMode, rawSnapshot?.panels, allTabs, uiSettings?.hideEmptyPanels]);
+
+  const handleSelectSidebarPanel = (panelId: string | null) => {
+    setActivePanelId(panelId);
+    if (activePage !== "workbench") {
+      setActivePage("workbench");
+    }
+  };
 
   const navItems: { page: AppPage; label: string; icon: React.ReactNode }[] = [
     { page: "workbench", label: "工作台", icon: <Layers size={17} /> },
@@ -134,7 +190,17 @@ export function AppSidebar() {
       >
 
         {/* Nav Items */}
-        <nav style={{ padding: "0.75rem 0.5rem", display: "flex", flexDirection: "column", gap: "0.35rem", flex: 1 }}>
+        <nav
+          style={{
+            padding: "0.75rem 0.5rem",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.35rem",
+            flex: 1,
+            minHeight: 0,
+            overflow: "hidden",
+          }}
+        >
           {navItems.map((item) => {
             const isActive = activePage === item.page;
             return (
@@ -151,6 +217,7 @@ export function AppSidebar() {
                   fontSize: "0.825rem",
                   width: "100%",
                   color: isActive ? "var(--accent-fg, #ffffff)" : "var(--text-muted)",
+                  flexShrink: 0,
                 }}
                 title={isCompact ? item.label : undefined}
               >
@@ -161,6 +228,308 @@ export function AppSidebar() {
               </Button>
             );
           })}
+
+          {/* Inserted Panel List below System Settings (when workbenchPanelLayout === "sidebar") */}
+          {isSidebarPanelMode && (
+            <>
+              <div
+                style={{
+                  marginTop: "0.35rem",
+                  paddingTop: "0.5rem",
+                  borderTop: "1px solid var(--border-subtle)",
+                  paddingLeft: isCompact ? 0 : "0.75rem",
+                  paddingRight: isCompact ? 0 : "0.5rem",
+                  paddingBottom: "0.15rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: isCompact ? "center" : "flex-start",
+                  gap: "0.65rem",
+                  color: "var(--text-muted)",
+                  fontSize: "0.825rem",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+                title={isCompact ? "面板" : undefined}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "18px" }}>
+                  <LayoutList size={17} />
+                </div>
+                {!isCompact && <span>面板</span>}
+              </div>
+
+              {!isCompact && (
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.2rem",
+                    padding: "0.15rem 0.1rem",
+                  }}
+                >
+                  {!rawSnapshot || panelEntries.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "0.65rem 0.5rem",
+                        fontSize: "0.74rem",
+                        color: "var(--text-muted)",
+                        textAlign: "center",
+                      }}
+                    >
+                      暂无已加载面板
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        onClick={() => handleSelectSidebarPanel(null)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: "0.35rem",
+                          padding: "0.4rem 0.5rem",
+                          borderRadius: "0.5rem",
+                          backgroundColor: panelFilter === null ? "var(--accent-subtle)" : "transparent",
+                          color: panelFilter === null ? "var(--accent-text)" : "var(--text-main)",
+                          fontWeight: panelFilter === null ? 600 : 400,
+                          cursor: "pointer",
+                          fontSize: "0.76rem",
+                          transition: "background-color 0.12s ease",
+                        }}
+                      >
+                        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          全部标签
+                        </span>
+                        <span style={{ fontSize: "0.7rem", color: panelFilter === null ? "var(--accent-text)" : "var(--text-muted)", flexShrink: 0 }}>
+                          {allTabs.length}
+                        </span>
+                      </div>
+
+                      {panelEntries.map((panel) => {
+                        const isActive = panelFilter === panel.id;
+                        return (
+                          <div
+                            key={panel.id}
+                            onClick={() => handleSelectSidebarPanel(panel.id)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "0.35rem",
+                              padding: "0.4rem 0.5rem",
+                              borderRadius: "0.5rem",
+                              backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
+                              color: isActive ? "var(--accent-text)" : "var(--text-main)",
+                              fontWeight: isActive ? 600 : 400,
+                              cursor: "pointer",
+                              fontSize: "0.76rem",
+                              transition: "background-color 0.12s ease",
+                            }}
+                            title={`${panel.name} (${panel.count})`}
+                          >
+                            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {panel.name}
+                            </span>
+                            <span style={{ fontSize: "0.7rem", color: isActive ? "var(--accent-text)" : "var(--text-muted)", flexShrink: 0 }}>
+                              {panel.count}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Inserted AI Chat History below System Settings (when aiChatHistoryLayout === "sidebar" on AI page) */}
+          {isSidebarChatHistoryMode && (
+            <>
+              <div
+                style={{
+                  marginTop: "0.35rem",
+                  paddingTop: "0.5rem",
+                  borderTop: "1px solid var(--border-subtle)",
+                  paddingLeft: isCompact ? 0 : "0.75rem",
+                  paddingRight: isCompact ? 0 : "0.5rem",
+                  paddingBottom: "0.15rem",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: isCompact ? "center" : "flex-start",
+                  gap: "0.65rem",
+                  color: "var(--text-muted)",
+                  fontSize: "0.825rem",
+                  fontWeight: 600,
+                  flexShrink: 0,
+                }}
+                title={isCompact ? "对话历史" : undefined}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "18px" }}>
+                  <History size={17} />
+                </div>
+                {!isCompact && <span>对话历史</span>}
+              </div>
+
+              {!isCompact && (
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    overflowY: "auto",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.2rem",
+                    padding: "0.15rem 0.1rem",
+                  }}
+                >
+                  {!aiChatSessions || aiChatSessions.length === 0 ? (
+                    <div
+                      style={{
+                        padding: "0.65rem 0.5rem",
+                        fontSize: "0.74rem",
+                        color: "var(--text-muted)",
+                        textAlign: "center",
+                      }}
+                    >
+                      暂无历史对话
+                    </div>
+                  ) : (
+                    aiChatSessions.map((session) => {
+                      const isActive = session.id === activeChatSessionId;
+                      const isEditing = editingSessionId === session.id;
+                      return (
+                        <div
+                          key={session.id}
+                          onClick={() => {
+                            if (!isEditing) {
+                              selectAiChatSession(session.id);
+                            }
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.3rem",
+                            padding: "0.4rem 0.5rem",
+                            borderRadius: "0.5rem",
+                            backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
+                            color: isActive ? "var(--accent-text)" : "var(--text-main)",
+                            cursor: isEditing ? "default" : "pointer",
+                            fontSize: "0.76rem",
+                            transition: "background-color 0.12s ease",
+                          }}
+                        >
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingTitleValue}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setEditingTitleValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  renameAiChatSession(session.id, editingTitleValue);
+                                  setEditingSessionId(null);
+                                } else if (e.key === "Escape") {
+                                  setEditingSessionId(null);
+                                }
+                              }}
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                border: "1px solid var(--accent-border)",
+                                backgroundColor: "var(--bg-card)",
+                                color: "var(--text-main)",
+                                fontSize: "0.74rem",
+                                outline: "none",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                fontWeight: isActive ? 600 : 400,
+                              }}
+                              title={session.title}
+                            >
+                              {session.title}
+                            </span>
+                          )}
+
+                          <div
+                            style={{ display: "flex", alignItems: "center", gap: "0.1rem", flexShrink: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {isEditing ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  renameAiChatSession(session.id, editingTitleValue);
+                                  setEditingSessionId(null);
+                                }}
+                                title="保存名称"
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "var(--success)",
+                                  cursor: "pointer",
+                                  padding: "2px",
+                                }}
+                              >
+                                <Check size={12} />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSessionId(session.id);
+                                  setEditingTitleValue(session.title);
+                                }}
+                                title="编辑名称"
+                                style={{
+                                  background: "transparent",
+                                  border: "none",
+                                  color: "var(--text-muted)",
+                                  cursor: "pointer",
+                                  padding: "2px",
+                                }}
+                              >
+                                <Edit3 size={11} />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => deleteAiChatSession(session.id)}
+                              title="删除对话"
+                              style={{
+                                background: "transparent",
+                                border: "none",
+                                color: "var(--text-muted)",
+                                cursor: "pointer",
+                                padding: "2px",
+                              }}
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </nav>
 
         {/* Sidebar Footer: Collapse Toggle & Summary Card */}

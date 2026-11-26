@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { AIConfig, AI_PROVIDERS, AIProviderKey, AIProtocolType, AIDropdownSettings, CustomAIProvider } from "@/types/ai";
+import { AIConfig, AI_PROVIDERS, AIProviderKey, AIProtocolType, AIDropdownSettings, CustomAIProvider, AICallPreset, AICallSettings, AIUsageStats } from "@/types/ai";
 import { getAPIKeySlot, getProviderMeta } from "@/services/aiService";
 import { CategorizationRule, RulesSettings } from "@/types/sidebery";
 import { DEFAULT_RULES_SETTINGS } from "@/services/ruleEngine";
@@ -14,13 +14,15 @@ export type AppPage = "workbench" | "process" | "rules" | "ai" | "settings";
 
 export type ProcessScope = "current" | "all" | "selected";
 
-export type WorkbenchPanelLayout = "vertical" | "horizontal" | "dropdown";
+export type WorkbenchPanelLayout = "vertical" | "horizontal" | "dropdown" | "sidebar";
+export type AIChatHistoryLayout = "dropdown" | "sidebar";
 
 export interface UISettings {
   hideFileName: boolean;
   hideQuickTheme: boolean;
   hideEmptyPanels: boolean;
   workbenchPanelLayout?: WorkbenchPanelLayout;
+  aiChatHistoryLayout?: AIChatHistoryLayout;
 }
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
@@ -28,11 +30,62 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   hideQuickTheme: false,
   hideEmptyPanels: false,
   workbenchPanelLayout: "vertical",
+  aiChatHistoryLayout: "dropdown",
 };
 
 export const DEFAULT_AI_DROPDOWN_SETTINGS: AIDropdownSettings = {
   visibleProviders: ["deepseek", "claude", "openai", "gemini"],
   maxDropdownModels: 8,
+};
+
+export const AI_CALL_PRESET_CONFIGS: Record<Exclude<AICallPreset, "custom">, AICallSettings> = {
+  eco: {
+    preset: "eco",
+    temperature: 0.1,
+    maxTokens: 2048,
+    timeoutSeconds: 60,
+    maxHistoryTurns: 2,
+    minIntervalSeconds: 3,
+    dailyCallLimit: 50,
+  },
+  balanced: {
+    preset: "balanced",
+    temperature: 0.2,
+    maxTokens: undefined,
+    timeoutSeconds: 90,
+    maxHistoryTurns: 6,
+    minIntervalSeconds: 2,
+    dailyCallLimit: 0,
+  },
+  deep: {
+    preset: "deep",
+    temperature: 0.35,
+    maxTokens: 8192,
+    timeoutSeconds: 150,
+    maxHistoryTurns: 12,
+    minIntervalSeconds: 1,
+    dailyCallLimit: 0,
+  },
+};
+
+export const DEFAULT_AI_CALL_SETTINGS: AICallSettings = {
+  ...AI_CALL_PRESET_CONFIGS.balanced,
+};
+
+function getTodayDateString(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export const DEFAULT_AI_USAGE_STATS: AIUsageStats = {
+  date: getTodayDateString(),
+  callsToday: 0,
+  totalCalls: 0,
+  promptTokensToday: 0,
+  completionTokensToday: 0,
 };
 
 export interface AIThresholds {
@@ -61,8 +114,14 @@ interface ConfigState {
   aiPrompts: AIPromptsConfig;
   uiSettings: UISettings;
   aiDropdownSettings: AIDropdownSettings;
+  aiCallSettings: AICallSettings;
+  aiUsageStats: AIUsageStats;
   setUISettings: (settings: Partial<UISettings>) => void;
   setAIDropdownSettings: (settings: Partial<AIDropdownSettings>) => void;
+  setAICallSettings: (settings: Partial<AICallSettings>) => void;
+  applyAICallPreset: (preset: Exclude<AICallPreset, "custom">) => void;
+  recordAIUsage: (usage?: { promptTokens?: number; completionTokens?: number }) => void;
+  resetTodayAIUsage: () => void;
   togglePinnedModel: (slot: string, modelName: string) => void;
   switchAIProvider: (key: AIProviderKey, protocolOverride?: AIProtocolType) => void;
   addCustomProvider: (provider: Omit<CustomAIProvider, "id">, apiKey?: string) => string;
@@ -132,12 +191,59 @@ export const useConfigStore = create<ConfigState>()(
       aiPrompts: DEFAULT_AI_PROMPTS,
       uiSettings: DEFAULT_UI_SETTINGS,
       aiDropdownSettings: DEFAULT_AI_DROPDOWN_SETTINGS,
+      aiCallSettings: DEFAULT_AI_CALL_SETTINGS,
+      aiUsageStats: DEFAULT_AI_USAGE_STATS,
       setUISettings: (settings) => set((state) => ({ uiSettings: { ...state.uiSettings, ...settings } })),
       setAIDropdownSettings: (settings) =>
         set((state) => ({
           aiDropdownSettings: {
             ...(state.aiDropdownSettings || DEFAULT_AI_DROPDOWN_SETTINGS),
             ...settings,
+          },
+        })),
+      setAICallSettings: (settings) =>
+        set((state) => {
+          const prev = state.aiCallSettings || DEFAULT_AI_CALL_SETTINGS;
+          return {
+            aiCallSettings: {
+              ...prev,
+              ...settings,
+              preset: settings.preset ?? "custom",
+            },
+          };
+        }),
+      applyAICallPreset: (preset) =>
+        set(() => ({
+          aiCallSettings: {
+            ...AI_CALL_PRESET_CONFIGS[preset],
+          },
+        })),
+      recordAIUsage: (usage) =>
+        set((state) => {
+          const today = getTodayDateString();
+          const prev = state.aiUsageStats || DEFAULT_AI_USAGE_STATS;
+          const isSameDay = prev.date === today;
+          return {
+            aiUsageStats: {
+              date: today,
+              callsToday: (isSameDay ? prev.callsToday : 0) + 1,
+              totalCalls: (prev.totalCalls || 0) + 1,
+              promptTokensToday: (isSameDay ? prev.promptTokensToday : 0) + (usage?.promptTokens || 0),
+              completionTokensToday:
+                (isSameDay ? prev.completionTokensToday : 0) + (usage?.completionTokens || 0),
+              lastCallAt: Date.now(),
+            },
+          };
+        }),
+      resetTodayAIUsage: () =>
+        set((state) => ({
+          aiUsageStats: {
+            date: getTodayDateString(),
+            callsToday: 0,
+            totalCalls: state.aiUsageStats?.totalCalls || 0,
+            promptTokensToday: 0,
+            completionTokensToday: 0,
+            lastCallAt: undefined,
           },
         })),
 

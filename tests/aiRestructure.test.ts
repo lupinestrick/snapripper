@@ -33,6 +33,9 @@ import {
 } from "../src/utils/cookieHelper";
 import {
   repairJSONString,
+  resolveCallSettings,
+  checkAICallLimits,
+  truncateChatTurns,
   extractAndParseJSON,
   generateTabsSummary,
   normalizeAnthropicMessagesUrl,
@@ -1009,6 +1012,75 @@ Based on your tabs, here is the distribution:
   assert(
     customMeta.name === "硅基流动" && customMeta.isCustom,
     "getProviderMeta resolves custom provider metadata accurately"
+  );
+
+  // --- AI Call Presets, Limits & Context Truncation Tests ---
+  const resolvedCall = resolveCallSettings({
+    provider: "deepseek",
+    baseURL: "https://api.deepseek.com/v1",
+    apiKey: "k",
+    model: "deepseek-flash",
+    callSettings: {
+      preset: "eco",
+      temperature: 0.1,
+      maxTokens: 2048,
+      timeoutSeconds: 60,
+      maxHistoryTurns: 2,
+      minIntervalSeconds: 3,
+      dailyCallLimit: 50,
+    },
+  });
+  assert(
+    resolvedCall.preset === "eco" && resolvedCall.maxTokens === 2048 && resolvedCall.timeoutSeconds === 60,
+    "resolveCallSettings preserves eco preset parameters"
+  );
+
+  const nowMs = Date.now();
+  const cooldownCheck = checkAICallLimits(
+    resolvedCall,
+    {
+      date: "2026-11-26",
+      callsToday: 1,
+      totalCalls: 1,
+      promptTokensToday: 0,
+      completionTokensToday: 0,
+      lastCallAt: nowMs - 1000,
+    },
+    nowMs
+  );
+  assert(!cooldownCheck.ok, "checkAICallLimits blocks request within cooldown interval");
+
+  const todayDate = `${new Date(nowMs).getFullYear()}-${String(new Date(nowMs).getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(new Date(nowMs).getDate()).padStart(2, "0")}`;
+  const quotaCheck = checkAICallLimits(
+    { ...resolvedCall, minIntervalSeconds: 0, dailyCallLimit: 5 },
+    {
+      date: todayDate,
+      callsToday: 5,
+      totalCalls: 5,
+      promptTokensToday: 0,
+      completionTokensToday: 0,
+      lastCallAt: nowMs - 10000,
+    },
+    nowMs
+  );
+  assert(!quotaCheck.ok, "checkAICallLimits blocks request when dailyCallLimit is reached");
+
+  const truncated = truncateChatTurns(
+    [
+      { role: "user", content: "q1" },
+      { role: "assistant", content: "a1" },
+      { role: "user", content: "q2" },
+      { role: "assistant", content: "a2" },
+      { role: "user", content: "q3" },
+    ],
+    1
+  );
+  assert(
+    truncated.length === 3 && truncated[0].content === "q2" && truncated[2].content === "q3",
+    "truncateChatTurns keeps latest maxHistoryTurns plus current user turn"
   );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);

@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
-import { useConfigStore, DEFAULT_AI_DROPDOWN_SETTINGS } from "@/store/useConfigStore";
-import { BUILTIN_PROVIDER_KEYS, AIProtocolType } from "@/types/ai";
+import React, { useState, useEffect } from "react";
+import {
+  useConfigStore,
+  DEFAULT_AI_DROPDOWN_SETTINGS,
+  DEFAULT_UI_SETTINGS,
+  DEFAULT_AI_CALL_SETTINGS,
+  DEFAULT_AI_USAGE_STATS,
+  AI_CALL_PRESET_CONFIGS,
+  AIChatHistoryLayout,
+} from "@/store/useConfigStore";
+import { BUILTIN_PROVIDER_KEYS, AIProtocolType, AICallPreset } from "@/types/ai";
 import {
   getAPIKeySlot,
   fetchAvailableModels,
@@ -24,26 +32,48 @@ import {
   AlertCircle,
   Plus,
   Trash2,
+  ChevronDownSquare,
+  LayoutList,
+  ChevronDown,
+  ChevronRight,
+  RotateCcw,
 } from "lucide-react";
+
+export type AIModelSettingsTab = "dropdown" | "api" | "architect" | "limits";
 
 interface AIModelSettingsHopupProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: AIModelSettingsTab;
 }
 
-export function AIModelSettingsHopup({ isOpen, onClose }: AIModelSettingsHopupProps) {
+export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" }: AIModelSettingsHopupProps) {
   const {
     aiConfig,
     setAIConfig,
     aiDropdownSettings,
     setAIDropdownSettings,
+    aiCallSettings,
+    setAICallSettings,
+    applyAICallPreset,
+    aiUsageStats,
+    resetTodayAIUsage,
+    uiSettings,
+    setUISettings,
     togglePinnedModel,
     switchAIProvider,
     updateCustomProvider,
     deleteCustomProvider,
   } = useConfigStore();
 
-  const [activeTab, setActiveTab] = useState<"dropdown" | "api">("dropdown");
+  const [activeTab, setActiveTab] = useState<AIModelSettingsTab>(initialTab);
+  const [advancedLimitsOpen, setAdvancedLimitsOpen] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   const [customPinInput, setCustomPinInput] = useState("");
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [fetchStatus, setFetchStatus] = useState<{ success: boolean; message: string } | null>(null);
@@ -160,7 +190,7 @@ export function AIModelSettingsHopup({ isOpen, onClose }: AIModelSettingsHopupPr
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <SlidersHorizontal size={15} style={{ color: "var(--accent)" }} />
                 <Dialog.Title style={{ fontSize: "0.94rem", fontWeight: 600 }}>
-                  模型与下拉菜单设置
+                  AI 架构师与模型设置
                 </Dialog.Title>
               </div>
               <Dialog.CloseTrigger asChild>
@@ -197,6 +227,24 @@ export function AIModelSettingsHopup({ isOpen, onClose }: AIModelSettingsHopupPr
                 onClick={() => setActiveTab("api")}
               >
                 模型 API 设置
+              </Button>
+              <Button
+                type="button"
+                variant={activeTab === "architect" ? "subtle" : "ghost"}
+                size="xs"
+                pill
+                onClick={() => setActiveTab("architect")}
+              >
+                对话历史布局
+              </Button>
+              <Button
+                type="button"
+                variant={activeTab === "limits" ? "subtle" : "ghost"}
+                size="xs"
+                pill
+                onClick={() => setActiveTab("limits")}
+              >
+                调用参数与限制
               </Button>
             </div>
 
@@ -427,7 +475,7 @@ export function AIModelSettingsHopup({ isOpen, onClose }: AIModelSettingsHopupPr
                     </div>
                   </div>
                 </>
-              ) : (
+              ) : activeTab === "api" ? (
                 /* Tab 2: Model API Settings */
                 <>
                   <div>
@@ -634,6 +682,337 @@ export function AIModelSettingsHopup({ isOpen, onClose }: AIModelSettingsHopupPr
                       </span>
                     )}
                   </div>
+                </>
+              ) : activeTab === "architect" ? (
+                /* Tab 3: Architect & Chat History Layout */
+                <>
+                  <div>
+                    <div style={{ fontSize: "0.78rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                      对话历史布局
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.55rem" }}>
+                      {(
+                        [
+                          {
+                            id: "dropdown" as AIChatHistoryLayout,
+                            label: "下拉菜单",
+                            icon: <ChevronDownSquare size={15} />,
+                          },
+                          {
+                            id: "sidebar" as AIChatHistoryLayout,
+                            label: "插入导航栏",
+                            icon: <LayoutList size={15} />,
+                          },
+                        ] as const
+                      ).map((opt) => {
+                        const currentLayout =
+                          uiSettings?.aiChatHistoryLayout ||
+                          DEFAULT_UI_SETTINGS.aiChatHistoryLayout ||
+                          "dropdown";
+                        const active = currentLayout === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setUISettings({ aiChatHistoryLayout: opt.id })}
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "0.35rem",
+                              padding: "0.75rem 0.5rem",
+                              borderRadius: "0.65rem",
+                              border: "1px solid",
+                              borderColor: active ? "var(--accent-solid)" : "var(--border-subtle)",
+                              backgroundColor: active ? "var(--accent-subtle)" : "var(--bg-surface)",
+                              color: active ? "var(--accent-text)" : "var(--text-muted)",
+                              fontSize: "0.78rem",
+                              fontWeight: active ? 600 : 500,
+                              cursor: "pointer",
+                              transition: "all 0.12s ease",
+                            }}
+                          >
+                            {opt.icon}
+                            <span>{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Tab 4: Call Presets, Parameters & Limits */
+                <>
+                  {(() => {
+                    const callCfg = aiCallSettings || DEFAULT_AI_CALL_SETTINGS;
+                    const usage = aiUsageStats || DEFAULT_AI_USAGE_STATS;
+                    const presets: {
+                      id: Exclude<AICallPreset, "custom">;
+                      title: string;
+                      summary: string;
+                    }[] = [
+                      { id: "eco", title: "省流快速", summary: "低温 0.1 · 2 轮 · 3s 冷却 · 50次/日" },
+                      { id: "balanced", title: "均衡默认", summary: "低温 0.2 · 6 轮 · 90s 超时" },
+                      { id: "deep", title: "深度架构", summary: "8192 输出 · 12 轮 · 150s 超时" },
+                    ];
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        {/* 1. Scenario Presets */}
+                        <div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: "0.45rem",
+                            }}
+                          >
+                            <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>场景预设</span>
+                            {callCfg.preset === "custom" && (
+                              <span
+                                style={{
+                                  fontSize: "0.68rem",
+                                  padding: "1px 7px",
+                                  borderRadius: "9999px",
+                                  backgroundColor: "var(--accent-subtle)",
+                                  color: "var(--accent-text)",
+                                  border: "1px solid var(--accent-border)",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                已自定义
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.45rem" }}>
+                            {presets.map((p) => {
+                              const active = callCfg.preset === p.id;
+                              return (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  onClick={() => applyAICallPreset(p.id)}
+                                  style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "flex-start",
+                                    gap: "0.2rem",
+                                    padding: "0.6rem 0.65rem",
+                                    borderRadius: "0.6rem",
+                                    border: "1px solid",
+                                    borderColor: active ? "var(--accent-solid)" : "var(--border-subtle)",
+                                    backgroundColor: active ? "var(--accent-subtle)" : "var(--bg-surface)",
+                                    color: active ? "var(--accent-text)" : "var(--text-main)",
+                                    cursor: "pointer",
+                                    textAlign: "left",
+                                    transition: "all 0.12s ease",
+                                  }}
+                                >
+                                  <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>{p.title}</span>
+                                  <span style={{ fontSize: "0.66rem", color: "var(--text-muted)", lineHeight: 1.3 }}>
+                                    {p.summary}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 2. Today's Usage Strip */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.5rem",
+                            padding: "0.55rem 0.75rem",
+                            borderRadius: "0.6rem",
+                            backgroundColor: "var(--bg-surface)",
+                            border: "1px solid var(--border-subtle)",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.74rem", flexWrap: "wrap" }}>
+                            <span>
+                              今日调用:{" "}
+                              <strong style={{ color: "var(--accent-text)" }}>
+                                {usage.callsToday}
+                                {callCfg.dailyCallLimit > 0 ? ` / ${callCfg.dailyCallLimit}` : ""}
+                              </strong>
+                            </span>
+                            <span style={{ color: "var(--text-muted)" }}>
+                              Tokens: {(usage.promptTokensToday || 0) + (usage.completionTokensToday || 0)}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            pill
+                            onClick={resetTodayAIUsage}
+                            title="重置今日调用计数"
+                            style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}
+                          >
+                            <RotateCcw size={11} />
+                            <span>重置</span>
+                          </Button>
+                        </div>
+
+                        {/* 3. Collapsible Advanced Parameters & Guardrails */}
+                        <div
+                          style={{
+                            borderRadius: "0.65rem",
+                            border: "1px solid var(--border-subtle)",
+                            backgroundColor: "var(--bg-surface)",
+                            overflow: "hidden",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setAdvancedLimitsOpen((prev) => !prev)}
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "0.6rem 0.75rem",
+                              backgroundColor: "transparent",
+                              border: "none",
+                              color: "var(--text-main)",
+                              fontSize: "0.78rem",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                            }}
+                          >
+                            <span>高级参数与调用限制</span>
+                            {advancedLimitsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                          </button>
+
+                          {advancedLimitsOpen && (
+                            <div
+                              style={{
+                                padding: "0.75rem",
+                                borderTop: "1px solid var(--border-subtle)",
+                                display: "grid",
+                                gridTemplateColumns: "repeat(2, 1fr)",
+                                gap: "0.7rem",
+                              }}
+                            >
+                              {/* Temperature */}
+                              <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.72rem" }}>
+                                <span style={{ color: "var(--text-muted)" }}>Temperature (0 ~ 1.5)</span>
+                                <Input
+                                  type="number"
+                                  step={0.05}
+                                  min={0}
+                                  max={1.5}
+                                  value={callCfg.temperature}
+                                  onChange={(e) =>
+                                    setAICallSettings({
+                                      temperature: Math.min(1.5, Math.max(0, parseFloat(e.target.value) || 0)),
+                                    })
+                                  }
+                                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem" }}
+                                />
+                              </label>
+
+                              {/* Max Tokens */}
+                              <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.72rem" }}>
+                                <span style={{ color: "var(--text-muted)" }}>最大输出 Token (留空不限)</span>
+                                <Input
+                                  type="number"
+                                  min={256}
+                                  max={32768}
+                                  step={256}
+                                  placeholder="不限制"
+                                  value={callCfg.maxTokens ?? ""}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.trim();
+                                    setAICallSettings({
+                                      maxTokens: raw ? Math.max(128, parseInt(raw, 10) || 2048) : undefined,
+                                    });
+                                  }}
+                                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem" }}
+                                />
+                              </label>
+
+                              {/* Timeout */}
+                              <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.72rem" }}>
+                                <span style={{ color: "var(--text-muted)" }}>请求超时 (10 ~ 180 秒)</span>
+                                <Input
+                                  type="number"
+                                  min={10}
+                                  max={180}
+                                  step={10}
+                                  value={callCfg.timeoutSeconds}
+                                  onChange={(e) =>
+                                    setAICallSettings({
+                                      timeoutSeconds: Math.min(180, Math.max(10, parseInt(e.target.value, 10) || 90)),
+                                    })
+                                  }
+                                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem" }}
+                                />
+                              </label>
+
+                              {/* Max History Turns */}
+                              <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.72rem" }}>
+                                <span style={{ color: "var(--text-muted)" }}>携带历史轮数 (0 ~ 20)</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={20}
+                                  value={callCfg.maxHistoryTurns}
+                                  onChange={(e) =>
+                                    setAICallSettings({
+                                      maxHistoryTurns: Math.min(20, Math.max(0, parseInt(e.target.value, 10) || 0)),
+                                    })
+                                  }
+                                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem" }}
+                                />
+                              </label>
+
+                              {/* Min Interval */}
+                              <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.72rem" }}>
+                                <span style={{ color: "var(--text-muted)" }}>最小冷却间隔 (0 ~ 60 秒)</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={60}
+                                  value={callCfg.minIntervalSeconds}
+                                  onChange={(e) =>
+                                    setAICallSettings({
+                                      minIntervalSeconds: Math.min(60, Math.max(0, parseInt(e.target.value, 10) || 0)),
+                                    })
+                                  }
+                                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem" }}
+                                />
+                              </label>
+
+                              {/* Daily Call Limit */}
+                              <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem", fontSize: "0.72rem" }}>
+                                <span style={{ color: "var(--text-muted)" }}>每日调用上限 (0 = 不限)</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={1000}
+                                  value={callCfg.dailyCallLimit}
+                                  onChange={(e) =>
+                                    setAICallSettings({
+                                      dailyCallLimit: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                    })
+                                  }
+                                  style={{ fontSize: "0.76rem", padding: "0.3rem 0.5rem" }}
+                                />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>

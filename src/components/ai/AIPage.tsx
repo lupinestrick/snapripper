@@ -5,7 +5,7 @@ import { useConfigStore, DEFAULT_AI_DROPDOWN_SETTINGS } from "@/store/useConfigS
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { flattenTabTree } from "@/services/snapshotParser";
 import { clusterSnapshotTabs } from "@/services/tabClusterEngine";
-import { getAPIKeySlot, getOrderedModelsForSlot, getProviderMeta } from "@/services/aiService";
+import { getAPIKeySlot, getOrderedModelsForSlot, getProviderMeta, checkAICallLimits } from "@/services/aiService";
 import {
   sendArchitectChatRequest,
   applySchemeToSnapshot,
@@ -21,7 +21,7 @@ import {
 } from "@/types/ai";
 import { SchemeCard } from "./SchemeCard";
 import { MarkdownView } from "./MarkdownView";
-import { AIModelSettingsHopup } from "./AIModelSettingsHopup";
+import { AIModelSettingsHopup, AIModelSettingsTab } from "./AIModelSettingsHopup";
 import { SnapshotFileHopupModal } from "@/components/layout/SnapshotFileHopupModal";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -144,9 +144,12 @@ export function AIPage() {
     setAIConfig,
     aiPrompts,
     aiDropdownSettings,
+    aiCallSettings,
+    aiUsageStats,
+    recordAIUsage,
+    uiSettings,
     togglePinnedModel,
     switchAIProvider,
-    setActivePage,
     crossPanelMerge,
     setCrossPanelMerge,
     createGroupTabs,
@@ -179,6 +182,7 @@ export function AIPage() {
   const [clusterInspectorOpen, setClusterInspectorOpen] = useState(false);
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [modelSettingsHopupOpen, setModelSettingsHopupOpen] = useState(false);
+  const [settingsHopupTab, setSettingsHopupTab] = useState<AIModelSettingsTab>("dropdown");
   const [fileHopupOpen, setFileHopupOpen] = useState(false);
   const [historyMenuOpen, setHistoryMenuOpen] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -274,6 +278,17 @@ export function AIPage() {
       return;
     }
 
+    const limitCheck = checkAICallLimits(aiCallSettings, aiUsageStats);
+    if (!limitCheck.ok) {
+      addAiChatMessage({
+        id: `ai_limit_${Date.now()}`,
+        sender: "assistant",
+        timestamp: Date.now(),
+        text: `⏳ **已触发调用限制**：${limitCheck.reason}`,
+      });
+      return;
+    }
+
     const userMsg: AIChatMessage = {
       id: `user_${Date.now()}`,
       sender: "user",
@@ -292,6 +307,7 @@ export function AIPage() {
       `已压缩 ${clusterReport.clusters.length} 微簇 · 请求 ${aiConfig.model || currentProviderDef.model}...`
     );
 
+    let usageRecorded = false;
     try {
       const historyForAI = [
         ...aiChatMessages.map((m) => ({
@@ -302,11 +318,20 @@ export function AIPage() {
       ];
 
       const { text, schemes } = await sendArchitectChatRequest(
-        aiConfig,
+        { ...aiConfig, callSettings: aiCallSettings },
         historyForAI,
         clusterReport,
-        aiPrompts?.architectPrompt
+        aiPrompts?.architectPrompt,
+        {
+          onUsage: (u) => {
+            usageRecorded = true;
+            recordAIUsage(u);
+          },
+        }
       );
+      if (!usageRecorded) {
+        recordAIUsage({ promptTokens: 0, completionTokens: 0 });
+      }
 
       const resolvedSchemes =
         schemes && schemes.length > 0
@@ -617,6 +642,7 @@ export function AIPage() {
                     type="button"
                     onClick={() => {
                       setModelMenuOpen(false);
+                      setSettingsHopupTab("dropdown");
                       setModelSettingsHopupOpen(true);
                     }}
                     style={{
@@ -703,8 +729,9 @@ export function AIPage() {
             <span style={{ fontSize: "0.74rem" }}>新对话</span>
           </Button>
 
-          {/* Chat History Dropdown */}
-          <div ref={historyMenuRef} style={{ position: "relative" }}>
+          {/* Chat History Dropdown (only when layout === "dropdown") */}
+          {(uiSettings?.aiChatHistoryLayout || "dropdown") === "dropdown" && (
+            <div ref={historyMenuRef} style={{ position: "relative" }}>
             <Button
               variant="ghost"
               size="xs"
@@ -907,14 +934,18 @@ export function AIPage() {
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           <Button
             variant="ghost"
             size="xs"
             pill
-            onClick={() => setActivePage("settings")}
-            title="设置"
+            onClick={() => {
+              setSettingsHopupTab("architect");
+              setModelSettingsHopupOpen(true);
+            }}
+            title="AI 架构师设置"
             style={{ color: "var(--text-muted)", padding: "0.35rem" }}
           >
             <Settings size={15} />
@@ -1466,10 +1497,11 @@ export function AIPage() {
         </Dialog.Root>
       )}
 
-      {/* Model & Dropdown Settings Hop-up */}
+      {/* Model & Architect Settings Hop-up */}
       <AIModelSettingsHopup
         isOpen={modelSettingsHopupOpen}
         onClose={() => setModelSettingsHopupOpen(false)}
+        initialTab={settingsHopupTab}
       />
 
       {/* Snapshot File Hop-up */}
