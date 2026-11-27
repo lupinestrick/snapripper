@@ -111,6 +111,7 @@ interface SnapshotStoreState {
   onlyDuplicates: boolean;
   onlyPinned: boolean;
   duplicateUrls: Set<string>;
+  lastChangedIds: Set<string>;
 
   proportionReport: ProportionReport | null;
   isAnalyzing: boolean;
@@ -192,6 +193,16 @@ interface SnapshotStoreState {
   clearAllCache: () => void;
 }
 
+let rowFlashTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleRowFlashClear(setFn: (partial: Partial<SnapshotStoreState>) => void) {
+  if (rowFlashTimer) clearTimeout(rowFlashTimer);
+  rowFlashTimer = setTimeout(() => {
+    setFn({ lastChangedIds: new Set<string>() });
+    rowFlashTimer = null;
+  }, 1300);
+}
+
 export const useSnapshotStore = create<SnapshotStoreState>()(
   persist(
     (set, get) => ({
@@ -211,6 +222,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   onlyDuplicates: false,
   onlyPinned: false,
   duplicateUrls: new Set<string>(),
+  lastChangedIds: new Set<string>(),
 
   proportionReport: null,
   isAnalyzing: false,
@@ -251,6 +263,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       panelFilter: null,
       rootNodes: tree,
       duplicateUrls: duplicates,
+      lastChangedIds: new Set<string>(),
       expandedIds: initialExpanded,
       selectedIds: new Set<string>(),
       searchQuery: "",
@@ -284,6 +297,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       containerFilter: null,
       rootNodes: tree,
       duplicateUrls: duplicates,
+      lastChangedIds: new Set<string>(),
       expandedIds: initialExpanded,
       selectedIds: new Set<string>(),
       searchQuery: "",
@@ -469,12 +483,16 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
 
     syncSnapshotCookie(get().fileName, updatedTabs.length);
 
+    const flashedIds = new Set(selectedIds);
+
     set({
       undoStack: [...undoStack, rawSnapshot],
       redoStack: [],
       rawSnapshot: updatedSnapshot,
       rootNodes: updatedNodes,
+      lastChangedIds: flashedIds,
     });
+    scheduleRowFlashClear(set);
   },
 
   moveSelectedToPanel: (targetPanelId) => {
@@ -493,6 +511,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
     };
 
     syncSnapshotCookie(get().fileName, updatedTabs.length);
+    const flashedIds = new Set(selectedIds);
 
     set({
       undoStack: [...undoStack, rawSnapshot],
@@ -500,7 +519,9 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       rawSnapshot: updatedSnapshot,
       rootNodes: updatedNodes,
       selectedIds: new Set<string>(),
+      lastChangedIds: flashedIds,
     });
+    scheduleRowFlashClear(set);
   },
 
   undo: () => {
@@ -860,6 +881,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       onlyDuplicates: false,
       onlyPinned: false,
       duplicateUrls: new Set<string>(),
+      lastChangedIds: new Set<string>(),
       proportionReport: null,
       isAnalyzing: false,
       isClassifying: false,

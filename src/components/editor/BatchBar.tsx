@@ -22,6 +22,7 @@ export function BatchBar() {
 
   return (
     <div
+      className="sr-float-bar-in"
       style={{
         position: "fixed",
         bottom: "1.25rem",
@@ -91,6 +92,7 @@ export function BatchBar() {
 
           {panelSelectOpen && (
             <div
+              className="sr-popover-in"
               style={{
                 position: "absolute",
                 bottom: "120%",

@@ -614,3 +614,178 @@ body {
 input, button, select, textarea {
   font-family: inherit;
 }
+
+/* ============================================================================
+ * UI Motion & Micro-interactions (Option A + Option C)
+ * ============================================================================ */
+@keyframes sr-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sr-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes sr-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.965);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sr-modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.975);
+  }
+}
+
+@keyframes sr-slide-in-left {
+  from {
+    opacity: 0.4;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sr-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sr-float-bar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes sr-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes sr-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sr-row-flash {
+  0% {
+    background-color: var(--accent-subtle-hover, var(--accent-subtle));
+    box-shadow: inset 2px 0 0 var(--accent-solid);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 2px 0 0 transparent;
+  }
+}
+
+.sr-dialog-backdrop[data-state="open"] {
+  animation: sr-fade-in 160ms ease-out forwards;
+}
+
+.sr-dialog-backdrop[data-state="closed"] {
+  animation: sr-fade-out 130ms ease-in forwards;
+}
+
+.sr-dialog-content[data-state="open"] {
+  animation: sr-modal-in 190ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sr-dialog-content[data-state="closed"] {
+  animation: sr-modal-out 130ms ease-in forwards;
+}
+
+.sr-drawer-backdrop {
+  animation: sr-fade-in 180ms ease-out forwards;
+}
+
+.sr-drawer-panel {
+  animation: sr-slide-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sr-popover-in {
+  animation: sr-popover-in 150ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top center;
+}
+
+.sr-float-bar-in {
+  animation: sr-float-bar-in 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sr-toast-in {
+  animation: sr-toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.sr-page-enter {
+  animation: sr-fade-up 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sr-msg-in {
+  animation: sr-fade-up 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sr-row-flash {
+  animation: sr-row-flash 1200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sr-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sr-dialog-backdrop[data-state="open"],
+  .sr-dialog-backdrop[data-state="closed"],
+  .sr-dialog-content[data-state="open"],
+  .sr-dialog-content[data-state="closed"],
+  .sr-drawer-backdrop,
+  .sr-drawer-panel,
+  .sr-popover-in,
+  .sr-float-bar-in,
+  .sr-toast-in,
+  .sr-page-enter,
+  .sr-msg-in,
+  .sr-row-flash {
+    animation: none !important;
+  }
+
+  .sr-btn:active:not(:disabled) {
+    transform: none !important;
+  }
+}

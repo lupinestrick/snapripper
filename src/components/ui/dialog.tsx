@@ -28,7 +28,7 @@ export const Dialog = {
       return (
         <ArkDialog.Backdrop
           ref={ref}
-          className={`${classes.backdrop} ${className}`}
+          className={`${classes.backdrop} sr-dialog-backdrop ${className}`}
           style={{
             position: "fixed",
             inset: 0,
@@ -71,7 +71,7 @@ export const Dialog = {
       return (
         <ArkDialog.Content
           ref={ref}
-          className={`${classes.content} ${className}`}
+          className={`${classes.content} sr-dialog-content ${className}`}
           style={{
             backgroundColor: "var(--bg-card)",
             border: "1px solid var(--border-card)",

@@ -669,6 +669,7 @@ export function AIPage() {
 
             {modelMenuOpen && (
               <div
+                className="sr-popover-in"
                 style={{
                   position: "absolute",
                   top: "calc(100% + 6px)",
@@ -938,6 +939,7 @@ export function AIPage() {
 
             {historyMenuOpen && (
               <div
+                className="sr-popover-in"
                 style={{
                   position: "absolute",
                   top: "calc(100% + 6px)",
@@ -1427,7 +1429,7 @@ export function AIPage() {
 
             if (isSystem) {
               return (
-                <div key={msg.id} style={{ display: "flex", justifyContent: "center" }}>
+                <div key={msg.id} className="sr-msg-in" style={{ display: "flex", justifyContent: "center" }}>
                   <div
                     style={{
                       padding: "0.3rem 0.8rem",
@@ -1450,6 +1452,7 @@ export function AIPage() {
             return (
               <div
                 key={msg.id}
+                className="sr-msg-in"
                 style={{
                   display: "flex",
                   flexDirection: isUser ? "row-reverse" : "row",

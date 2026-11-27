@@ -1231,52 +1231,65 @@ export function SettingsPage() {
                   {item.title}
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    pill
-                    onClick={() => setFullscreenPromptKey(item.key)}
-                    title="全屏编辑"
-                  >
-                    <Maximize2 size={12} />
-                    <span>全屏编辑</span>
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    pill
-                    onClick={() => resetAIPrompt(item.key)}
-                    title="恢复默认"
-                  >
-                    <RotateCcw size={12} />
-                    <span>恢复默认</span>
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  pill
+                  onClick={() => resetAIPrompt(item.key)}
+                  title="恢复默认"
+                >
+                  <RotateCcw size={12} />
+                  <span>恢复默认</span>
+                </Button>
               </div>
 
-              <textarea
-                rows={item.rows}
-                value={aiPrompts?.[item.key] ?? item.defaultVal}
-                onChange={(e) => setAIPrompt(item.key, e.target.value)}
-                placeholder={item.placeholder}
-                style={{
-                  width: "100%",
-                  padding: "0.55rem 0.75rem",
-                  borderRadius: "var(--radius-btn, 6px)",
-                  backgroundColor: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
-                  color: "var(--text-main)",
-                  fontSize: "0.78rem",
-                  lineHeight: "1.45",
-                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-                  outline: "none",
-                  resize: "vertical",
-                }}
-              />
+              <div style={{ position: "relative", width: "100%" }}>
+                <textarea
+                  rows={item.rows}
+                  value={aiPrompts?.[item.key] ?? item.defaultVal}
+                  onChange={(e) => setAIPrompt(item.key, e.target.value)}
+                  placeholder={item.placeholder}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    padding: "0.55rem 0.75rem 2rem 0.75rem",
+                    borderRadius: "var(--radius-btn, 6px)",
+                    backgroundColor: "var(--bg-card)",
+                    border: "1px solid var(--border-subtle)",
+                    color: "var(--text-main)",
+                    fontSize: "0.78rem",
+                    lineHeight: "1.45",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                    outline: "none",
+                    resize: "none",
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setFullscreenPromptKey(item.key)}
+                  title="全屏编辑"
+                  aria-label="全屏编辑"
+                  style={{
+                    position: "absolute",
+                    right: "14px",
+                    bottom: "8px",
+                    width: "26px",
+                    height: "26px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-subtle)",
+                    color: "var(--text-muted)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Maximize2 size={13} />
+                </button>
+              </div>
             </div>
           ))}
         </div>

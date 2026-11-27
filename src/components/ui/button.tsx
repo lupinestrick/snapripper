@@ -79,7 +79,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
-        className={className}
+        className={`sr-btn ${className}`}
         style={{
           borderRadius: pill ? "9999px" : "var(--radius-btn, 6px)",
           padding,
@@ -96,7 +96,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           alignItems: "center",
           justifyContent: "center",
           gap: "0.35rem",
-          transition: "all 0.12s ease",
+          transition: "background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease, opacity 0.12s ease, transform 0.1s ease",
           ...style,
         }}
         onMouseEnter={(e) => {

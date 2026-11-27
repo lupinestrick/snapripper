@@ -3,7 +3,6 @@
 import React, { useRef, useState } from "react";
 import {
   ChevronRight,
-  ChevronDown,
   Pin,
   ExternalLink,
   Copy,
@@ -38,6 +37,7 @@ export function TabTreeView() {
     onlyPinned,
     setOnlyPinned,
     duplicateUrls,
+    lastChangedIds,
     rawSnapshot,
     loadSnapshot,
   } = useSnapshotStore();
@@ -157,6 +157,7 @@ export function TabTreeView() {
           selectedIds={selectedIds}
           selectTab={selectTab}
           duplicateUrls={duplicateUrls}
+          lastChangedIds={lastChangedIds}
           containers={rawSnapshot?.containers || {}}
         />
       ))}
@@ -172,6 +173,7 @@ interface TreeNodeRowProps {
   selectedIds: Set<string>;
   selectTab: (id: string, isMulti?: boolean) => void;
   duplicateUrls: Set<string>;
+  lastChangedIds: Set<string>;
   containers: Record<string, any>;
 }
 
@@ -183,6 +185,7 @@ function TreeNodeRow({
   selectedIds,
   selectTab,
   duplicateUrls,
+  lastChangedIds,
   containers,
 }: TreeNodeRowProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -190,6 +193,7 @@ function TreeNodeRow({
   const hasChildren = node.children && node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const isSelected = selectedIds.has(node.id);
+  const isRecentlyChanged = lastChangedIds.has(node.id);
   const isDuplicate = duplicateUrls.has(node.tab.url);
   const isGroupNode = Boolean(node.isCategoryHeader || node.isGroup);
 
@@ -210,6 +214,7 @@ function TreeNodeRow({
   return (
     <div>
       <div
+        className={isRecentlyChanged ? "sr-row-flash" : undefined}
         onClick={(e) => {
           selectTab(node.id, e.ctrlKey || e.metaKey || e.shiftKey);
         }}
@@ -229,7 +234,7 @@ function TreeNodeRow({
               : "transparent",
           border: isSelected ? "1px solid var(--accent-border)" : "1px solid transparent",
           cursor: "pointer",
-          transition: "background 0.1s ease",
+          transition: "background-color 0.12s ease, border-color 0.12s ease",
           fontSize: "0.82rem",
           userSelect: "none",
         }}
@@ -252,7 +257,13 @@ function TreeNodeRow({
                 padding: 0,
               }}
             >
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <ChevronRight
+                size={14}
+                style={{
+                  transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
+                  transition: "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
+                }}
+              />
             </button>
           ) : (
             <div style={{ width: "14px" }} />
@@ -428,6 +439,7 @@ function TreeNodeRow({
               selectedIds={selectedIds}
               selectTab={selectTab}
               duplicateUrls={duplicateUrls}
+              lastChangedIds={lastChangedIds}
               containers={containers}
             />
           ))}

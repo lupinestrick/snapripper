@@ -181,6 +181,7 @@ export function AppSidebar() {
 
   const sidebarElement = (
       <aside
+        className={isMobile ? "sr-drawer-panel" : undefined}
         style={{
           width: effectiveCompact ? "64px" : isMobile ? "224px" : "210px",
           transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -673,6 +674,7 @@ export function AppSidebar() {
                               flexBasis: 0,
                               height: "100%",
                               backgroundColor: seg.color,
+                              transition: "flex-grow 320ms cubic-bezier(0.22, 1, 0.36, 1), background-color 200ms ease",
                             }}
                           />
                         ))}
@@ -890,6 +892,7 @@ export function AppSidebar() {
         mobileDrawerOpen && (
           <>
             <div
+              className="sr-drawer-backdrop"
               onClick={() => setMobileDrawerOpen(false)}
               style={{
                 position: "fixed",

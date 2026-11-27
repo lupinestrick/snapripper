@@ -44,6 +44,7 @@ export function FeedbackHost() {
           {toasts.map((t) => (
             <div
               key={t.id}
+              className="sr-toast-in"
               style={{
                 pointerEvents: "auto",
                 display: "flex",

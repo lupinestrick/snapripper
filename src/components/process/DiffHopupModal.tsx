@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useConfigStore } from "@/store/useConfigStore";
 import { PanelDiffResult, TabTreeNode, SideberyTab } from "@/types/sidebery";
+import { ClusterGranularity } from "@/types/ai";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,8 @@ interface DiffHopupModalProps {
   totalDeduped: number;
   totalGroupsCreated: number;
   onRecomputeDiff?: () => void;
+  clusterGranularity?: ClusterGranularity;
+  onChangeClusterGranularity?: (granularity: ClusterGranularity) => void;
 }
 
 interface ComputedPanelSummary {
@@ -55,6 +58,8 @@ export function DiffHopupModal({
   totalDeduped,
   totalGroupsCreated,
   onRecomputeDiff,
+  clusterGranularity,
+  onChangeClusterGranularity,
 }: DiffHopupModalProps) {
   const { uiSettings } = useConfigStore();
   const [activePanelId, setActivePanelId] = useState<string>("");
@@ -352,6 +357,40 @@ export function DiffHopupModal({
                   />
                   <span>仅看有变更面板</span>
                 </label>
+              )}
+
+              {clusterGranularity && onChangeClusterGranularity && (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", marginLeft: "0.2rem" }}>
+                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>微簇粒度：</span>
+                  {(
+                    [
+                      { id: "coarse", label: "粗略" },
+                      { id: "balanced", label: "均衡" },
+                      { id: "fine", label: "细致" },
+                    ] as const
+                  ).map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => onChangeClusterGranularity(g.id)}
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: "9999px",
+                        fontSize: "0.7rem",
+                        border: "1px solid",
+                        borderColor:
+                          clusterGranularity === g.id ? "var(--accent-border)" : "var(--border-subtle)",
+                        backgroundColor:
+                          clusterGranularity === g.id ? "var(--accent-subtle)" : "var(--bg-card)",
+                        color:
+                          clusterGranularity === g.id ? "var(--accent-text)" : "var(--text-muted)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
               )}
 
               {viewMode === "tree" && (

@@ -153,15 +153,27 @@ export default function WorkbenchPage() {
             minHeight: 0,
           }}
         >
-          {activePage === "workbench" && <WorkbenchView />}
+          <div
+            key={activePage}
+            className="sr-page-enter"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            {activePage === "workbench" && <WorkbenchView />}
 
-          {activePage === "process" && <ProcessPage />}
+            {activePage === "process" && <ProcessPage />}
 
-          {activePage === "rules" && <RulesPage />}
+            {activePage === "rules" && <RulesPage />}
 
-          {activePage === "ai" && <AIPage />}
+            {activePage === "ai" && <AIPage />}
 
-          {activePage === "settings" && <SettingsPage />}
+            {activePage === "settings" && <SettingsPage />}
+          </div>
         </main>
       </div>
 
