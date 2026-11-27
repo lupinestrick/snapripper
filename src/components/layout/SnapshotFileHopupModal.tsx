@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
+import { serializeSnapshot } from "@/services/snapshotParser";
 import { confirmAction, toast } from "@/store/useFeedbackStore";
 import {
   buildFilteredExportSnapshot,
@@ -130,9 +131,7 @@ export function SnapshotFileHopupModal({ isOpen, onClose }: SnapshotFileHopupMod
       panelIds: panelFilter,
       dedupUrls: dedupOnExport,
     });
-    const jsonString = compactJson
-      ? JSON.stringify(res.snapshot)
-      : JSON.stringify(res.snapshot, null, 2);
+    const jsonString = serializeSnapshot(res.snapshot, compactJson);
     return {
       ...res,
       jsonString,

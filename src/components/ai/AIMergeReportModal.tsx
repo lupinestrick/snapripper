@@ -52,8 +52,6 @@ export function AIMergeReportModal({ isOpen, report, onClose }: AIMergeReportMod
     });
   }, [report, query, selectedCategory, onlyMoved]);
 
-  if (!isOpen || !report) return null;
-
   const locateInWorkbench = (panelId: string, searchText: string) => {
     setActivePanelId(panelId);
     setSearchQuery(searchText);
@@ -64,6 +62,7 @@ export function AIMergeReportModal({ isOpen, report, onClose }: AIMergeReportMod
   };
 
   const buildMarkdownReport = () => {
+    if (!report) return "";
     const lines: string[] = [
       `# AI 架构合并变更报告`,
       `- 时间：${new Date(report.timestamp).toLocaleString()}`,
@@ -95,6 +94,7 @@ export function AIMergeReportModal({ isOpen, report, onClose }: AIMergeReportMod
   };
 
   const handleDownloadMarkdown = () => {
+    if (!report) return;
     const blob = new Blob([buildMarkdownReport()], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -108,9 +108,10 @@ export function AIMergeReportModal({ isOpen, report, onClose }: AIMergeReportMod
   };
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog.Root open={isOpen && Boolean(report)} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Backdrop style={{ zIndex: 130 }} />
       <Dialog.Positioner style={{ zIndex: 140 }}>
+        {report && (
         <Dialog.Content
           style={{
             maxWidth: "860px",
@@ -387,6 +388,7 @@ export function AIMergeReportModal({ isOpen, report, onClose }: AIMergeReportMod
             </Button>
           </div>
         </Dialog.Content>
+        )}
       </Dialog.Positioner>
     </Dialog.Root>
   );

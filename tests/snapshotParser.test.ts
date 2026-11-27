@@ -35,6 +35,30 @@ export function runSnapshotParserTests() {
   const flattenedPinned = flattened.filter((t) => t.pinned).length;
   assert(originalPinned === flattenedPinned, `Pinned tabs count preserved (${flattenedPinned})`);
 
+  const v5Input = JSON.stringify({
+    ver: "5.2.0",
+    panels: { main: { id: "main", name: "Main" } },
+    sidebar: { nav: ["main"] },
+    tabs: [[[{ url: "https://old.example.com", title: "Old Tab", panelId: "main" }]]],
+  });
+  const parsedV5 = parseSnapshot(v5Input).snapshot;
+  const editedV5 = {
+    ...parsedV5,
+    windows: {
+      "1": {
+        tabs: [{ id: "1", url: "https://edited.example.com", title: "Edited Tab", panelId: "main", parentId: -1, lvl: 0 }],
+      },
+    },
+  };
+  const exportedV5 = JSON.parse(serializeSnapshot(editedV5, true));
+  assert(
+    Array.isArray(exportedV5.tabs) &&
+      exportedV5.tabs[0]?.[0]?.[0]?.url === "https://edited.example.com" &&
+      !exportedV5.windows &&
+      !exportedV5.rawTabsFormat,
+    "serializeSnapshot exports edited v5 tabs and strips internal windows/rawTabsFormat"
+  );
+
   console.log(`Snapshot Parser Tests Completed: ${passed} passed, ${failed} failed.\n`);
   return failed === 0;
 }

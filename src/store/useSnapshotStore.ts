@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage, StateStorage } from "zustand/middleware";
+import { get as idbGet, set as idbSet, del as idbDel } from "idb-keyval";
 import { SideberySnapshot, SideberyTab, TabTreeNode, CategorizationRule } from "@/types/sidebery";
 import { ProportionReport, AIProcessedCache, CategoryProportion, AIChatMessage, AIChatSession, AIMergeReport } from "@/types/ai";
 import { parseSnapshot, buildTabTree, flattenTabTree } from "@/services/snapshotParser";
@@ -202,6 +203,71 @@ function scheduleRowFlashClear(setFn: (partial: Partial<SnapshotStoreState>) => 
     rowFlashTimer = null;
   }, 1300);
 }
+
+const SNAPSHOT_STORAGE_KEY = "snapripper-snapshot-storage";
+
+/**
+ * IndexedDB storage adapter for large tab snapshots & undo stacks,
+ * with transparent one-time migration from legacy localStorage and error-safe writes.
+ */
+const snapshotStorage: StateStorage = {
+  getItem: async (name) => {
+    if (typeof window === "undefined") return null;
+    if (typeof indexedDB !== "undefined") {
+      try {
+        const val = await idbGet<string>(name);
+        if (val != null) return val;
+      } catch (err) {
+        console.warn("[useSnapshotStore] IndexedDB getItem failed:", err);
+      }
+    }
+    if (typeof localStorage !== "undefined") {
+      try {
+        const legacy = localStorage.getItem(name);
+        if (legacy != null) {
+          if (typeof indexedDB !== "undefined") {
+            await idbSet(name, legacy).catch(() => {});
+            localStorage.removeItem(name);
+          }
+          return legacy;
+        }
+      } catch {}
+    }
+    return null;
+  },
+  setItem: async (name, value) => {
+    if (typeof window === "undefined") return;
+    if (typeof indexedDB !== "undefined") {
+      try {
+        await idbSet(name, value);
+        return;
+      } catch (err) {
+        console.warn("[useSnapshotStore] IndexedDB setItem failed:", err);
+        return;
+      }
+    }
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.setItem(name, value);
+      } catch (err) {
+        console.warn("[useSnapshotStore] localStorage setItem failed:", err);
+      }
+    }
+  },
+  removeItem: async (name) => {
+    if (typeof window === "undefined") return;
+    if (typeof indexedDB !== "undefined") {
+      try {
+        await idbDel(name);
+      } catch {}
+    }
+    if (typeof localStorage !== "undefined") {
+      try {
+        localStorage.removeItem(name);
+      } catch {}
+    }
+  },
+};
 
 export const useSnapshotStore = create<SnapshotStoreState>()(
   persist(
@@ -540,6 +606,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       redoStack: [...redoStack, rawSnapshot],
       duplicateUrls: getDuplicateUrlSet(tabs),
       selectedIds: new Set<string>(),
+      isAIDiffModalOpen: false,
     });
   },
 
@@ -859,11 +926,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
 
   clearAllCache: () => {
     clearSnapshotCookies();
-    if (typeof localStorage !== "undefined") {
-      try {
-        localStorage.removeItem("snapripper-snapshot-storage");
-      } catch {}
-    }
+    void snapshotStorage.removeItem?.(SNAPSHOT_STORAGE_KEY);
     set({
       rawSnapshot: null,
       initialSnapshot: null,
@@ -892,7 +955,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       aiChatSessions: [],
       activeChatSessionId: null,
       isAIDiffModalOpen: false,
-  activeMergeReport: null,
+      activeMergeReport: null,
       isOverviewHopupOpen: false,
       undoStack: [],
       redoStack: [],
@@ -900,7 +963,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   },
 }),
     {
-      name: "snapripper-snapshot-storage",
+      name: SNAPSHOT_STORAGE_KEY,
+      storage: createJSONStorage(() => snapshotStorage),
       partialize: (state) => ({
         rawSnapshot: state.rawSnapshot,
         initialSnapshot: state.initialSnapshot,
@@ -909,9 +973,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
         rawFileSize: state.rawFileSize,
         activeWindowId: state.activeWindowId,
         activePanelId: state.activePanelId,
-        rootNodes: state.rootNodes,
         proportionReport: state.proportionReport,
-        aiProcessedCache: state.aiProcessedCache,
         aiChatMessages: state.aiChatMessages.slice(-20),
         aiChatSessions: (state.aiChatSessions || []).slice(0, 25),
         activeChatSessionId: state.activeChatSessionId,
@@ -920,18 +982,26 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       }),
       merge: (persistedState: any, currentState: SnapshotStoreState) => {
         if (!persistedState) return currentState;
-        const rootNodes = persistedState.rootNodes || [];
-        const tabs = persistedState.rawSnapshot?.windows?.[persistedState.activeWindowId || "1"]?.tabs || [];
+        const activeWinId = persistedState.activeWindowId || currentState.activeWindowId || "1";
+        const tabs = persistedState.rawSnapshot?.windows?.[activeWinId]?.tabs || [];
+        const rootNodes =
+          Array.isArray(persistedState.rootNodes) && persistedState.rootNodes.length > 0
+            ? persistedState.rootNodes
+            : buildTabTree(tabs);
         const duplicates = getDuplicateUrlSet(tabs);
         const initialExpanded = new Set<string>(rootNodes.map((n: any) => n.id));
         return {
           ...currentState,
           ...persistedState,
+          rootNodes,
           initialSnapshot: persistedState.initialSnapshot || persistedState.rawSnapshot || null,
           initialLoadedAt: persistedState.initialLoadedAt || null,
           duplicateUrls: duplicates,
           expandedIds: initialExpanded,
           selectedIds: new Set<string>(),
+          isAIDiffModalOpen: false,
+          activeMergeReport: null,
+          isOverviewHopupOpen: false,
           aiChatMessages: Array.isArray(persistedState.aiChatMessages) ? persistedState.aiChatMessages : [],
           aiChatSessions: Array.isArray(persistedState.aiChatSessions) ? persistedState.aiChatSessions : [],
           activeChatSessionId: persistedState.activeChatSessionId || null,

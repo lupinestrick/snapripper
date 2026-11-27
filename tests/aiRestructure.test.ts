@@ -1583,6 +1583,48 @@ Based on your tabs, here is the distribution:
     "computeSnapshotComposition partitions grouped, duplicate, exempt, and loose tabs accurately"
   );
 
+  // Repeated apply + undo + re-apply cycle with 1,200 tabs should never throw or corrupt tree
+  const largeTabs: SideberyTab[] = Array.from({ length: 1200 }, (_, i) => ({
+    id: `lt_${i + 1}`,
+    panelId: i % 2 === 0 ? "p1" : "p2",
+    parentId: -1,
+    lvl: 0,
+    title: `Large Tab ${i + 1}`,
+    url: `https://${i % 3 === 0 ? "github.com" : i % 3 === 1 ? "youtube.com" : "react.dev"}/path/${i + 1}`,
+  }));
+  const largeSnapPayload = JSON.stringify({
+    windows: { "1": { tabs: largeTabs } },
+    panels: { p1: { id: "p1", name: "Main" }, p2: { id: "p2", name: "Dev" } },
+  });
+  useSnapshotStore.getState().loadSnapshot(largeSnapPayload, "large.json");
+  const largeReport = clusterSnapshotTabs(largeTabs, useSnapshotStore.getState().rawSnapshot!.panels, "balanced");
+  const largeScheme = getFallbackSchemes(largeTabs, largeReport, "balanced")[0];
+
+  const cache1 = applySchemeToSnapshot(useSnapshotStore.getState().rawSnapshot!, largeScheme, {
+    crossPanelMerge: true,
+    createGroupTabs: true,
+    clusterReport: largeReport,
+  });
+  useSnapshotStore.getState().applySnapshotUpdate(cache1.processedSnapshot, "Round 1");
+  const cache2 = applySchemeToSnapshot(useSnapshotStore.getState().rawSnapshot!, largeScheme, {
+    crossPanelMerge: true,
+    createGroupTabs: true,
+    clusterReport: largeReport,
+  });
+  useSnapshotStore.getState().applySnapshotUpdate(cache2.processedSnapshot, "Round 2");
+  useSnapshotStore.getState().undo();
+  const cacheAfterUndo = applySchemeToSnapshot(useSnapshotStore.getState().rawSnapshot!, largeScheme, {
+    crossPanelMerge: true,
+    createGroupTabs: true,
+    clusterReport: largeReport,
+  });
+  assert(
+    cacheAfterUndo.summary.categorizedCount > 0 &&
+      useSnapshotStore.getState().undoStack.length === 1 &&
+      !useSnapshotStore.getState().isAIDiffModalOpen,
+    "Repeated apply, undo, and re-apply on 1,200 tabs succeeds cleanly without errors"
+  );
+
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);
   return { passed, failed };
 }

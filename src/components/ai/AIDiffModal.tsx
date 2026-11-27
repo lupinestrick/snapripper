@@ -201,8 +201,6 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     return list.length > 0 ? list : [{ id: "main", name: "主面板" }];
   }, [aiProcessedCache?.originalSnapshot.panels]);
 
-  if (!isOpen || !aiProcessedCache) return null;
-
   const effectivePanelId = activePanelId || displayedPanelList[0]?.id || "main";
   const currentSummary = panelSummaries.get(effectivePanelId);
   const changedPanelsCount = Array.from(panelSummaries.values()).filter((s) => s.changeCount > 0).length;
@@ -229,6 +227,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
   };
 
   const handleDirectApply = () => {
+    if (!aiProcessedCache) return;
     applySnapshotUpdate(aiProcessedCache.processedSnapshot, "应用 AI 重构方案");
     const report = buildAIMergeReport(aiProcessedCache);
     addAiChatMessage({
@@ -238,19 +237,28 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
       text: `已完成重构写入：**${report.categorizedCount}** 个标签已归类，**${report.movedAcrossPanelsCount}** 个标签跨面板迁移。点击下方按钮可随时检索每个标签的去向：`,
       mergeReport: report,
     });
+    onClose();
     setActiveMergeReport(report);
     toast.success("已应用方案并生成合并变更报告");
-    onClose();
   };
 
-  const summary = aiProcessedCache.summary;
+  const summary = aiProcessedCache?.summary || {
+    total: 0,
+    categorizedCount: 0,
+    uncategorizedCount: 0,
+    categoryCounts: {},
+  };
   const categorizedPercent =
     summary.total > 0 ? Math.round((summary.categorizedCount / summary.total) * 100) : 0;
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog.Root
+      open={isOpen && Boolean(aiProcessedCache)}
+      onOpenChange={(open) => !open && onClose()}
+    >
       <Dialog.Backdrop style={{ zIndex: 110 }} />
       <Dialog.Positioner style={{ zIndex: 120 }}>
+        {aiProcessedCache && (
         <Dialog.Content
           style={{
             width: "94vw",
@@ -647,6 +655,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
             </div>
           </div>
         </Dialog.Content>
+        )}
       </Dialog.Positioner>
     </Dialog.Root>
   );

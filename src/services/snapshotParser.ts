@@ -268,7 +268,7 @@ export function flattenTabTree(nodes: TabTreeNode[], panelIdFallback = "main"): 
   return result;
 }
 
-export function serializeSnapshot(snapshot: SideberySnapshot): string {
+export function serializeSnapshot(snapshot: SideberySnapshot, compact = false): string {
   // If the original was Sidebery v5 format with tabs: [ [ [ ... ] ] ], reconstruct that format
   const copy: any = { ...snapshot };
 
@@ -320,8 +320,8 @@ export function serializeSnapshot(snapshot: SideberySnapshot): string {
     delete copy.rawTabsFormat;
     delete copy.extensionBaseUrl;
 
-    return JSON.stringify(copy, null, 2);
+    return compact ? JSON.stringify(copy) : JSON.stringify(copy, null, 2);
   }
 
-  return JSON.stringify(copy, null, 2);
+  return compact ? JSON.stringify(copy) : JSON.stringify(copy, null, 2);
 }
