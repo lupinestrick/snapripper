@@ -4,7 +4,9 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useConfigStore, AppPage } from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { flattenTabTree } from "@/services/snapshotParser";
-import { OverviewHopup } from "./OverviewHopup";
+import { computeSnapshotComposition } from "@/services/snapshotDataService";
+import { extractDomain } from "@/utils/urlHelper";
+import { SnapshotFileHopupModal } from "./SnapshotFileHopupModal";
 import { Button } from "@/components/ui/button";
 import {
   Layers,
@@ -12,9 +14,12 @@ import {
   SlidersHorizontal,
   Bot,
   Settings,
-  BarChart2,
-  ChevronLeft,
+  ArrowLeft,
+  ArrowRight,
   ChevronRight,
+  ChevronsUpDown,
+  FileText,
+  Menu,
   LayoutList,
   History,
   Edit3,
@@ -22,11 +27,43 @@ import {
   Trash2,
 } from "lucide-react";
 
+/**
+ * 窄屏 / 低 DPI 模式下放在各页面顶栏最左侧的抽屉导航触发按钮。
+ */
+export function SidebarDrawerTrigger() {
+  const { isMobileViewport, setMobileDrawerOpen } = useConfigStore();
+  if (!isMobileViewport) return null;
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="xs"
+      pill
+      onClick={() => setMobileDrawerOpen(true)}
+      title="打开导航栏"
+      style={{ color: "var(--text-main)", padding: "0.35rem", flexShrink: 0 }}
+    >
+      <Menu size={16} />
+    </Button>
+  );
+}
+
 export function AppSidebar() {
-  const { activePage, setActivePage, uiSettings } = useConfigStore();
+  const {
+    activePage,
+    setActivePage,
+    uiSettings,
+    setSidebarCollapsed,
+    setIsMobileViewport,
+    mobileDrawerOpen,
+    setMobileDrawerOpen,
+  } = useConfigStore();
   const {
     rawSnapshot,
     rootNodes,
+    fileName,
+    duplicateUrls,
     panelFilter,
     setActivePanelId,
     aiChatSessions,
@@ -34,11 +71,13 @@ export function AppSidebar() {
     selectAiChatSession,
     renameAiChatSession,
     deleteAiChatSession,
-    isOverviewHopupOpen,
     setIsOverviewHopupOpen,
   } = useSnapshotStore();
   const [isCompact, setIsCompact] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [overviewHovered, setOverviewHovered] = useState(false);
+  const [selectorHovered, setSelectorHovered] = useState(false);
+  const [snapshotFileModalOpen, setSnapshotFileModalOpen] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState("");
 
@@ -48,35 +87,61 @@ export function AppSidebar() {
       const w = window.innerWidth;
       if (w < 768) {
         setIsMobile(true);
-      } else if (w < 1100) {
-        setIsMobile(false);
-        setIsCompact(true);
+        setIsMobileViewport(true);
+        setIsCompact(false);
       } else {
         setIsMobile(false);
-        setIsCompact(false);
+        setIsMobileViewport(false);
+        setMobileDrawerOpen(false);
+        setIsCompact(w < 1100);
       }
     };
 
     handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [setIsMobileViewport, setMobileDrawerOpen]);
 
-  const totalTabs = rawSnapshot
-    ? Object.values(rawSnapshot.windows).reduce((acc, w) => acc + (w.tabs?.length || 0), 0)
-    : 0;
+  useEffect(() => {
+    setSidebarCollapsed(isMobile || isCompact);
+  }, [isMobile, isCompact, setSidebarCollapsed]);
 
-  const panelCount = rawSnapshot?.panels ? Object.keys(rawSnapshot.panels).length : 0;
-
-  const isSidebarPanelMode =
-    uiSettings?.workbenchPanelLayout === "sidebar" && activePage === "workbench";
-  const isSidebarChatHistoryMode =
-    (uiSettings?.aiChatHistoryLayout || "dropdown") === "sidebar" && activePage === "ai";
+  useEffect(() => {
+    if (!isMobile || !mobileDrawerOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileDrawerOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isMobile, mobileDrawerOpen, setMobileDrawerOpen]);
 
   const allTabs = useMemo(
-    () => (isSidebarPanelMode && rawSnapshot ? flattenTabTree(rootNodes) : []),
-    [isSidebarPanelMode, rawSnapshot, rootNodes]
+    () => (rawSnapshot ? flattenTabTree(rootNodes) : []),
+    [rawSnapshot, rootNodes]
   );
+
+  const totalTabs = allTabs.length;
+  const panelCount = rawSnapshot?.panels ? Object.keys(rawSnapshot.panels).length : 0;
+  const domainCount = useMemo(() => {
+    const domains = new Set<string>();
+    for (const t of allTabs) {
+      const domain = extractDomain(t.url);
+      if (domain) domains.add(domain);
+    }
+    return domains.size;
+  }, [allTabs]);
+  const composition = useMemo(
+    () => computeSnapshotComposition(allTabs, duplicateUrls),
+    [allTabs, duplicateUrls]
+  );
+  const duplicateCount = composition.duplicateTabCount;
+
+  const isSidebarPanelMode =
+    (uiSettings?.workbenchPanelLayout || "sidebar") === "sidebar" && activePage === "workbench";
+  const isSidebarChatHistoryMode =
+    (uiSettings?.aiChatHistoryLayout || "sidebar") === "sidebar" && activePage === "ai";
 
   const panelEntries = useMemo(() => {
     if (!isSidebarPanelMode || !rawSnapshot?.panels) return [];
@@ -112,71 +177,12 @@ export function AppSidebar() {
     { page: "settings", label: "系统设置", icon: <Settings size={17} /> },
   ];
 
-  // Mobile Bottom Bar Navigation
-  if (isMobile) {
-    return (
-      <>
-        <div
-          style={{
-            position: "fixed",
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: "56px",
-            backgroundColor: "var(--bg-surface)",
-            borderTop: "1px solid var(--border-subtle)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-around",
-            zIndex: 90,
-            padding: "0 0.5rem",
-          }}
-        >
-          {navItems.map((item) => {
-            const isActive = activePage === item.page;
-            return (
-              <Button
-                key={item.page}
-                variant={isActive ? "solid" : "ghost"}
-                size="xs"
-                onClick={() => setActivePage(item.page)}
-                style={{
-                  flexDirection: "column",
-                  gap: "2px",
-                  padding: "4px 8px",
-                  fontSize: "0.68rem",
-                }}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </Button>
-            );
-          })}
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => setIsOverviewHopupOpen(true)}
-            style={{
-              padding: "4px 8px",
-              gap: "4px",
-              fontSize: "0.68rem",
-              color: "var(--accent-text)",
-            }}
-          >
-            <BarChart2 size={13} />
-            <span>{totalTabs}</span>
-          </Button>
-        </div>
-      </>
-    );
-  }
+  const effectiveCompact = !isMobile && isCompact;
 
-  // Desktop / Tablet Sidebar
-  return (
-    <>
+  const sidebarElement = (
       <aside
         style={{
-          width: isCompact ? "64px" : "210px",
+          width: effectiveCompact ? "64px" : isMobile ? "224px" : "210px",
           transition: "width 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
           backgroundColor: "var(--bg-surface)",
           borderRight: "1px solid var(--border-subtle)",
@@ -184,8 +190,19 @@ export function AppSidebar() {
           flexDirection: "column",
           flexShrink: 0,
           userSelect: "none",
-          position: "relative",
-          zIndex: 40,
+          ...(isMobile
+            ? {
+                position: "fixed",
+                top: 0,
+                bottom: 0,
+                left: 0,
+                zIndex: 100,
+                boxShadow: "8px 0 28px rgba(0, 0, 0, 0.28)",
+              }
+            : {
+                position: "relative",
+                zIndex: 40,
+              }),
         }}
       >
 
@@ -207,30 +224,33 @@ export function AppSidebar() {
               <Button
                 key={item.page}
                 variant={isActive ? "solid" : "ghost"}
-                onClick={() => setActivePage(item.page)}
+                onClick={() => {
+                  setActivePage(item.page);
+                  if (isMobile) setMobileDrawerOpen(false);
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: isCompact ? "center" : "flex-start",
+                  justifyContent: effectiveCompact ? "center" : "flex-start",
                   gap: "0.65rem",
-                  padding: isCompact ? "0.55rem 0" : "0.5rem 0.75rem",
+                  padding: effectiveCompact ? "0.55rem 0" : "0.5rem 0.75rem",
                   fontSize: "0.825rem",
                   width: "100%",
                   color: isActive ? "var(--accent-fg, #ffffff)" : "var(--text-muted)",
                   flexShrink: 0,
                 }}
-                title={isCompact ? item.label : undefined}
+                title={effectiveCompact ? item.label : undefined}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "18px" }}>
                   {item.icon}
                 </div>
-                {!isCompact && <span>{item.label}</span>}
+                {!effectiveCompact && <span>{item.label}</span>}
               </Button>
             );
           })}
 
           {/* Inserted Panel List below System Settings (when workbenchPanelLayout === "sidebar") */}
-          {isSidebarPanelMode && (
+          {isSidebarPanelMode && !effectiveCompact && !isMobile && (
             <>
               <div
                 style={{
@@ -346,7 +366,7 @@ export function AppSidebar() {
           )}
 
           {/* Inserted AI Chat History below System Settings (when aiChatHistoryLayout === "sidebar" on AI page) */}
-          {isSidebarChatHistoryMode && (
+          {isSidebarChatHistoryMode && !effectiveCompact && !isMobile && (
             <>
               <div
                 style={{
@@ -532,72 +552,265 @@ export function AppSidebar() {
           )}
         </nav>
 
-        {/* Sidebar Footer: Collapse Toggle & Summary Card */}
-        {!isCompact ? (
+        {/* Sidebar Footer: Option A Card + Bottom Collapse Control + File Pill */}
+        {!effectiveCompact ? (
           <div
             style={{
-              padding: "0.5rem 0.6rem 0.75rem",
+              padding: "0.55rem 0.65rem 0.7rem",
               display: "flex",
-              alignItems: "center",
+              flexDirection: "column",
               gap: "0.45rem",
             }}
           >
-            {/* Circular Collapse Button (on the left of Snapshot Overview) */}
-            <Button
-              variant="ghost"
-              size="xs"
-              onClick={() => setIsCompact(true)}
+            {/* 1. Option A Hero + Segmented Composition Overview Card */}
+            {!uiSettings?.hideSidebarOverviewCard && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isMobile) setMobileDrawerOpen(false);
+                  setIsOverviewHopupOpen(true);
+                }}
+                onMouseEnter={() => setOverviewHovered(true)}
+                onMouseLeave={() => setOverviewHovered(false)}
+                title={
+                  rawSnapshot
+                    ? `点击查看快照多维分析 (已成组 ${composition.groupedCount} · 散落 ${composition.looseCount} · 重复 ${composition.duplicateTabCount} · 豁免 ${composition.exemptCount})`
+                    : "点击查看快照多维分析"
+                }
+                style={{
+                  width: "100%",
+                  padding: "0.65rem 0.72rem",
+                  borderRadius: "0.8rem",
+                  border: rawSnapshot
+                    ? `1px solid ${overviewHovered ? "var(--accent-border)" : "var(--border-subtle)"}`
+                    : `1px dashed ${overviewHovered ? "var(--accent-border)" : "var(--border-card)"}`,
+                  backgroundColor: overviewHovered ? "var(--bg-card)" : "var(--bg-subtle)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: "0.38rem",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  transition: "border-color 0.15s ease, background-color 0.15s ease",
+                }}
+              >
+                {rawSnapshot ? (
+                  <>
+                    {/* Row 1: Hero Total + Analyze Prompt */}
+                    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "0.35rem" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "0.26rem", minWidth: 0 }}>
+                        <span
+                          style={{
+                            fontSize: "1.12rem",
+                            fontWeight: 700,
+                            color: "var(--text-main)",
+                            lineHeight: 1.1,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {totalTabs}
+                        </span>
+                        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                          标签
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "1px",
+                          fontSize: "0.68rem",
+                          fontWeight: 500,
+                          color: overviewHovered ? "var(--accent)" : "var(--text-muted)",
+                          whiteSpace: "nowrap",
+                          transition: "color 0.15s ease",
+                        }}
+                      >
+                        <ChevronRight size={12} />
+                      </span>
+                    </div>
+
+                    {/* Row 2: Secondary Scale Summary */}
+                    <div
+                      style={{
+                        fontSize: "0.67rem",
+                        color: "var(--text-muted)",
+                        lineHeight: 1.2,
+                        fontVariantNumeric: "tabular-nums",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {panelCount} 面板 · {domainCount} 域名
+                    </div>
+
+                    {/* Row 3: 4px Segmented Structure Bar */}
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "4px",
+                        borderRadius: "9999px",
+                        backgroundColor: "var(--border-subtle)",
+                        overflow: "hidden",
+                        display: "flex",
+                        gap: "1px",
+                        marginTop: "0.06rem",
+                      }}
+                    >
+                      {[
+                        { key: "grouped", count: composition.groupedCount, color: "var(--accent-solid)" },
+                        { key: "loose", count: composition.looseCount, color: "var(--border-card)" },
+                        { key: "duplicate", count: composition.duplicateTabCount, color: "#f59e0b" },
+                        { key: "exempt", count: composition.exemptCount, color: "#10b981" },
+                      ]
+                        .filter((seg) => seg.count > 0)
+                        .map((seg) => (
+                          <div
+                            key={seg.key}
+                            style={{
+                              flexGrow: seg.count,
+                              flexBasis: 0,
+                              height: "100%",
+                              backgroundColor: seg.color,
+                            }}
+                          />
+                        ))}
+                    </div>
+
+                    {/* Row 4: Grouped vs Duplicate Focus Pair */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.35rem",
+                        fontSize: "0.67rem",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      <span style={{ color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                        已组 {composition.groupedCount}
+                      </span>
+                      <span
+                        style={{
+                          fontWeight: 500,
+                          color: duplicateCount > 0 ? "#d97706" : "#059669",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {duplicateCount > 0 ? `重复 ${duplicateCount}` : "无重复"}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.35rem" }}>
+                      <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-main)" }}>
+                        快照分析
+                      </span>
+                      <ChevronRight
+                        size={13}
+                        style={{ color: overviewHovered ? "var(--accent)" : "var(--text-muted)" }}
+                      />
+                    </div>
+                    <div style={{ fontSize: "0.67rem", color: "var(--text-muted)" }}>
+                      暂无快照 · 点击查看详情
+                    </div>
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "4px",
+                        borderRadius: "9999px",
+                        backgroundColor: "var(--border-subtle)",
+                      }}
+                    />
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* 2. Bottom Row: Circular Collapse Button + Snapshot File Selector Pill */}
+            <div
               style={{
-                width: "32px",
-                height: "32px",
-                minWidth: "32px",
-                padding: 0,
-                borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text-muted)",
-                border: "1px solid var(--border-subtle)",
-                backgroundColor: "var(--bg-subtle)",
-                flexShrink: 0,
-              }}
-              title="折叠侧边栏"
-            >
-              <ChevronLeft size={15} />
-            </Button>
-
-            {/* Snapshot Overview Button (always visible in footer) */}
-            <Button
-              variant="outline"
-              onClick={() => setIsOverviewHopupOpen(true)}
-              style={{
-                flex: 1,
-                padding: "0.4rem 0.55rem",
-                borderRadius: "0.65rem",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "stretch",
-                gap: "0.2rem",
-                textAlign: "left",
-                backgroundColor: "var(--bg-subtle)",
-                borderColor: "var(--border-subtle)",
+                gap: "0.45rem",
+                paddingTop: "0.08rem",
                 minWidth: 0,
               }}
-              title="查看快照总览数据分析"
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 600 }}>快照概览</span>
-                <BarChart2 size={12} style={{ color: "var(--accent)" }} />
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", overflow: "hidden" }}>
-                <span style={{ fontSize: "1.05rem", fontWeight: 700, color: "var(--text-main)", lineHeight: 1.1 }}>
-                  {totalTabs}
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  if (isMobile) {
+                    setMobileDrawerOpen(false);
+                  } else {
+                    setIsCompact(true);
+                  }
+                }}
+                style={{
+                  width: "30px",
+                  height: "30px",
+                  minWidth: "30px",
+                  padding: 0,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--text-main)",
+                  border: "1px solid var(--border-subtle)",
+                  backgroundColor: "var(--bg-subtle)",
+                  flexShrink: 0,
+                }}
+                title={isMobile ? "关闭导航抽屉" : "收起导航栏"}
+              >
+                <ArrowLeft size={14} />
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (isMobile) setMobileDrawerOpen(false);
+                  setSnapshotFileModalOpen(true);
+                }}
+                onMouseEnter={() => setSelectorHovered(true)}
+                onMouseLeave={() => setSelectorHovered(false)}
+                title={rawSnapshot ? `管理或切换快照 (${fileName || "未命名快照"})` : "导入或粘贴快照"}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "0.42rem 0.6rem",
+                  borderRadius: "0.7rem",
+                  border: `1px solid ${selectorHovered ? "var(--accent-border)" : "var(--border-subtle)"}`,
+                  backgroundColor: selectorHovered ? "var(--bg-card)" : "var(--bg-subtle)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "0.4rem",
+                  cursor: "pointer",
+                  transition: "border-color 0.15s ease, background-color 0.15s ease",
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: "0.75rem",
+                    fontWeight: 500,
+                    color: rawSnapshot ? "var(--text-main)" : "var(--text-muted)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    textAlign: "left",
+                  }}
+                >
+                  {rawSnapshot ? fileName || "已加载快照" : "导入 / 切换快照"}
                 </span>
-                <span style={{ fontSize: "0.68rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-                  {rawSnapshot ? `标签 / ${panelCount} 面板` : "等待导入"}
-                </span>
-              </div>
-            </Button>
+                <ChevronsUpDown size={13} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+              </button>
+            </div>
           </div>
         ) : (
           <div
@@ -606,25 +819,43 @@ export function AppSidebar() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "0.45rem",
+              gap: "0.5rem",
             }}
           >
             <Button
               variant="outline"
-              onClick={() => setIsOverviewHopupOpen(true)}
+              size="xs"
+              onClick={() => setSnapshotFileModalOpen(true)}
               style={{
-                width: "100%",
-                padding: "0.45rem 0",
-                flexDirection: "column",
-                gap: "2px",
+                position: "relative",
+                width: "34px",
+                height: "34px",
+                minWidth: "34px",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 backgroundColor: "var(--bg-subtle)",
                 borderColor: "var(--border-subtle)",
-                borderRadius: "0.5rem",
+                borderRadius: "0.6rem",
+                color: rawSnapshot ? "var(--accent)" : "var(--text-muted)",
               }}
-              title="查看快照总览数据分析"
+              title={rawSnapshot ? `快照文件与数据中心 (${fileName || "已加载快照"})` : "快照文件与数据中心"}
             >
-              <BarChart2 size={14} style={{ color: "var(--accent)" }} />
-              <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-main)" }}>{totalTabs}</span>
+              {rawSnapshot && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "4px",
+                    right: "4px",
+                    width: "5px",
+                    height: "5px",
+                    borderRadius: "50%",
+                    backgroundColor: duplicateCount > 0 ? "#d97706" : "#3b9b74",
+                  }}
+                />
+              )}
+              <FileText size={15} />
             </Button>
 
             <Button
@@ -632,25 +863,53 @@ export function AppSidebar() {
               size="xs"
               onClick={() => setIsCompact(false)}
               style={{
-                width: "32px",
-                height: "32px",
-                minWidth: "32px",
+                width: "30px",
+                height: "30px",
+                minWidth: "30px",
                 padding: 0,
                 borderRadius: "50%",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--text-muted)",
+                color: "var(--text-main)",
                 border: "1px solid var(--border-subtle)",
                 backgroundColor: "var(--bg-subtle)",
               }}
-              title="展开侧边栏"
+              title="展开导航栏"
             >
-              <ChevronRight size={15} />
+              <ArrowRight size={14} />
             </Button>
           </div>
         )}
       </aside>
+  );
+
+  return (
+    <>
+      {isMobile ? (
+        mobileDrawerOpen && (
+          <>
+            <div
+              onClick={() => setMobileDrawerOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.45)",
+                backdropFilter: "blur(2px)",
+                zIndex: 95,
+              }}
+            />
+            {sidebarElement}
+          </>
+        )
+      ) : (
+        sidebarElement
+      )}
+
+      <SnapshotFileHopupModal
+        isOpen={snapshotFileModalOpen}
+        onClose={() => setSnapshotFileModalOpen(false)}
+      />
     </>
   );
 }

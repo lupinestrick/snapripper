@@ -11,6 +11,7 @@ import { DiffHopupModal } from "./DiffHopupModal";
 import { DiffSettingsModal } from "./DiffSettingsModal";
 import { flattenTabTree } from "@/services/snapshotParser";
 import { getDuplicateUrlSet } from "@/services/treeOperations";
+import { SidebarDrawerTrigger } from "@/components/layout/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,13 +21,14 @@ import {
   AlertCircle,
   Sparkles,
   Globe,
-  SlidersHorizontal,
+  Settings,
   Layers,
   CheckCircle2,
   ArrowRight,
   X,
   Play,
   Check,
+  Undo2,
 } from "lucide-react";
 
 interface PipelineStepState {
@@ -44,7 +46,7 @@ const GRANULARITY_LABELS: Record<ClusterGranularity, string> = {
 };
 
 export function ProcessPage() {
-  const { rawSnapshot, rootNodes, activePanelId, applySnapshotUpdate, aiProcessedCache } =
+  const { rawSnapshot, rootNodes, activePanelId, applySnapshotUpdate, aiProcessedCache, undoStack, undo } =
     useSnapshotStore();
   const {
     rulesSettings,
@@ -365,21 +367,37 @@ export function ProcessPage() {
   ];
 
   return (
-    <div style={{ padding: "1.75rem 2rem", maxWidth: "880px", margin: "0 auto", color: "var(--text-main)" }}>
-      {/* Header */}
+    <div
+      style={{
+        height: "100%",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        color: "var(--text-main)",
+      }}
+    >
+      {/* Unified Top Navbar for Process Center */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: "1rem",
+          padding: "0.55rem 1.25rem",
+          minHeight: "50px",
+          backgroundColor: "var(--bg-surface)",
+          borderBottom: "1px solid var(--border-subtle)",
+          flexShrink: 0,
           flexWrap: "wrap",
-          gap: "0.75rem",
+          gap: "0.6rem",
         }}
       >
-        <h1 style={{ fontSize: "1.35rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
-          处理中心
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+          <SidebarDrawerTrigger />
+          <h1 style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+            处理中心
+          </h1>
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
           <Button variant="subtle" size="xs" pill onClick={() => applyPreset("full")}>
@@ -392,18 +410,34 @@ export function ProcessPage() {
           <Button variant="outline" size="xs" pill onClick={() => applyPreset("cluster")}>
             <span>去重+微簇</span>
           </Button>
+          {undoStack.length > 0 && (
+            <Button
+              variant="outline"
+              size="xs"
+              pill
+              onClick={undo}
+              title={`撤销上一步修改 (${undoStack.length})`}
+            >
+              <Undo2 size={12} />
+              <span>撤销</span>
+            </Button>
+          )}
           <Button
-            variant="outline"
+            variant="ghost"
             size="xs"
             pill
             onClick={() => setPageSettingsOpen(true)}
-            style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+            title="处理范围与策略设置"
+            style={{ color: "var(--text-muted)", padding: "0.35rem" }}
           >
-            <SlidersHorizontal size={12} />
-            <span>设置</span>
+            <Settings size={15} />
           </Button>
         </div>
       </div>
+
+      {/* Scrollable Body */}
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <div style={{ padding: "1.25rem 2rem 70px", maxWidth: "880px", margin: "0 auto" }}>
 
       {/* Compact Telemetry Strip */}
       <div
@@ -660,6 +694,8 @@ export function ProcessPage() {
         activePanelId={activePanelId || undefined}
         panels={panelsList}
       />
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,16 +2,17 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
-import { useConfigStore } from "@/store/useConfigStore";
+import { useConfigStore, resolveEffectiveWorkbenchPanelLayout } from "@/store/useConfigStore";
 import { flattenTabTree } from "@/services/snapshotParser";
 import { SearchFilter } from "./SearchFilter";
 import { TabTreeView } from "./TabTreeView";
 import { BatchBar } from "./BatchBar";
+import { SidebarDrawerTrigger } from "@/components/layout/AppSidebar";
 import { LayoutList } from "lucide-react";
 
 export function WorkbenchView() {
   const { rawSnapshot, rootNodes, panelFilter, setActivePanelId } = useSnapshotStore();
-  const { uiSettings } = useConfigStore();
+  const { uiSettings, sidebarCollapsed } = useConfigStore();
   const [isNarrow, setIsNarrow] = useState(false);
 
   useEffect(() => {
@@ -21,7 +22,10 @@ export function WorkbenchView() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
-  const panelLayout = uiSettings?.workbenchPanelLayout || "vertical";
+  const panelLayout = resolveEffectiveWorkbenchPanelLayout(
+    uiSettings?.workbenchPanelLayout,
+    sidebarCollapsed
+  );
 
   const allTabs = useMemo(
     () => (rawSnapshot ? flattenTabTree(rootNodes) : []),
@@ -59,92 +63,129 @@ export function WorkbenchView() {
     <div
       style={{
         display: "flex",
-        flexDirection: renderHorizontal ? "column" : "row",
+        flexDirection: "column",
         height: "100%",
         width: "100%",
         overflow: "hidden",
       }}
     >
-      {/* Panel Rail: Vertical Left Sidebar OR Horizontal Bar Above Search */}
-      {showPanelBar && (
-        <aside
-          style={
-            renderHorizontal
-              ? {
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.35rem",
-                  padding: "0.45rem 0.85rem",
-                  borderBottom: "1px solid var(--border-subtle)",
-                  backgroundColor: "var(--bg-surface)",
-                  overflowX: "auto",
-                  flexShrink: 0,
-                }
-              : {
-                  width: "184px",
-                  flexShrink: 0,
-                  borderRight: "1px solid var(--border-subtle)",
-                  backgroundColor: "var(--bg-surface)",
-                  display: "flex",
-                  flexDirection: "column",
-                  overflowY: "auto",
-                  padding: "0.55rem 0.45rem",
-                  gap: "0.15rem",
-                }
-          }
+      {/* Unified Top Navbar for Workbench (Search + Filters + Actions) */}
+      {rawSnapshot ? (
+        <SearchFilter />
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0.55rem 1.25rem",
+            minHeight: "50px",
+            backgroundColor: "var(--bg-surface)",
+            borderBottom: "1px solid var(--border-subtle)",
+            flexShrink: 0,
+          }}
         >
-          {!renderHorizontal && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
-                fontSize: "0.68rem",
-                fontWeight: 600,
-                color: "var(--text-muted)",
-                padding: "0.2rem 0.5rem 0.35rem 0.5rem",
-                letterSpacing: "0.02em",
-              }}
-            >
-              <LayoutList size={12} />
-              <span>面板</span>
-            </div>
-          )}
-
-          <PanelRailItem
-            label="全部"
-            count={allTabs.length}
-            active={!panelFilter}
-            compact={renderHorizontal}
-            onClick={() => setActivePanelId(null)}
-          />
-
-          {panelEntries.map((p) => (
-            <PanelRailItem
-              key={p.id}
-              label={p.name}
-              count={p.count}
-              active={panelFilter === p.id}
-              compact={renderHorizontal}
-              onClick={() => setActivePanelId(p.id)}
-            />
-          ))}
-        </aside>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+            <SidebarDrawerTrigger />
+            <h1 style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+              工作台
+            </h1>
+          </div>
+        </div>
       )}
 
-      {/* Right / Main Canvas: Sticky Toolbar + Scrollable Tree + Floating BatchBar */}
+      {/* Body: Panel Rail (Vertical Left or Horizontal Top) + Tab Tree */}
       <div
         style={{
           flex: 1,
           display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
+          flexDirection: renderHorizontal ? "column" : "row",
+          minHeight: 0,
+          width: "100%",
           overflow: "hidden",
         }}
       >
-        {rawSnapshot && <SearchFilter />}
-        <TabTreeView />
-        <BatchBar />
+        {/* Panel Rail: Vertical Left Sidebar OR Horizontal Bar Below Topbar */}
+        {showPanelBar && (
+          <aside
+            style={
+              renderHorizontal
+                ? {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    padding: "0.45rem 0.85rem",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-surface)",
+                    overflowX: "auto",
+                    flexShrink: 0,
+                  }
+                : {
+                    width: "184px",
+                    flexShrink: 0,
+                    borderRight: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-surface)",
+                    display: "flex",
+                    flexDirection: "column",
+                    overflowY: "auto",
+                    padding: "0.55rem 0.45rem",
+                    gap: "0.15rem",
+                  }
+            }
+          >
+            {!renderHorizontal && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.35rem",
+                  fontSize: "0.68rem",
+                  fontWeight: 600,
+                  color: "var(--text-muted)",
+                  padding: "0.2rem 0.5rem 0.35rem 0.5rem",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                <LayoutList size={12} />
+                <span>面板</span>
+              </div>
+            )}
+
+            <PanelRailItem
+              label="全部"
+              count={allTabs.length}
+              active={!panelFilter}
+              compact={renderHorizontal}
+              onClick={() => setActivePanelId(null)}
+            />
+
+            {panelEntries.map((p) => (
+              <PanelRailItem
+                key={p.id}
+                label={p.name}
+                count={p.count}
+                active={panelFilter === p.id}
+                compact={renderHorizontal}
+                onClick={() => setActivePanelId(p.id)}
+              />
+            ))}
+          </aside>
+        )}
+
+        {/* Main Canvas: Scrollable Tree + Floating BatchBar */}
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            minWidth: 0,
+            minHeight: 0,
+            overflow: "hidden",
+          }}
+        >
+          <TabTreeView />
+          <BatchBar />
+        </div>
       </div>
     </div>
   );

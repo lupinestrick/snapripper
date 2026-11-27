@@ -9,6 +9,7 @@ export function filterTree(
     panelId?: string;
     showOnlyDuplicates?: boolean;
     duplicateUrls?: Set<string>;
+    showOnlyPinned?: boolean;
   }
 ): TabTreeNode[] {
   const q = query.trim().toLowerCase();
@@ -16,6 +17,7 @@ export function filterTree(
   function matchNode(node: TabTreeNode): boolean {
     if (options?.containerId && node.tab.containerId !== options.containerId) return false;
     if (options?.panelId && node.tab.panelId !== options.panelId) return false;
+    if (options?.showOnlyPinned && !node.tab.pinned) return false;
     if (options?.showOnlyDuplicates && options.duplicateUrls) {
       if (!options.duplicateUrls.has(node.tab.url)) return false;
     }
@@ -330,11 +332,12 @@ export function reorganizeTreeIntoCategories(
 
   if (uncategorizedBucket.length > 0) {
     const headerId = String(++virtualIdCounter);
+    const uncatPanelId = options?.targetPanelId || uncategorizedBucket[0]?.tab.panelId || "main";
     finalTree.push({
       id: headerId,
       tab: {
         id: headerId,
-        panelId: "main",
+        panelId: uncatPanelId,
         parentId: -1,
         lvl: 0,
         title: `📁 [未分类] (${uncategorizedBucket.length})`,
@@ -360,7 +363,16 @@ export function reorganizeTabsIntoPanels(
   const panels: Record<string, SideberyPanel> = { ...existingPanels };
   const catToPanelId = new Map<string, string>();
 
+  // Only create target panels for categories that actually receive >= 1 movable tab
+  const usedCatNames = new Set<string>();
+  for (const tab of tabs) {
+    if (tab.pinned || tab.url?.startsWith("about:")) continue;
+    const catName = classificationMap.get(String(tab.id));
+    if (catName) usedCatNames.add(catName);
+  }
+
   categories.forEach((cat, index) => {
+    if (!usedCatNames.has(cat.name)) return;
     const panelId = `panel_cat_${index + 1}`;
     catToPanelId.set(cat.name, panelId);
     if (!panels[panelId]) {
@@ -372,13 +384,37 @@ export function reorganizeTabsIntoPanels(
     }
   });
 
-  const updatedTabs = tabs.map((tab) => {
-    if (tab.pinned || tab.url?.startsWith("about:")) return tab;
+  const finalPanelByTabId = new Map<string, string>();
+  const movedTabs = tabs.map((tab) => {
+    if (tab.pinned || tab.url?.startsWith("about:")) {
+      finalPanelByTabId.set(String(tab.id), tab.panelId || "main");
+      return tab;
+    }
     const catName = classificationMap.get(String(tab.id));
     if (catName && catToPanelId.has(catName)) {
+      const targetPanelId = catToPanelId.get(catName)!;
+      finalPanelByTabId.set(String(tab.id), targetPanelId);
       return {
         ...tab,
-        panelId: catToPanelId.get(catName)!,
+        panelId: targetPanelId,
+      };
+    }
+    finalPanelByTabId.set(String(tab.id), tab.panelId || "main");
+    return tab;
+  });
+
+  // Prevent dangling cross-panel parentId links after moving tabs across panels
+  const updatedTabs = movedTabs.map((tab) => {
+    const curPanel = tab.panelId || "main";
+    if (tab.parentId === undefined || tab.parentId === -1) {
+      return tab.lvl ? { ...tab, lvl: 0 } : tab;
+    }
+    const parentPanel = finalPanelByTabId.get(String(tab.parentId));
+    if (!parentPanel || parentPanel !== curPanel) {
+      return {
+        ...tab,
+        parentId: -1,
+        lvl: 0,
       };
     }
     return tab;

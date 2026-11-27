@@ -1,5 +1,6 @@
 import { buildTabTree } from "../src/services/snapshotParser";
 import {
+  filterTree,
   getDuplicateUrlSet,
   batchDeleteNodes,
   reorganizeTreeIntoCategories,
@@ -59,6 +60,12 @@ export function runTreeOperationsTests() {
       `Subtree intact! Node 201 retained its ${node201?.children.length} children under category header`
     );
   }
+
+  const pinnedFiltered = filterTree(tree, "", { showOnlyPinned: true });
+  assert(
+    pinnedFiltered.length > 0 && pinnedFiltered.every((n) => !!n.tab.pinned),
+    "filterTree with showOnlyPinned returns only pinned tabs"
+  );
 
   console.log(`Tree Operations Tests Completed: ${passed} passed, ${failed} failed.\n`);
   return failed === 0;

@@ -19,8 +19,7 @@ export type AIChatHistoryLayout = "dropdown" | "sidebar";
 export type RulesLayoutMode = "list" | "grid";
 
 export interface UISettings {
-  hideFileName: boolean;
-  hideQuickTheme: boolean;
+  hideSidebarOverviewCard: boolean;
   hideEmptyPanels: boolean;
   workbenchPanelLayout?: WorkbenchPanelLayout;
   aiChatHistoryLayout?: AIChatHistoryLayout;
@@ -31,16 +30,37 @@ export interface UISettings {
 }
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
-  hideFileName: false,
-  hideQuickTheme: false,
+  hideSidebarOverviewCard: false,
   hideEmptyPanels: false,
-  workbenchPanelLayout: "vertical",
-  aiChatHistoryLayout: "dropdown",
+  workbenchPanelLayout: "sidebar",
+  aiChatHistoryLayout: "sidebar",
   rulesLayoutMode: "list",
   rulesHideDisabled: false,
   rulesOnlyWithHits: false,
   rulesShowSampleTitles: false,
 };
+
+/**
+ * Resolve effective workbench panel layout; falls back from "sidebar" to "horizontal" when sidebar is collapsed.
+ */
+export function resolveEffectiveWorkbenchPanelLayout(
+  layout: WorkbenchPanelLayout | undefined,
+  sidebarCollapsed: boolean
+): WorkbenchPanelLayout {
+  const base = layout || "sidebar";
+  return base === "sidebar" && sidebarCollapsed ? "horizontal" : base;
+}
+
+/**
+ * Resolve effective AI chat history layout; falls back from "sidebar" to "dropdown" when sidebar is collapsed.
+ */
+export function resolveEffectiveAIChatHistoryLayout(
+  layout: AIChatHistoryLayout | undefined,
+  sidebarCollapsed: boolean
+): AIChatHistoryLayout {
+  const base = layout || "sidebar";
+  return base === "sidebar" && sidebarCollapsed ? "dropdown" : base;
+}
 
 export const DEFAULT_AI_DROPDOWN_SETTINGS: AIDropdownSettings = {
   visibleProviders: ["deepseek", "claude", "openai", "gemini"],
@@ -125,6 +145,12 @@ interface ConfigState {
   aiDropdownSettings: AIDropdownSettings;
   aiCallSettings: AICallSettings;
   aiUsageStats: AIUsageStats;
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  isMobileViewport: boolean;
+  setIsMobileViewport: (mobile: boolean) => void;
+  mobileDrawerOpen: boolean;
+  setMobileDrawerOpen: (open: boolean) => void;
   setUISettings: (settings: Partial<UISettings>) => void;
   setAIDropdownSettings: (settings: Partial<AIDropdownSettings>) => void;
   setAICallSettings: (settings: Partial<AICallSettings>) => void;
@@ -202,6 +228,12 @@ export const useConfigStore = create<ConfigState>()(
       aiDropdownSettings: DEFAULT_AI_DROPDOWN_SETTINGS,
       aiCallSettings: DEFAULT_AI_CALL_SETTINGS,
       aiUsageStats: DEFAULT_AI_USAGE_STATS,
+      sidebarCollapsed: false,
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+      isMobileViewport: false,
+      setIsMobileViewport: (isMobileViewport) => set({ isMobileViewport }),
+      mobileDrawerOpen: false,
+      setMobileDrawerOpen: (mobileDrawerOpen) => set({ mobileDrawerOpen }),
       setUISettings: (settings) => set((state) => ({ uiSettings: { ...state.uiSettings, ...settings } })),
       setAIDropdownSettings: (settings) =>
         set((state) => ({
@@ -635,6 +667,9 @@ export const useConfigStore = create<ConfigState>()(
         return {
           ...currentState,
           ...persistedState,
+          sidebarCollapsed: false,
+          isMobileViewport: false,
+          mobileDrawerOpen: false,
           aiConfig: {
             ...currentState.aiConfig,
             ...persistedAIConfig,

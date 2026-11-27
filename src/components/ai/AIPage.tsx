@@ -1,7 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { useConfigStore, DEFAULT_AI_DROPDOWN_SETTINGS } from "@/store/useConfigStore";
+import {
+  useConfigStore,
+  DEFAULT_AI_DROPDOWN_SETTINGS,
+  resolveEffectiveAIChatHistoryLayout,
+} from "@/store/useConfigStore";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { toast } from "@/store/useFeedbackStore";
 import { flattenTabTree } from "@/services/snapshotParser";
@@ -26,7 +30,7 @@ import { SchemeCard } from "./SchemeCard";
 import { MarkdownView } from "./MarkdownView";
 import { AIModelSettingsHopup, AIModelSettingsTab } from "./AIModelSettingsHopup";
 import { BlueprintCanvasModal } from "./BlueprintCanvasModal";
-import { SnapshotFileHopupModal } from "@/components/layout/SnapshotFileHopupModal";
+import { SidebarDrawerTrigger } from "@/components/layout/AppSidebar";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +50,6 @@ import {
   X,
   Pin,
   SlidersHorizontal,
-  FolderArchive,
   Undo2,
   History,
   Edit3,
@@ -230,10 +233,10 @@ export function AIPage() {
     aiUsageStats,
     recordAIUsage,
     uiSettings,
+    sidebarCollapsed,
     togglePinnedModel,
     switchAIProvider,
     crossPanelMerge,
-    setCrossPanelMerge,
     createGroupTabs,
     setCreateGroupTabs,
   } = useConfigStore();
@@ -266,7 +269,6 @@ export function AIPage() {
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
   const [modelSettingsHopupOpen, setModelSettingsHopupOpen] = useState(false);
   const [settingsHopupTab, setSettingsHopupTab] = useState<AIModelSettingsTab>("dropdown");
-  const [fileHopupOpen, setFileHopupOpen] = useState(false);
   const [historyMenuOpen, setHistoryMenuOpen] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState("");
@@ -628,17 +630,7 @@ export function AIPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", minWidth: 0 }}>
-          {/* Icon-only File Button (replaces TopNav file button without text) */}
-          <Button
-            variant="outline"
-            size="xs"
-            pill
-            onClick={() => setFileHopupOpen(true)}
-            title="快照文件与导入导出管理"
-            style={{ width: "30px", height: "30px", padding: 0, flexShrink: 0 }}
-          >
-            <FolderArchive size={14} style={{ color: "var(--accent)" }} />
-          </Button>
+          <SidebarDrawerTrigger />
 
           {/* Provider & Model Dropdown Trigger */}
           <div ref={modelMenuRef} style={{ position: "relative" }}>
@@ -925,8 +917,9 @@ export function AIPage() {
             <span style={{ fontSize: "0.74rem" }}>新对话</span>
           </Button>
 
-          {/* Chat History Dropdown (only when layout === "dropdown") */}
-          {(uiSettings?.aiChatHistoryLayout || "dropdown") === "dropdown" && (
+          {/* Chat History Dropdown (when layout === "dropdown", or sidebar is collapsed in "sidebar" mode) */}
+          {resolveEffectiveAIChatHistoryLayout(uiSettings?.aiChatHistoryLayout, sidebarCollapsed) ===
+            "dropdown" && (
             <div ref={historyMenuRef} style={{ position: "relative" }}>
             <Button
               variant="ghost"
@@ -1643,27 +1636,6 @@ export function AIPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
               <button
                 type="button"
-                onClick={() => setCrossPanelMerge(!crossPanelMerge)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
-                  padding: "2px 8px",
-                  borderRadius: "9999px",
-                  fontSize: "0.7rem",
-                  border: "1px solid",
-                  borderColor: crossPanelMerge ? "var(--accent-border)" : "var(--border-subtle)",
-                  backgroundColor: crossPanelMerge ? "var(--accent-subtle)" : "var(--bg-surface)",
-                  color: crossPanelMerge ? "var(--accent-text)" : "var(--text-muted)",
-                  cursor: "pointer",
-                }}
-              >
-                <Check size={11} style={{ opacity: crossPanelMerge ? 1 : 0.3 }} />
-                <span>跨面板合并</span>
-              </button>
-
-              <button
-                type="button"
                 onClick={() => setCreateGroupTabs(!createGroupTabs)}
                 style={{
                   display: "inline-flex",
@@ -1678,9 +1650,10 @@ export function AIPage() {
                   color: createGroupTabs ? "var(--accent-text)" : "var(--text-muted)",
                   cursor: "pointer",
                 }}
+                title="整理时是否生成 Sidebery 原生可折叠 Group 组"
               >
                 <Check size={11} style={{ opacity: createGroupTabs ? 1 : 0.3 }} />
-                <span>折叠组</span>
+                <span>原生折叠组</span>
               </button>
             </div>
 
@@ -1927,12 +1900,6 @@ export function AIPage() {
           }
           handleApplyScheme(updated, clusterReport);
         }}
-      />
-
-      {/* Snapshot File Hop-up */}
-      <SnapshotFileHopupModal
-        isOpen={fileHopupOpen}
-        onClose={() => setFileHopupOpen(false)}
       />
     </div>
   );

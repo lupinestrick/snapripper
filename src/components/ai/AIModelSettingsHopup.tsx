@@ -709,7 +709,7 @@ export function AIModelSettingsHopup({ isOpen, onClose, initialTab = "dropdown" 
                         const currentLayout =
                           uiSettings?.aiChatHistoryLayout ||
                           DEFAULT_UI_SETTINGS.aiChatHistoryLayout ||
-                          "dropdown";
+                          "sidebar";
                         const active = currentLayout === opt.id;
                         return (
                           <button

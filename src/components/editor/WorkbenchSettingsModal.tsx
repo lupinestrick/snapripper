@@ -37,6 +37,8 @@ export function WorkbenchSettingsModal({ isOpen, onClose }: WorkbenchSettingsMod
     setContainerFilter,
     onlyDuplicates,
     setOnlyDuplicates,
+    onlyPinned,
+    setOnlyPinned,
     duplicateUrls,
     searchQuery,
     setSearchQuery,
@@ -46,15 +48,16 @@ export function WorkbenchSettingsModal({ isOpen, onClose }: WorkbenchSettingsMod
 
   if (!isOpen) return null;
 
-  const currentLayout: WorkbenchPanelLayout = uiSettings?.workbenchPanelLayout || "vertical";
+  const currentLayout: WorkbenchPanelLayout = uiSettings?.workbenchPanelLayout || "sidebar";
   const containers = rawSnapshot?.containers ? (Object.values(rawSnapshot.containers) as any[]) : [];
-  const hasActiveFilters = Boolean(searchQuery || panelFilter || containerFilter || onlyDuplicates);
+  const hasActiveFilters = Boolean(searchQuery || panelFilter || containerFilter || onlyDuplicates || onlyPinned);
 
   const handleResetFilters = () => {
     setSearchQuery("");
     setActivePanelId(null);
     setContainerFilter(null);
     setOnlyDuplicates(false);
+    setOnlyPinned(false);
   };
 
   return (
@@ -217,6 +220,26 @@ export function WorkbenchSettingsModal({ isOpen, onClose }: WorkbenchSettingsMod
                     type="checkbox"
                     checked={onlyDuplicates}
                     onChange={(e) => setOnlyDuplicates(e.target.checked)}
+                    style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
+                  />
+                </label>
+
+                {/* Only Pinned */}
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    fontSize: "0.78rem",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span>仅显示置顶标签</span>
+                  <input
+                    type="checkbox"
+                    checked={onlyPinned}
+                    onChange={(e) => setOnlyPinned(e.target.checked)}
                     style={{ accentColor: "var(--accent-solid)", cursor: "pointer" }}
                   />
                 </label>

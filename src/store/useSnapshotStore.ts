@@ -96,6 +96,8 @@ export function buildProcessedSnapshot(
 
 interface SnapshotStoreState {
   rawSnapshot: SideberySnapshot | null;
+  initialSnapshot: SideberySnapshot | null;
+  initialLoadedAt: number | null;
   fileName: string;
   rawFileSize: number;
   activeWindowId: string;
@@ -107,6 +109,7 @@ interface SnapshotStoreState {
   panelFilter: string | null;
   containerFilter: string | null;
   onlyDuplicates: boolean;
+  onlyPinned: boolean;
   duplicateUrls: Set<string>;
 
   proportionReport: ProportionReport | null;
@@ -138,11 +141,13 @@ interface SnapshotStoreState {
   setPanelFilter: (panelId: string | null) => void;
   setContainerFilter: (containerId: string | null) => void;
   setOnlyDuplicates: (val: boolean) => void;
+  setOnlyPinned: (val: boolean) => void;
 
   deleteSelected: () => void;
   markSelectedPinned: (pinned: boolean) => void;
   moveSelectedToPanel: (targetPanelId: string) => void;
   applySnapshotUpdate: (newSnapshot: SideberySnapshot, actionLabel?: string) => void;
+  resetToInitialSnapshot: () => boolean;
   undo: () => void;
   redo: () => void;
 
@@ -179,7 +184,11 @@ interface SnapshotStoreState {
   setIsAIDiffModalOpen: (open: boolean) => void;
   setActiveMergeReport: (report: AIMergeReport | null) => void;
   setIsOverviewHopupOpen: (open: boolean) => void;
-  updateProcessedTreeTarget: (targetMode: "tree" | "panel", targetPanelId?: string) => void;
+  updateProcessedTreeTarget: (
+    targetMode: "tree" | "panel",
+    targetPanelId?: string,
+    options?: { crossPanelMerge?: boolean }
+  ) => void;
   clearAllCache: () => void;
 }
 
@@ -187,6 +196,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   persist(
     (set, get) => ({
   rawSnapshot: null,
+  initialSnapshot: null,
+  initialLoadedAt: null,
   fileName: "",
   rawFileSize: 0,
   activeWindowId: "1",
@@ -198,6 +209,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   panelFilter: null,
   containerFilter: null,
   onlyDuplicates: false,
+  onlyPinned: false,
   duplicateUrls: new Set<string>(),
 
   proportionReport: null,
@@ -230,6 +242,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
 
     set({
       rawSnapshot: parsed.snapshot,
+      initialSnapshot: parsed.snapshot,
+      initialLoadedAt: Date.now(),
       fileName,
       rawFileSize: new Blob([jsonString]).size,
       activeWindowId: primaryWinId,
@@ -241,13 +255,46 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       selectedIds: new Set<string>(),
       searchQuery: "",
       onlyDuplicates: false,
+      onlyPinned: false,
       undoStack: [],
       redoStack: [],
       proportionReport: null,
       aiProcessedCache: null,
       isAIDiffModalOpen: false,
-  activeMergeReport: null,
+      activeMergeReport: null,
     });
+  },
+
+  resetToInitialSnapshot: () => {
+    const { initialSnapshot, rawSnapshot, fileName, activeWindowId, undoStack } = get();
+    if (!initialSnapshot || !rawSnapshot) return false;
+    const winKeys = Object.keys(initialSnapshot.windows || {});
+    const targetWinId = initialSnapshot.windows?.[activeWindowId] ? activeWindowId : winKeys[0] || "1";
+    const tabs = initialSnapshot.windows?.[targetWinId]?.tabs || [];
+    const tree = buildTabTree(tabs);
+    const duplicates = getDuplicateUrlSet(tabs);
+    const initialExpanded = new Set<string>(tree.map((n) => n.id));
+    syncSnapshotCookie(fileName, tabs.length);
+
+    set({
+      rawSnapshot: initialSnapshot,
+      activeWindowId: targetWinId,
+      activePanelId: null,
+      panelFilter: null,
+      containerFilter: null,
+      rootNodes: tree,
+      duplicateUrls: duplicates,
+      expandedIds: initialExpanded,
+      selectedIds: new Set<string>(),
+      searchQuery: "",
+      onlyDuplicates: false,
+      onlyPinned: false,
+      undoStack: [...undoStack, rawSnapshot],
+      redoStack: [],
+      aiProcessedCache: null,
+      activeMergeReport: null,
+    });
+    return true;
   },
 
   setActivePanelId: (panelId) => {
@@ -278,10 +325,10 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   },
 
   selectAll: () => {
-    const { rootNodes, searchQuery, panelFilter, containerFilter, onlyDuplicates, duplicateUrls } = get();
+    const { rootNodes, searchQuery, panelFilter, containerFilter, onlyDuplicates, onlyPinned, duplicateUrls } = get();
     const all = new Set<string>();
 
-    const hasFilter = searchQuery.trim() !== "" || !!panelFilter || !!containerFilter || onlyDuplicates;
+    const hasFilter = searchQuery.trim() !== "" || !!panelFilter || !!containerFilter || onlyDuplicates || onlyPinned;
 
     if (hasFilter) {
       const filtered = filterTree(rootNodes, searchQuery, {
@@ -289,16 +336,14 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
         containerId: containerFilter || undefined,
         showOnlyDuplicates: onlyDuplicates,
         duplicateUrls,
+        showOnlyPinned: onlyPinned,
       });
 
       function collectMatching(nodes: TabTreeNode[]) {
         for (const n of nodes) {
-          if (onlyDuplicates) {
-            // Strictly select only nodes that are actual duplicate tabs
-            if (duplicateUrls.has(n.tab.url)) {
-              all.add(n.id);
-            }
-          } else {
+          const matchesDuplicate = !onlyDuplicates || duplicateUrls.has(n.tab.url);
+          const matchesPinned = !onlyPinned || !!n.tab.pinned;
+          if (matchesDuplicate && matchesPinned) {
             all.add(n.id);
           }
           if (n.children) collectMatching(n.children);
@@ -356,6 +401,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   setPanelFilter: (panelFilter) => set({ panelFilter, activePanelId: panelFilter }),
   setContainerFilter: (containerFilter) => set({ containerFilter }),
   setOnlyDuplicates: (onlyDuplicates) => set({ onlyDuplicates }),
+  setOnlyPinned: (onlyPinned) => set({ onlyPinned }),
 
   applySnapshotUpdate: (newSnapshot, actionLabel) => {
     const { rawSnapshot, undoStack } = get();
@@ -649,7 +695,19 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   setAiChatMessages: (messages) => set({ aiChatMessages: messages }),
   addAiChatMessage: (message) =>
     set((state) => {
-      const nextMessages = [...state.aiChatMessages, message];
+      const isDiffNotice =
+        message.sender === "system" &&
+        (Boolean(message.appliedSchemeId) || /^已生成【.*】差分/.test(message.text || ""));
+      const baseMessages = isDiffNotice
+        ? state.aiChatMessages.filter(
+            (m) =>
+              !(
+                m.sender === "system" &&
+                (Boolean(m.appliedSchemeId) || /^已生成【.*】差分/.test(m.text || ""))
+              )
+          )
+        : state.aiChatMessages;
+      const nextMessages = [...baseMessages, message];
       const now = Date.now();
       let sessionId = state.activeChatSessionId;
       let nextSessions = [...(state.aiChatSessions || [])];
@@ -746,7 +804,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
   setActiveMergeReport: (report: AIMergeReport | null) => set({ activeMergeReport: report }),
   setIsOverviewHopupOpen: (open) => set({ isOverviewHopupOpen: open }),
 
-  updateProcessedTreeTarget: (targetMode, targetPanelId) => {
+  updateProcessedTreeTarget: (targetMode, targetPanelId, options) => {
     const { aiProcessedCache } = get();
     if (!aiProcessedCache) return;
 
@@ -754,20 +812,23 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
     const categories = aiProcessedCache.categoryNames.map((name, i) => ({ id: `cat_${i}`, name }));
 
     const { crossPanelMerge, createGroupTabs } = useConfigStore.getState();
+    const resolvedCrossPanelMerge =
+      targetMode === "panel" ? true : (options?.crossPanelMerge ?? crossPanelMerge);
+
     const { processedSnapshot } = buildProcessedSnapshot(
       aiProcessedCache.originalSnapshot,
       classificationMap,
       categories,
       targetMode,
-      targetPanelId,
-      { crossPanelMerge, createGroupTabs }
+      targetMode === "tree" ? targetPanelId : undefined,
+      { crossPanelMerge: resolvedCrossPanelMerge, createGroupTabs }
     );
 
     const updatedCache: AIProcessedCache = {
       ...aiProcessedCache,
       processedSnapshot,
       targetMode,
-      targetPanelId,
+      targetPanelId: targetMode === "tree" ? targetPanelId : undefined,
     };
 
     set({
@@ -784,6 +845,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
     }
     set({
       rawSnapshot: null,
+      initialSnapshot: null,
+      initialLoadedAt: null,
       fileName: "",
       rawFileSize: 0,
       activeWindowId: "1",
@@ -795,6 +858,7 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       expandedIds: new Set<string>(),
       searchQuery: "",
       onlyDuplicates: false,
+      onlyPinned: false,
       duplicateUrls: new Set<string>(),
       proportionReport: null,
       isAnalyzing: false,
@@ -817,6 +881,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
       name: "snapripper-snapshot-storage",
       partialize: (state) => ({
         rawSnapshot: state.rawSnapshot,
+        initialSnapshot: state.initialSnapshot,
+        initialLoadedAt: state.initialLoadedAt,
         fileName: state.fileName,
         rawFileSize: state.rawFileSize,
         activeWindowId: state.activeWindowId,
@@ -839,6 +905,8 @@ export const useSnapshotStore = create<SnapshotStoreState>()(
         return {
           ...currentState,
           ...persistedState,
+          initialSnapshot: persistedState.initialSnapshot || persistedState.rawSnapshot || null,
+          initialLoadedAt: persistedState.initialLoadedAt || null,
           duplicateUrls: duplicates,
           expandedIds: initialExpanded,
           selectedIds: new Set<string>(),

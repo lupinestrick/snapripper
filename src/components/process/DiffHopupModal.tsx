@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
+import { MasonryColumns } from "@/components/ui/MasonryColumns";
 import {
   X,
   Check,
@@ -583,12 +584,14 @@ function ChangesSummaryView({
             新建分组 / 归类 ({filteredGroups.length})
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.55rem" }}>
-            {filteredGroups.map((group) => {
+          <MasonryColumns
+            items={filteredGroups}
+            getKey={(group) => group.id}
+            estimateHeight={(group) => 44 + Math.min(group.children.length * 24, 260)}
+            renderItem={(group) => {
               const isExpanded = expandedGroups.has(group.id) || Boolean(q);
               return (
                 <div
-                  key={group.id}
                   style={{
                     borderRadius: "0.65rem",
                     border: "1px solid rgba(16, 185, 129, 0.35)",
@@ -628,7 +631,16 @@ function ChangesSummaryView({
                   </button>
 
                   {isExpanded && group.children.length > 0 && (
-                    <div style={{ padding: "0.45rem 0.7rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    <div
+                      style={{
+                        padding: "0.45rem 0.7rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.25rem",
+                        maxHeight: "260px",
+                        overflowY: "auto",
+                      }}
+                    >
                       {group.children
                         .filter((c) => !q || matchesSearch(c.tab, q) || matchesSearch(group.tab, q))
                         .map((child) => {
@@ -660,8 +672,8 @@ function ChangesSummaryView({
                   )}
                 </div>
               );
-            })}
-          </div>
+            }}
+          />
         </div>
       )}
 

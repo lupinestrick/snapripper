@@ -8,7 +8,9 @@ import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { testAIConnection, fetchAvailableModels, getAPIKeySlot, getOrderedModelsForSlot, getProviderMeta } from "@/services/aiService";
 import { AI_PROVIDERS, AIProviderKey, AIProtocolType, BUILTIN_PROVIDER_KEYS } from "@/types/ai";
 import { AddProviderModal } from "@/components/ai/AddProviderModal";
+import { SidebarDrawerTrigger } from "@/components/layout/AppSidebar";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   Bot,
   Sliders,
@@ -33,6 +35,9 @@ import {
   Trash2,
   Pin,
   Plus,
+  Maximize2,
+  Minimize2,
+  X,
 } from "lucide-react";
 import {
   DEFAULT_RULES_GENERATOR_PROMPT,
@@ -40,6 +45,39 @@ import {
   DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT,
   DEFAULT_ARCHITECT_REFINEMENT_PROMPT,
 } from "@/constants/aiPrompts";
+
+const PROMPT_TEMPLATE_ITEMS = [
+  {
+    key: "rulesGeneratorPrompt",
+    title: "1. 规则生成助手 (System Prompt)",
+    defaultVal: DEFAULT_RULES_GENERATOR_PROMPT,
+    placeholder: "规则生成助手提示词...",
+    rows: 6,
+  },
+  {
+    key: "architectPrompt",
+    title: "2. AI 架构师 - 全量方案 (System Prompt)",
+    defaultVal: DEFAULT_AI_ARCHITECT_PROMPT,
+    placeholder: "AI 架构师全量方案提示词...",
+    rows: 6,
+  },
+  {
+    key: "architectDiagnosisPrompt",
+    title: "3. AI 架构师 - 前置轻诊断与方向反问",
+    defaultVal: DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT,
+    placeholder: "AI 架构师轻诊断提示词...",
+    rows: 5,
+  },
+  {
+    key: "architectRefinementPrompt",
+    title: "4. AI 架构师 - 多轮精准微调",
+    defaultVal: DEFAULT_ARCHITECT_REFINEMENT_PROMPT,
+    placeholder: "AI 架构师多轮微调提示词...",
+    rows: 5,
+  },
+] as const;
+
+type PromptTemplateKey = (typeof PROMPT_TEMPLATE_ITEMS)[number]["key"];
 
 export function SettingsPage() {
   const {
@@ -113,7 +151,15 @@ export function SettingsPage() {
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [isSearchingModels, setIsSearchingModels] = useState(false);
   const [addProviderOpen, setAddProviderOpen] = useState(false);
+  const [fullscreenPromptKey, setFullscreenPromptKey] = useState<PromptTemplateKey | null>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  const activeFullscreenPrompt = fullscreenPromptKey
+    ? PROMPT_TEMPLATE_ITEMS.find((item) => item.key === fullscreenPromptKey) ?? null
+    : null;
+  const activeFullscreenValue = activeFullscreenPrompt
+    ? aiPrompts?.[activeFullscreenPrompt.key] ?? activeFullscreenPrompt.defaultVal
+    : "";
 
   // Click outside to close model dropdown
   useEffect(() => {
@@ -225,11 +271,40 @@ export function SettingsPage() {
   const THEME_CONFIGS = THEME_DEFINITIONS;
 
   return (
-    <div style={{ padding: "1.5rem 2.25rem", maxWidth: "1360px", margin: "0 auto", color: "var(--text-main)" }}>
-      {/* Header */}
-      <div style={{ marginBottom: "1.25rem" }}>
-        <h1 style={{ fontSize: "1.35rem", fontWeight: 700, letterSpacing: "-0.02em" }}>系统设置</h1>
+    <div
+      style={{
+        height: "100%",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        color: "var(--text-main)",
+      }}
+    >
+      {/* Unified Top Navbar for Settings */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0.55rem 1.25rem",
+          minHeight: "50px",
+          backgroundColor: "var(--bg-surface)",
+          borderBottom: "1px solid var(--border-subtle)",
+          flexShrink: 0,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+          <SidebarDrawerTrigger />
+          <h1 style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+            系统设置
+          </h1>
+        </div>
       </div>
+
+      {/* Scrollable Body */}
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <div style={{ padding: "1.25rem 2.25rem 70px", maxWidth: "1360px", width: "100%", margin: "0 auto" }}>
 
       {/* Theme Section */}
       <div
@@ -317,14 +392,9 @@ export function SettingsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "0.55rem" }}>
           {[
             {
-              label: "隐藏顶栏配置文件名",
-              checked: uiSettings?.hideFileName || false,
-              onChange: (checked: boolean) => setUISettings({ hideFileName: checked }),
-            },
-            {
-              label: "隐藏顶栏快速主题按钮",
-              checked: uiSettings?.hideQuickTheme || false,
-              onChange: (checked: boolean) => setUISettings({ hideQuickTheme: checked }),
+              label: "隐藏左下角数据总览卡片",
+              checked: uiSettings?.hideSidebarOverviewCard || false,
+              onChange: (checked: boolean) => setUISettings({ hideSidebarOverviewCard: checked }),
             },
             {
               label: "隐藏 0 标签页空面板",
@@ -1143,38 +1213,7 @@ export function SettingsPage() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-          {(
-            [
-              {
-                key: "rulesGeneratorPrompt",
-                title: "1. 规则生成助手 (System Prompt)",
-                defaultVal: DEFAULT_RULES_GENERATOR_PROMPT,
-                placeholder: "规则生成助手提示词...",
-                rows: 6,
-              },
-              {
-                key: "architectPrompt",
-                title: "2. AI 架构师 - 全量方案 (System Prompt)",
-                defaultVal: DEFAULT_AI_ARCHITECT_PROMPT,
-                placeholder: "AI 架构师全量方案提示词...",
-                rows: 6,
-              },
-              {
-                key: "architectDiagnosisPrompt",
-                title: "3. AI 架构师 - 前置轻诊断与方向反问",
-                defaultVal: DEFAULT_ARCHITECT_DIAGNOSIS_PROMPT,
-                placeholder: "AI 架构师轻诊断提示词...",
-                rows: 5,
-              },
-              {
-                key: "architectRefinementPrompt",
-                title: "4. AI 架构师 - 多轮精准微调",
-                defaultVal: DEFAULT_ARCHITECT_REFINEMENT_PROMPT,
-                placeholder: "AI 架构师多轮微调提示词...",
-                rows: 5,
-              },
-            ] as const
-          ).map((item) => (
+          {PROMPT_TEMPLATE_ITEMS.map((item) => (
             <div
               key={item.key}
               style={{
@@ -1192,22 +1231,36 @@ export function SettingsPage() {
                   {item.title}
                 </div>
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  pill
-                  onClick={() => resetAIPrompt(item.key)}
-                  title="恢复默认"
-                >
-                  <RotateCcw size={12} />
-                  <span>恢复默认</span>
-                </Button>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    pill
+                    onClick={() => setFullscreenPromptKey(item.key)}
+                    title="全屏编辑"
+                  >
+                    <Maximize2 size={12} />
+                    <span>全屏编辑</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    pill
+                    onClick={() => resetAIPrompt(item.key)}
+                    title="恢复默认"
+                  >
+                    <RotateCcw size={12} />
+                    <span>恢复默认</span>
+                  </Button>
+                </div>
               </div>
 
               <textarea
                 rows={item.rows}
-                value={aiPrompts?.[item.key] || item.defaultVal}
+                value={aiPrompts?.[item.key] ?? item.defaultVal}
                 onChange={(e) => setAIPrompt(item.key, e.target.value)}
                 placeholder={item.placeholder}
                 style={{
@@ -1403,6 +1456,143 @@ export function SettingsPage() {
       </div>
 
       <AddProviderModal isOpen={addProviderOpen} onClose={() => setAddProviderOpen(false)} />
+
+      <Dialog.Root
+        open={Boolean(activeFullscreenPrompt)}
+        onOpenChange={(open) => !open && setFullscreenPromptKey(null)}
+      >
+        <Dialog.Backdrop style={{ zIndex: 130 }} />
+        <Dialog.Positioner style={{ zIndex: 140, padding: "0.75rem" }}>
+          <Dialog.Content
+            style={{
+              width: "100%",
+              height: "100%",
+              maxWidth: "none",
+              maxHeight: "none",
+              backgroundColor: "var(--bg-card)",
+              border: "1px solid var(--border-card)",
+              borderRadius: "0.85rem",
+              color: "var(--text-main)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 24px 48px rgba(0, 0, 0, 0.45)",
+            }}
+          >
+            {activeFullscreenPrompt && (
+              <>
+                <div
+                  style={{
+                    padding: "0.75rem 1.15rem",
+                    borderBottom: "1px solid var(--border-subtle)",
+                    backgroundColor: "var(--bg-surface)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "0.75rem",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
+                    <MessageSquareCode size={16} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                    <Dialog.Title style={{ fontSize: "0.95rem", fontWeight: 600 }}>
+                      {activeFullscreenPrompt.title}
+                    </Dialog.Title>
+                    <span
+                      style={{
+                        fontSize: "0.72rem",
+                        color: "var(--text-muted)",
+                        padding: "0.12rem 0.5rem",
+                        borderRadius: "999px",
+                        backgroundColor: "var(--bg-subtle)",
+                        border: "1px solid var(--border-subtle)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {activeFullscreenValue ? activeFullscreenValue.split("\n").length : 0} 行 · {activeFullscreenValue.length} 字符
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      pill
+                      onClick={() => resetAIPrompt(activeFullscreenPrompt.key)}
+                      title="恢复默认"
+                    >
+                      <RotateCcw size={12} />
+                      <span>恢复默认</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="solid"
+                      size="xs"
+                      pill
+                      onClick={() => setFullscreenPromptKey(null)}
+                      title="退出全屏 (Esc)"
+                    >
+                      <Minimize2 size={12} />
+                      <span>退出全屏</span>
+                    </Button>
+
+                    <Dialog.CloseTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        pill
+                        onClick={() => setFullscreenPromptKey(null)}
+                        style={{ padding: "4px" }}
+                        title="关闭"
+                      >
+                        <X size={15} />
+                      </Button>
+                    </Dialog.CloseTrigger>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 0,
+                    padding: "1rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    backgroundColor: "var(--bg-subtle)",
+                  }}
+                >
+                  <textarea
+                    autoFocus
+                    value={activeFullscreenValue}
+                    onChange={(e) => setAIPrompt(activeFullscreenPrompt.key, e.target.value)}
+                    placeholder={activeFullscreenPrompt.placeholder}
+                    style={{
+                      flex: 1,
+                      width: "100%",
+                      height: "100%",
+                      padding: "0.9rem 1rem",
+                      borderRadius: "var(--radius-btn, 8px)",
+                      backgroundColor: "var(--bg-card)",
+                      border: "1px solid var(--border-subtle)",
+                      color: "var(--text-main)",
+                      fontSize: "0.84rem",
+                      lineHeight: "1.6",
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                      outline: "none",
+                      resize: "none",
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+        </div>
+      </div>
     </div>
   );
 }

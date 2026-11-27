@@ -14,6 +14,7 @@ import {
 import { AIRulesChatModal } from "./AIRulesChatModal";
 import { RuleEditorModal } from "./RuleEditorModal";
 import { RulesSettingsHopup } from "./RulesSettingsHopup";
+import { SidebarDrawerTrigger } from "@/components/layout/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -163,25 +164,32 @@ export function RulesPage() {
   return (
     <div
       style={{
-        padding: "1.5rem 2rem",
-        maxWidth: layoutMode === "grid" ? "100%" : "920px",
-        margin: "0 auto",
+        height: "100%",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
         color: "var(--text-main)",
       }}
     >
-      {/* Header */}
+      {/* Unified Top Navbar for Rules Management */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "1rem",
+          padding: "0.55rem 1.25rem",
+          minHeight: "50px",
+          backgroundColor: "var(--bg-surface)",
+          borderBottom: "1px solid var(--border-subtle)",
+          flexShrink: 0,
           flexWrap: "wrap",
-          gap: "0.75rem",
+          gap: "0.6rem",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: "0.65rem", flexWrap: "wrap" }}>
-          <h1 style={{ fontSize: "1.35rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.55rem", flexWrap: "wrap" }}>
+          <SidebarDrawerTrigger />
+          <h1 style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>
             规则管理
           </h1>
           <span style={{ fontSize: "0.76rem", color: "var(--text-muted)" }}>
@@ -228,6 +236,17 @@ export function RulesPage() {
           </Button>
         </div>
       </div>
+
+      {/* Scrollable Body */}
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <div
+          style={{
+            padding: "1.25rem 2rem 70px",
+            maxWidth: layoutMode === "grid" ? "100%" : "920px",
+            width: "100%",
+            margin: "0 auto",
+          }}
+        >
 
       {/* Rules List or Grid */}
       {visibleRulesWithIndex.length === 0 ? (
@@ -726,6 +745,8 @@ export function RulesPage() {
         hasSnapshot={allTabs.length > 0}
         previewStats={previewStats}
       />
+        </div>
+      </div>
     </div>
   );
 }

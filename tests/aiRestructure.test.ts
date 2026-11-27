@@ -2,6 +2,10 @@ import { SideberySnapshot, SideberyTab } from "../src/types/sidebery";
 import { CategoryProportion, AIConfig } from "../src/types/ai";
 import { buildProcessedSnapshot, useSnapshotStore } from "../src/store/useSnapshotStore";
 import {
+  resolveEffectiveWorkbenchPanelLayout,
+  resolveEffectiveAIChatHistoryLayout,
+} from "../src/store/useConfigStore";
+import {
   matchTabWithRule,
   DEFAULT_RULES_SETTINGS,
   normalizeRuleToDSL,
@@ -12,7 +16,7 @@ import {
 } from "../src/services/ruleEngine";
 import { buildAIMergeReport } from "../src/services/aiArchitectEngine";
 import { buildTabTree } from "../src/services/snapshotParser";
-import { determineTargetPanelForCategory } from "../src/services/treeOperations";
+import { determineTargetPanelForCategory, reorganizeTabsIntoPanels } from "../src/services/treeOperations";
 import { isGroupTab, getGroupTitle } from "../src/services/snapshotParser";
 import { computeSnapshotDiff } from "../src/services/diffEngine";
 import {
@@ -29,6 +33,16 @@ import {
   tokenizeTabText,
   formatClusterReportForPrompt,
 } from "../src/services/tabClusterEngine";
+import {
+  computeSnapshotHealth,
+  computeSnapshotComposition,
+  compareSnapshotsBaseline,
+  buildFilteredExportSnapshot,
+  formatTabsAsMarkdown,
+  formatTabsAsBookmarksHtml,
+  formatTabsAsPlainUrls,
+} from "../src/services/snapshotDataService";
+import { distributeMasonryItems } from "../src/components/ui/MasonryColumns";
 import { INITIAL_ARCHITECT_ANALYSIS_PROMPT, DEFAULT_AI_ARCHITECT_PROMPT } from "../src/constants/aiPrompts";
 import {
   setCookie,
@@ -1331,6 +1345,242 @@ Based on your tabs, here is the distribution:
     newPanel?.name === "🔨 独立开发面板" &&
       panelTargetCache.processedSnapshot.windows["1"].tabs[0].panelId === newPanel?.id,
     "applySchemeToSnapshot honors targetPanelName while preserving classificationMap category matching"
+  );
+
+  // --- Test Set 16: Snapshot Health, Baseline Diff, Filtered Multi-Format Export & Reset ---
+  const baseJsonStr = JSON.stringify({
+    time: Date.now(),
+    panels: {
+      p1: { id: "p1", name: "工作", color: "blue" },
+      p2: { id: "p2", name: "闲置", color: "toolbar" },
+    },
+    windows: {
+      "1": {
+        tabs: [
+          { id: 1, panelId: "p1", parentId: -1, lvl: 0, title: "Docs & Specs", url: "https://react.dev/learn", pinned: true },
+          { id: 2, panelId: "p1", parentId: -1, lvl: 0, title: "GitHub Repo", url: "https://github.com/a/b" },
+          { id: 3, panelId: "p1", parentId: -1, lvl: 0, title: "GitHub Repo Dup", url: "https://github.com/a/b#readme" },
+        ],
+      },
+    },
+  });
+
+  useSnapshotStore.getState().clearAllCache();
+  useSnapshotStore.getState().loadSnapshot(baseJsonStr, "work-tabs.json");
+  const loadedState = useSnapshotStore.getState();
+  assert(
+    Boolean(loadedState.initialSnapshot) && Boolean(loadedState.initialLoadedAt),
+    "loadSnapshot preserves initialSnapshot baseline and initialLoadedAt timestamp"
+  );
+
+  const healthMetrics = computeSnapshotHealth(
+    loadedState.rawSnapshot,
+    loadedState.rootNodes,
+    loadedState.duplicateUrls,
+    loadedState.activeWindowId
+  );
+  assert(
+    healthMetrics.totalTabs === 3 &&
+      healthMetrics.exemptPinnedCount === 1 &&
+      healthMetrics.effectiveTabs === 2 &&
+      healthMetrics.emptyPanelCount === 1 &&
+      healthMetrics.duplicateTabCount >= 1,
+    "computeSnapshotHealth calculates effective/exempt tabs, empty panels, and duplicate counts"
+  );
+
+  const modifiedSnap: SideberySnapshot = {
+    ...loadedState.rawSnapshot!,
+    windows: {
+      "1": {
+        tabs: [
+          { id: 1, panelId: "p1", parentId: -1, lvl: 0, title: "Docs & Specs", url: "https://react.dev/learn", pinned: true },
+          { id: "group_new", panelId: "p2", parentId: -1, lvl: 0, title: "开发组", url: "about:blank#group", isGroup: true },
+          { id: 2, panelId: "p2", parentId: "group_new", lvl: 1, title: "GitHub Repo", url: "https://github.com/a/b" },
+        ],
+      },
+    },
+  };
+  useSnapshotStore.getState().applySnapshotUpdate(modifiedSnap, "reorg");
+  const currentState = useSnapshotStore.getState();
+
+  const baselineDiff = compareSnapshotsBaseline(
+    currentState.initialSnapshot,
+    currentState.rawSnapshot,
+    currentState.activeWindowId
+  );
+  assert(
+    baselineDiff.hasChanges &&
+      baselineDiff.removedCount >= 1 &&
+      baselineDiff.newGroupsCount === 1,
+    "compareSnapshotsBaseline detects removed tabs and newly created groups against initial baseline"
+  );
+
+  const exportRes = buildFilteredExportSnapshot(
+    loadedState.rawSnapshot!,
+    loadedState.rootNodes,
+    { activeWindowId: "1", panelIds: ["p1"], dedupUrls: true }
+  );
+  assert(
+    exportRes.removedDuplicateCount === 1 && exportRes.effectiveTabCount === 2,
+    "buildFilteredExportSnapshot deduplicates URLs non-destructively during export"
+  );
+
+  const mdOut = formatTabsAsMarkdown(exportRes.tabs, loadedState.rawSnapshot!.panels);
+  const htmlOut = formatTabsAsBookmarksHtml(exportRes.tabs, loadedState.rawSnapshot!.panels);
+  const txtOut = formatTabsAsPlainUrls(exportRes.tabs);
+  assert(
+    mdOut.includes("## 工作") &&
+      htmlOut.includes("NETSCAPE-Bookmark-file-1") &&
+      txtOut.includes("https://github.com/a/b"),
+    "formatTabsAsMarkdown, formatTabsAsBookmarksHtml, and formatTabsAsPlainUrls produce valid outputs"
+  );
+
+  const restored = useSnapshotStore.getState().resetToInitialSnapshot();
+  const afterRestore = useSnapshotStore.getState();
+  assert(
+    restored &&
+      afterRestore.rawSnapshot?.windows["1"].tabs.length === 3 &&
+      afterRestore.undoStack.length >= 1,
+    "resetToInitialSnapshot restores original tabs while keeping current state in undoStack"
+  );
+
+  // Deduplicate diff preview system notices (keep only latest)
+  useSnapshotStore.getState().clearAiChatMessages();
+  useSnapshotStore.getState().addAiChatMessage({
+    id: "sys_diff_1",
+    sender: "system",
+    timestamp: Date.now(),
+    text: "已生成【方案 A】差分（覆盖 10 标签）",
+    appliedSchemeId: "scheme_a",
+  });
+  useSnapshotStore.getState().addAiChatMessage({
+    id: "sys_diff_2",
+    sender: "system",
+    timestamp: Date.now() + 1,
+    text: "已生成【方案 B】差分（覆盖 12 标签）",
+    appliedSchemeId: "scheme_b",
+  });
+  const chatAfterDiffs = useSnapshotStore.getState().aiChatMessages;
+  assert(
+    chatAfterDiffs.length === 1 &&
+      chatAfterDiffs[0].id === "sys_diff_2" &&
+      chatAfterDiffs[0].appliedSchemeId === "scheme_b",
+    "addAiChatMessage replaces earlier diff preview system notices so only the latest remains"
+  );
+
+  // Masonry waterfall greedy distribution
+  const masonryCols = distributeMasonryItems(
+    [
+      { id: "tall", h: 300 },
+      { id: "short1", h: 60 },
+      { id: "short2", h: 80 },
+      { id: "med", h: 120 },
+    ],
+    2,
+    (item) => item.h
+  );
+  assert(
+    masonryCols.length === 2 &&
+      masonryCols[0].map((i) => i.id).join(",") === "tall" &&
+      masonryCols[1].map((i) => i.id).join(",") === "short1,short2,med",
+    "distributeMasonryItems balances columns via greedy shortest-column-first waterfall"
+  );
+
+  // Tree vs Cross-Panel mode & reorganizeTabsIntoPanels safety
+  const panelReorg = reorganizeTabsIntoPanels(
+    [
+      { id: "t1", panelId: "p1", parentId: -1, lvl: 0, title: "Parent", url: "https://a.com" },
+      { id: "t2", panelId: "p1", parentId: "t1", lvl: 1, title: "Child Moved", url: "https://github.com/x" },
+    ],
+    new Map([["t2", "开发组"]]),
+    [
+      { id: "c1", name: "开发组" },
+      { id: "c2", name: "空分类" },
+    ],
+    { p1: { id: "p1", name: "主面板", color: "toolbar" } }
+  );
+  const movedChild = panelReorg.tabs.find((t) => t.id === "t2");
+  assert(
+    Boolean(panelReorg.panels["panel_cat_1"]) &&
+      !panelReorg.panels["panel_cat_2"] &&
+      movedChild?.panelId === "panel_cat_1" &&
+      movedChild?.parentId === -1 &&
+      movedChild?.lvl === 0,
+    "reorganizeTabsIntoPanels skips empty category panels and detaches cross-panel parentId"
+  );
+
+  useSnapshotStore.getState().setAiProcessedCache({
+    originalSnapshot: {
+      id: "mode_snap",
+      time: Date.now(),
+      windows: {
+        "1": {
+          tabs: [
+            { id: "1", panelId: "p1", parentId: -1, lvl: 0, title: "GH 1", url: "https://github.com/1" },
+            { id: "2", panelId: "p2", parentId: -1, lvl: 0, title: "GH 2", url: "https://github.com/2" },
+            { id: "3", panelId: "p2", parentId: -1, lvl: 0, title: "GH 3", url: "https://github.com/3" },
+          ],
+        },
+      },
+      panels: {
+        p1: { id: "p1", name: "工作", color: "blue" },
+        p2: { id: "p2", name: "日常", color: "green" },
+      },
+    },
+    processedSnapshot: { id: "mode_snap_out", time: Date.now(), windows: { "1": { tabs: [] } }, panels: {} },
+    timestamp: Date.now(),
+    categoryNames: ["开发"],
+    classificationMap: { "1": "开发", "2": "开发", "3": "开发" },
+    summary: { total: 3, categorizedCount: 3, uncategorizedCount: 0, categoryCounts: { 开发: 3 } },
+    targetMode: "tree",
+  });
+  useSnapshotStore.getState().updateProcessedTreeTarget("tree", undefined, { crossPanelMerge: false });
+  const keepTreeTabs = useSnapshotStore.getState().aiProcessedCache!.processedSnapshot.windows["1"].tabs;
+  assert(
+    keepTreeTabs.find((t) => t.id === "1")?.panelId === "p1" &&
+      keepTreeTabs.find((t) => t.id === "2")?.panelId === "p2",
+    "updateProcessedTreeTarget with crossPanelMerge:false keeps tabs in their original panels"
+  );
+  useSnapshotStore.getState().updateProcessedTreeTarget("panel", "p1");
+  const panelModeCache = useSnapshotStore.getState().aiProcessedCache!;
+  assert(
+    panelModeCache.targetMode === "panel" &&
+      panelModeCache.targetPanelId === undefined &&
+      panelModeCache.processedSnapshot.windows["1"].tabs.every((t) => t.panelId === "panel_cat_1"),
+    "updateProcessedTreeTarget switching to panel mode creates category panel cleanly without stale targetPanelId"
+  );
+
+  assert(
+    resolveEffectiveWorkbenchPanelLayout("sidebar", true) === "horizontal" &&
+      resolveEffectiveWorkbenchPanelLayout("sidebar", false) === "sidebar" &&
+      resolveEffectiveWorkbenchPanelLayout("vertical", true) === "vertical",
+    "resolveEffectiveWorkbenchPanelLayout falls back to horizontal when sidebar is collapsed"
+  );
+
+  assert(
+    resolveEffectiveAIChatHistoryLayout("sidebar", true) === "dropdown" &&
+      resolveEffectiveAIChatHistoryLayout("sidebar", false) === "sidebar" &&
+      resolveEffectiveAIChatHistoryLayout("dropdown", false) === "dropdown",
+    "resolveEffectiveAIChatHistoryLayout falls back to dropdown when sidebar is collapsed"
+  );
+
+  const comp = computeSnapshotComposition(
+    [
+      { id: "g1", panelId: "p1", parentId: -1, lvl: 0, title: "Group", url: "about:blank#group" },
+      { id: "c1", panelId: "p1", parentId: "g1", lvl: 1, title: "Child", url: "https://a.com" },
+      { id: "d1", panelId: "p1", parentId: -1, lvl: 0, title: "Dup", url: "https://dup.com" },
+      { id: "p1", panelId: "p1", parentId: -1, lvl: 0, title: "Pinned", url: "https://pin.com", pinned: true },
+      { id: "l1", panelId: "p1", parentId: -1, lvl: 0, title: "Loose", url: "https://loose.com" },
+    ],
+    new Set(["https://dup.com"])
+  );
+  assert(
+    comp.totalTabs === 5 &&
+      comp.groupedCount === 2 &&
+      comp.duplicateTabCount === 1 &&
+      comp.exemptCount === 1 &&
+      comp.looseCount === 1,
+    "computeSnapshotComposition partitions grouped, duplicate, exempt, and loose tabs accurately"
   );
 
   console.log(`AI Restructure Tests Completed: ${passed} passed, ${failed} failed.`);

@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, X, Copy, ChevronsUpDown, ChevronsDownUp, SlidersHorizontal } from "lucide-react";
+import { Search, X, Copy, ChevronsUpDown, ChevronsDownUp, Settings, Undo2 } from "lucide-react";
 import { useSnapshotStore } from "@/store/useSnapshotStore";
 import { useConfigStore } from "@/store/useConfigStore";
 import { flattenTabTree } from "@/services/snapshotParser";
 import { Button } from "@/components/ui/button";
+import { SidebarDrawerTrigger } from "@/components/layout/AppSidebar";
 import { WorkbenchSettingsModal } from "./WorkbenchSettingsModal";
 
 export function SearchFilter() {
@@ -18,6 +19,7 @@ export function SearchFilter() {
     containerFilter,
     onlyDuplicates,
     setOnlyDuplicates,
+    onlyPinned,
     duplicateUrls,
     rawSnapshot,
     expandAll,
@@ -25,12 +27,14 @@ export function SearchFilter() {
     selectAll,
     clearSelection,
     selectedIds,
+    undoStack,
+    undo,
   } = useSnapshotStore();
 
   const { cascadeSelectChildren, setCascadeSelectChildren, uiSettings } = useConfigStore();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const panelLayout = uiSettings?.workbenchPanelLayout || "vertical";
+  const panelLayout = uiSettings?.workbenchPanelLayout || "sidebar";
   const allTabs = React.useMemo(() => flattenTabTree(rootNodes), [rootNodes]);
   const totalTabs = allTabs.length;
   const pinnedCount = React.useMemo(() => allTabs.filter((t) => t.pinned).length, [allTabs]);
@@ -51,7 +55,7 @@ export function SearchFilter() {
     return uiSettings?.hideEmptyPanels ? list.filter((p) => p.count > 0) : list;
   }, [rawSnapshot?.panels, allTabs, uiSettings?.hideEmptyPanels]);
 
-  const hasFilterBadges = Boolean(containerFilter || onlyDuplicates);
+  const hasFilterBadges = Boolean(containerFilter || onlyDuplicates || onlyPinned);
 
   return (
     <>
@@ -62,23 +66,26 @@ export function SearchFilter() {
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: "0.5rem",
-          padding: "0.5rem 1rem",
+          padding: "0.55rem 1.25rem",
+          minHeight: "50px",
           backgroundColor: "var(--bg-surface)",
           borderBottom: "1px solid var(--border-subtle)",
           flexShrink: 0,
         }}
       >
-        {/* Left: Search + Optional Dropdown Panel Selector + Compact Counters */}
+        {/* Left: Drawer Trigger (Mobile) + Search + Optional Dropdown Panel Selector + Compact Counters */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: "0.45rem",
             flex: 1,
-            minWidth: "240px",
+            minWidth: "200px",
             flexWrap: "wrap",
           }}
         >
+          <SidebarDrawerTrigger />
+
           <div
             style={{
               display: "flex",
@@ -89,7 +96,7 @@ export function SearchFilter() {
               borderRadius: "9999px",
               border: "1px solid var(--border-subtle)",
               flex: 1,
-              minWidth: "160px",
+              minWidth: "130px",
               maxWidth: "260px",
             }}
           >
@@ -243,16 +250,33 @@ export function SearchFilter() {
             </Button>
           )}
 
+          {undoStack.length > 0 && (
+            <Button
+              size="xs"
+              pill
+              variant="outline"
+              onClick={undo}
+              title={`撤销上一步修改 (${undoStack.length})`}
+              style={{ fontSize: "0.72rem" }}
+            >
+              <Undo2 size={12} />
+              <span>撤销</span>
+            </Button>
+          )}
+
           <Button
             size="xs"
             pill
-            variant={hasFilterBadges ? "subtle" : "outline"}
+            variant={hasFilterBadges ? "subtle" : "ghost"}
             onClick={() => setSettingsOpen(true)}
             title="工作台筛选与面板排列设置"
-            style={{ position: "relative", fontSize: "0.72rem" }}
+            style={{
+              position: "relative",
+              color: hasFilterBadges ? "var(--accent)" : "var(--text-muted)",
+              padding: "0.35rem",
+            }}
           >
-            <SlidersHorizontal size={12} />
-            <span>设置</span>
+            <Settings size={15} />
           </Button>
         </div>
       </div>

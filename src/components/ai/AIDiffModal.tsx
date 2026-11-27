@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
+import { MasonryColumns } from "@/components/ui/MasonryColumns";
 import { buildTabTree } from "@/services/snapshotParser";
 import { TabTreeNode, SideberyTab } from "@/types/sidebery";
 import {
@@ -58,7 +59,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     setActiveMergeReport,
   } = useSnapshotStore();
 
-  const { uiSettings } = useConfigStore();
+  const { uiSettings, crossPanelMerge } = useConfigStore();
 
   const [activePanelId, setActivePanelId] = useState<string>("");
   const [viewMode, setViewMode] = useState<"changes" | "tree">("changes");
@@ -70,7 +71,13 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
   const [selectedMode, setSelectedMode] = useState<"tree" | "panel">(
     aiProcessedCache?.targetMode || "tree"
   );
-  const [selectedPanelId, setSelectedPanelId] = useState<string>(
+  // Explicit 3-way strategy: "keep" (stay in original panels) | "merge" (tree merge into existing panel) | "panel" (new top-level panels)
+  const [strategy, setStrategy] = useState<"keep" | "merge" | "panel">(() => {
+    if (aiProcessedCache?.targetMode === "panel") return "panel";
+    if (aiProcessedCache?.targetPanelId || crossPanelMerge) return "merge";
+    return "keep";
+  });
+  const [mergeTargetPanelId, setMergeTargetPanelId] = useState<string>(
     aiProcessedCache?.targetPanelId || ""
   );
 
@@ -82,11 +89,21 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
   }, []);
 
   useEffect(() => {
-    if (aiProcessedCache) {
-      if (aiProcessedCache.targetMode) setSelectedMode(aiProcessedCache.targetMode);
-      if (aiProcessedCache.targetPanelId) setSelectedPanelId(aiProcessedCache.targetPanelId);
+    if (!aiProcessedCache) return;
+    const mode = aiProcessedCache.targetMode || "tree";
+    setSelectedMode(mode);
+    if (mode === "panel") {
+      setStrategy("panel");
+      setMergeTargetPanelId("");
+    } else if (aiProcessedCache.targetPanelId) {
+      setStrategy("merge");
+      setMergeTargetPanelId(aiProcessedCache.targetPanelId);
+    } else {
+      setStrategy(crossPanelMerge ? "merge" : "keep");
+      setMergeTargetPanelId("");
     }
-  }, [aiProcessedCache]);
+    setActivePanelId("");
+  }, [aiProcessedCache?.timestamp]);
 
   const originalTabs = useMemo(() => {
     return aiProcessedCache?.originalSnapshot.windows[activeWindowId]?.tabs || [];
@@ -122,7 +139,12 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
         (t) => !beforeIds.has(t.id) && !String(t.id).startsWith("group_") && !String(t.id).startsWith("cat_header_")
       );
       const newGroups = afterTree.filter(
-        (n) => n.isGroup || (n as any).categoryName || n.id.startsWith("group_") || n.id.startsWith("cat_header_")
+        (n) =>
+          !beforeIds.has(n.tab.id) &&
+          (n.isGroup ||
+            (n.tab.url || "").startsWith("about:blank#category=") ||
+            String(n.id).startsWith("group_") ||
+            String(n.id).startsWith("cat_header_"))
       );
       const changeCount = removedTabs.length + movedInTabs.length + newGroups.length;
 
@@ -170,20 +192,40 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
     }
   }, [isOpen, displayedPanelList, activePanelId, panelSummaries]);
 
+  const existingPanelsForTarget = useMemo(() => {
+    const origPanels = aiProcessedCache?.originalSnapshot.panels || {};
+    const list = Object.entries(origPanels).map(([id, p]: [string, any]) => ({
+      id,
+      name: p.name || (id === "main" ? "主面板" : id),
+    }));
+    return list.length > 0 ? list : [{ id: "main", name: "主面板" }];
+  }, [aiProcessedCache?.originalSnapshot.panels]);
+
   if (!isOpen || !aiProcessedCache) return null;
 
   const effectivePanelId = activePanelId || displayedPanelList[0]?.id || "main";
   const currentSummary = panelSummaries.get(effectivePanelId);
   const changedPanelsCount = Array.from(panelSummaries.values()).filter((s) => s.changeCount > 0).length;
 
-  const handleModeChange = (mode: "tree" | "panel") => {
-    setSelectedMode(mode);
-    updateProcessedTreeTarget(mode, selectedPanelId || undefined);
+  const handleStrategyChange = (nextStrategy: "keep" | "merge" | "panel") => {
+    setStrategy(nextStrategy);
+    setActivePanelId("");
+    if (nextStrategy === "panel") {
+      setSelectedMode("panel");
+      updateProcessedTreeTarget("panel", undefined, { crossPanelMerge: true });
+    } else if (nextStrategy === "keep") {
+      setSelectedMode("tree");
+      updateProcessedTreeTarget("tree", undefined, { crossPanelMerge: false });
+    } else {
+      setSelectedMode("tree");
+      updateProcessedTreeTarget("tree", mergeTargetPanelId || undefined, { crossPanelMerge: true });
+    }
   };
 
-  const handlePanelChange = (panelId: string) => {
-    setSelectedPanelId(panelId);
-    updateProcessedTreeTarget(selectedMode, panelId || undefined);
+  const handleMergeTargetChange = (panelId: string) => {
+    setMergeTargetPanelId(panelId);
+    setActivePanelId("");
+    updateProcessedTreeTarget("tree", panelId || undefined, { crossPanelMerge: true });
   };
 
   const handleDirectApply = () => {
@@ -274,7 +316,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
             </Dialog.CloseTrigger>
           </div>
 
-          {/* Toolbar */}
+          {/* Toolbar: Separated Rows (Strategy/View | Dedicated Panel Strip | Search) */}
           <div
             style={{
               padding: "0.6rem 1.25rem",
@@ -285,14 +327,89 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
               gap: "0.55rem",
             }}
           >
-            {/* Row 1: Panels + Target Mode + View Mode */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem", flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flex: 1, minWidth: 0, overflowX: "auto" }}>
+            {/* Row 1: Fixed Strategy Controls + View Mode Switcher */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.65rem", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    backgroundColor: "var(--bg-card)",
+                    borderRadius: "9999px",
+                    padding: "2px",
+                    border: "1px solid var(--border-subtle)",
+                  }}
+                >
+                  {(
+                    [
+                      { id: "keep" as const, label: "原地建组", icon: <FolderTree size={12} />, title: "不跨面板，仅在各原面板内按分类建组" },
+                      { id: "merge" as const, label: "跨面板归并", icon: <Folder size={12} />, title: "在现有面板中按类智能归并或集中至指定面板" },
+                      { id: "panel" as const, label: "新建面板", icon: <PanelsTopLeft size={12} />, title: "抛弃旧面板划分，按每个分类新建顶层面板" },
+                    ]
+                  ).map((opt) => (
+                    <Button
+                      key={opt.id}
+                      type="button"
+                      variant={strategy === opt.id ? "solid" : "ghost"}
+                      size="xs"
+                      pill
+                      onClick={() => handleStrategyChange(opt.id)}
+                      title={opt.title}
+                      style={{ fontSize: "0.71rem" }}
+                    >
+                      {opt.icon}
+                      <span>{opt.label}</span>
+                    </Button>
+                  ))}
+                </div>
+
+                {strategy === "merge" && (
+                  <Select
+                    value={mergeTargetPanelId}
+                    onChange={(e) => handleMergeTargetChange(e.target.value)}
+                    style={{ fontSize: "0.72rem", padding: "0.2rem 0.55rem" }}
+                  >
+                    <option value="">智能归并至最多标签面板</option>
+                    {existingPanelsForTarget.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        全部集中至: {p.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                <Button
+                  type="button"
+                  variant={viewMode === "changes" ? "solid" : "outline"}
+                  size="xs"
+                  pill
+                  onClick={() => setViewMode("changes")}
+                >
+                  <GitCommit size={13} />
+                  <span>变更摘要</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant={viewMode === "tree" ? "solid" : "outline"}
+                  size="xs"
+                  pill
+                  onClick={() => setViewMode("tree")}
+                >
+                  <ListTree size={13} />
+                  <span>左右树对比</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Row 2: Dedicated Panel Strip (hidden in New-Panel Summary mode where global waterfall shows all new panels at once) */}
+            {(strategy !== "panel" || viewMode === "tree") && (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", minWidth: 0 }}>
                 {isNarrowScreen ? (
                   <Select
                     value={effectivePanelId}
                     onChange={(e) => setActivePanelId(e.target.value)}
-                    style={{ flex: 1, maxWidth: "260px" }}
+                    style={{ flex: 1, maxWidth: "280px" }}
                   >
                     {displayedPanelList.map((p) => {
                       const s = panelSummaries.get(p.id);
@@ -306,7 +423,7 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                     })}
                   </Select>
                 ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", overflowX: "auto" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", overflowX: "auto", paddingBottom: "2px", width: "100%" }}>
                     {displayedPanelList.map((p) => {
                       const isActive = p.id === effectivePanelId;
                       const s = panelSummaries.get(p.id);
@@ -320,15 +437,16 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                             display: "inline-flex",
                             alignItems: "center",
                             gap: "0.35rem",
-                            padding: "0.28rem 0.68rem",
+                            padding: "0.26rem 0.65rem",
                             borderRadius: "9999px",
                             border: "1px solid",
                             borderColor: isActive ? "var(--accent-solid)" : "var(--border-subtle)",
                             backgroundColor: isActive ? "var(--accent-subtle)" : "var(--bg-card)",
                             color: isActive ? "var(--accent-text)" : chg > 0 ? "var(--text-main)" : "var(--text-muted)",
-                            fontSize: "0.74rem",
+                            fontSize: "0.73rem",
                             fontWeight: isActive || chg > 0 ? 600 : 400,
                             whiteSpace: "nowrap",
+                            flexShrink: 0,
                             cursor: "pointer",
                           }}
                         >
@@ -354,79 +472,9 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                   </div>
                 )}
               </div>
+            )}
 
-              <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
-                {/* AI Target Mode Switcher */}
-                <div
-                  style={{
-                    display: "inline-flex",
-                    backgroundColor: "var(--bg-card)",
-                    borderRadius: "9999px",
-                    padding: "2px",
-                    border: "1px solid var(--border-subtle)",
-                  }}
-                >
-                  <Button
-                    variant={selectedMode === "tree" ? "solid" : "ghost"}
-                    size="xs"
-                    pill
-                    onClick={() => handleModeChange("tree")}
-                    style={{ fontSize: "0.7rem" }}
-                  >
-                    <FolderTree size={12} />
-                    <span>树形分组</span>
-                  </Button>
-                  <Button
-                    variant={selectedMode === "panel" ? "solid" : "ghost"}
-                    size="xs"
-                    pill
-                    onClick={() => handleModeChange("panel")}
-                    style={{ fontSize: "0.7rem" }}
-                  >
-                    <PanelsTopLeft size={12} />
-                    <span>跨面板</span>
-                  </Button>
-                </div>
-
-                {selectedMode === "tree" && (
-                  <Select
-                    value={selectedPanelId}
-                    onChange={(e) => handlePanelChange(e.target.value)}
-                    style={{ fontSize: "0.72rem", padding: "0.2rem 0.5rem" }}
-                  >
-                    <option value="">保留各原面板</option>
-                    {panelList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        集中至: {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-
-                <div style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                  <Button
-                    variant={viewMode === "changes" ? "solid" : "outline"}
-                    size="xs"
-                    pill
-                    onClick={() => setViewMode("changes")}
-                  >
-                    <GitCommit size={13} />
-                    <span>变更摘要</span>
-                  </Button>
-                  <Button
-                    variant={viewMode === "tree" ? "solid" : "outline"}
-                    size="xs"
-                    pill
-                    onClick={() => setViewMode("tree")}
-                  >
-                    <ListTree size={13} />
-                    <span>左右树对比</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Row 2: Search + Quick Toggles */}
+            {/* Row 3: Search + Quick Toggles */}
             <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap" }}>
               <div style={{ position: "relative", flex: 1, minWidth: "200px" }}>
                 <Search
@@ -443,12 +491,12 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="搜索标签标题、域名或新建分类..."
+                  placeholder={strategy === "panel" && viewMode === "changes" ? "搜索新建面板名、标签标题或来源面板..." : "搜索标签标题、域名或新建分类..."}
                   style={{ paddingLeft: "1.9rem", fontSize: "0.76rem", paddingTop: "0.28rem", paddingBottom: "0.28rem" }}
                 />
               </div>
 
-              {changedPanelsCount > 0 && (
+              {(strategy !== "panel" || viewMode === "tree") && changedPanelsCount > 0 && (
                 <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontSize: "0.73rem", cursor: "pointer", color: "var(--text-muted)" }}>
                   <input
                     type="checkbox"
@@ -478,8 +526,18 @@ export function AIDiffModal({ isOpen, onClose }: AIDiffModalProps) {
           {/* Main Diff Content Area */}
           {viewMode === "changes" ? (
             <div style={{ flex: 1, overflowY: "auto", padding: "1rem 1.25rem", backgroundColor: "var(--bg-canvas)" }}>
-              {currentSummary && (
-                <ChangesSummaryView summary={currentSummary} searchQuery={searchQuery} />
+              {strategy === "panel" ? (
+                <PanelModeGlobalSummaryView
+                  panelList={panelList}
+                  panelSummaries={panelSummaries}
+                  originalTabs={originalTabs}
+                  originalPanels={aiProcessedCache.originalSnapshot.panels || {}}
+                  searchQuery={searchQuery}
+                />
+              ) : (
+                currentSummary && (
+                  <ChangesSummaryView summary={currentSummary} searchQuery={searchQuery} />
+                )
               )}
             </div>
           ) : (
@@ -603,6 +661,229 @@ function matchesSearch(tab: SideberyTab, q: string): boolean {
   );
 }
 
+function PanelModeGlobalSummaryView({
+  panelList,
+  panelSummaries,
+  originalTabs,
+  originalPanels,
+  searchQuery,
+}: {
+  panelList: { id: string; name: string }[];
+  panelSummaries: Map<string, ComputedPanelSummary>;
+  originalTabs: SideberyTab[];
+  originalPanels: Record<string, any>;
+  searchQuery: string;
+}) {
+  const newPanels = panelList.filter((p) => p.id.startsWith("panel_cat_"));
+  const legacyPanels = panelList.filter((p) => !p.id.startsWith("panel_cat_"));
+
+  const [expandedPanels, setExpandedPanels] = useState<Set<string>>(
+    () => new Set(newPanels.map((p) => p.id))
+  );
+
+  useEffect(() => {
+    setExpandedPanels(new Set(panelList.filter((p) => p.id.startsWith("panel_cat_")).map((p) => p.id)));
+  }, [panelList]);
+
+  const origTabPanelNameById = useMemo(() => {
+    const map = new Map<string | number, string>();
+    for (const t of originalTabs) {
+      const pId = t.panelId || "main";
+      const pName = originalPanels[pId]?.name || (pId === "main" ? "主面板" : pId);
+      map.set(t.id, pName);
+    }
+    return map;
+  }, [originalTabs, originalPanels]);
+
+  const q = searchQuery.trim().toLowerCase();
+
+  const filteredNewPanels = newPanels.filter((p) => {
+    const s = panelSummaries.get(p.id);
+    if (!s || s.afterTabs.length === 0) return false;
+    if (!q) return true;
+    if (p.name.toLowerCase().includes(q)) return true;
+    return s.afterTabs.some(
+      (t) => matchesSearch(t, q) || (origTabPanelNameById.get(t.id) || "").toLowerCase().includes(q)
+    );
+  });
+
+  const togglePanelCard = (id: string) => {
+    setExpandedPanels((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const totalMovedTabs = newPanels.reduce(
+    (acc, p) => acc + (panelSummaries.get(p.id)?.afterTabs.length || 0),
+    0
+  );
+  const retainedOldTabs = legacyPanels.reduce(
+    (acc, p) => acc + (panelSummaries.get(p.id)?.afterTabs.length || 0),
+    0
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      {/* Top Compact Overview of Panel Reconstruction */}
+      <div
+        style={{
+          padding: "0.7rem 0.9rem",
+          borderRadius: "0.75rem",
+          backgroundColor: "var(--bg-surface)",
+          border: "1px solid var(--border-subtle)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.45rem",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", fontSize: "0.78rem", fontWeight: 700, color: "var(--accent-text)" }}>
+            <PanelsTopLeft size={14} />
+            <span>全局重建 {newPanels.length} 个顶层面板（迁入 {totalMovedTabs} 个标签）</span>
+          </div>
+          {retainedOldTabs > 0 && (
+            <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+              原面板留守 {retainedOldTabs} 个固定/豁免或未归类标签
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+          {legacyPanels.map((lp) => {
+            const s = panelSummaries.get(lp.id);
+            if (!s || (s.beforeTabs.length === 0 && s.afterTabs.length === 0)) return null;
+            return (
+              <Badge key={lp.id} variant="outline" size="sm" style={{ fontSize: "0.68rem", color: "var(--text-muted)" }}>
+                {lp.name}: {s.beforeTabs.length} → {s.afterTabs.length}
+              </Badge>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Waterfall Cards for Each Newly Created Panel */}
+      {filteredNewPanels.length === 0 ? (
+        <div style={{ padding: "2rem", textAlign: "center", fontSize: "0.8rem", color: "var(--text-muted)" }}>
+          {q ? `未匹配到 “${searchQuery}” 相关新建面板或标签` : "当前方案暂无新建分类面板"}
+        </div>
+      ) : (
+        <MasonryColumns
+          items={filteredNewPanels}
+          getKey={(p) => p.id}
+          estimateHeight={(p) => 48 + Math.min((panelSummaries.get(p.id)?.afterTabs.length || 0) * 26, 260)}
+          renderItem={(panel) => {
+            const s = panelSummaries.get(panel.id);
+            const tabs = (s?.afterTabs || []).filter(
+              (t) =>
+                !q ||
+                panel.name.toLowerCase().includes(q) ||
+                matchesSearch(t, q) ||
+                (origTabPanelNameById.get(t.id) || "").toLowerCase().includes(q)
+            );
+            const isExpanded = expandedPanels.has(panel.id) || Boolean(q);
+
+            const sourceBreakdown = new Map<string, number>();
+            for (const t of s?.afterTabs || []) {
+              const src = origTabPanelNameById.get(t.id) || "原面板";
+              sourceBreakdown.set(src, (sourceBreakdown.get(src) || 0) + 1);
+            }
+            const sourceHint = Array.from(sourceBreakdown.entries())
+              .map(([name, cnt]) => `${name}(${cnt})`)
+              .join(" · ");
+
+            return (
+              <div
+                style={{
+                  borderRadius: "0.65rem",
+                  border: "1px solid var(--accent-border)",
+                  backgroundColor: "var(--bg-card)",
+                  overflow: "hidden",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => togglePanelCard(panel.id)}
+                  style={{
+                    width: "100%",
+                    padding: "0.55rem 0.75rem",
+                    backgroundColor: "var(--accent-subtle)",
+                    border: "none",
+                    color: "var(--text-main)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.2rem",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.4rem" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: "var(--accent-text)" }}>
+                      {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                      <PanelsTopLeft size={13} style={{ flexShrink: 0 }} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {panel.name}
+                      </span>
+                    </span>
+                    <Badge variant="subtle" size="sm" style={{ fontSize: "0.66rem", flexShrink: 0 }}>
+                      {s?.afterTabs.length || 0}
+                    </Badge>
+                  </div>
+                  {sourceHint && (
+                    <div style={{ fontSize: "0.66rem", color: "var(--text-muted)", paddingLeft: "1.1rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      来自: {sourceHint}
+                    </div>
+                  )}
+                </button>
+
+                {isExpanded && tabs.length > 0 && (
+                  <div
+                    style={{
+                      padding: "0.45rem 0.7rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.25rem",
+                      maxHeight: "260px",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {tabs.map((tab) => {
+                      const srcName = origTabPanelNameById.get(tab.id);
+                      const domain = extractDomain(tab.url);
+                      return (
+                        <div
+                          key={tab.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "0.45rem",
+                            fontSize: "0.74rem",
+                            color: "var(--text-main)",
+                          }}
+                        >
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            · {tab.title || tab.url}
+                          </span>
+                          <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", flexShrink: 0 }}>
+                            {srcName ? `${srcName} →` : domain}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 function ChangesSummaryView({
   summary,
   searchQuery,
@@ -669,12 +950,14 @@ function ChangesSummaryView({
             新建分类 / 分组 ({filteredGroups.length})
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "0.55rem" }}>
-            {filteredGroups.map((group) => {
+          <MasonryColumns
+            items={filteredGroups}
+            getKey={(group) => group.id}
+            estimateHeight={(group) => 44 + Math.min(group.children.length * 24, 260)}
+            renderItem={(group) => {
               const isExpanded = expandedGroups.has(group.id) || Boolean(q);
               return (
                 <div
-                  key={group.id}
                   style={{
                     borderRadius: "0.65rem",
                     border: "1px solid rgba(16, 185, 129, 0.35)",
@@ -714,7 +997,16 @@ function ChangesSummaryView({
                   </button>
 
                   {isExpanded && group.children.length > 0 && (
-                    <div style={{ padding: "0.45rem 0.7rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                    <div
+                      style={{
+                        padding: "0.45rem 0.7rem",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.25rem",
+                        maxHeight: "260px",
+                        overflowY: "auto",
+                      }}
+                    >
                       {group.children
                         .filter((c) => !q || matchesSearch(c.tab, q) || matchesSearch(group.tab, q))
                         .map((child) => {
@@ -746,8 +1038,8 @@ function ChangesSummaryView({
                   )}
                 </div>
               );
-            })}
-          </div>
+            }}
+          />
         </div>
       )}
 

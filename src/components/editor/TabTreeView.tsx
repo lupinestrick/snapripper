@@ -35,6 +35,8 @@ export function TabTreeView() {
     setContainerFilter,
     onlyDuplicates,
     setOnlyDuplicates,
+    onlyPinned,
+    setOnlyPinned,
     duplicateUrls,
     rawSnapshot,
     loadSnapshot,
@@ -46,8 +48,9 @@ export function TabTreeView() {
       containerId: containerFilter || undefined,
       showOnlyDuplicates: onlyDuplicates,
       duplicateUrls,
+      showOnlyPinned: onlyPinned,
     });
-  }, [rootNodes, searchQuery, panelFilter, containerFilter, onlyDuplicates, duplicateUrls]);
+  }, [rootNodes, searchQuery, panelFilter, containerFilter, onlyDuplicates, onlyPinned, duplicateUrls]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,6 +136,7 @@ export function TabTreeView() {
             setPanelFilter(null);
             setContainerFilter(null);
             setOnlyDuplicates(false);
+            setOnlyPinned(false);
           }}
         >
           重置筛选

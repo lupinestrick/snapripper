@@ -2,13 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { TopNav } from "@/components/layout/TopNav";
 import { WorkbenchView } from "@/components/editor/WorkbenchView";
 import { ProcessPage } from "@/components/process/ProcessPage";
 import { RulesPage } from "@/components/rules/RulesPage";
 import { AIPage } from "@/components/ai/AIPage";
 import { SettingsPage } from "@/components/settings/SettingsPage";
-import { ExportDialog } from "@/components/export/ExportDialog";
 import { AIDiffModal } from "@/components/ai/AIDiffModal";
 import { AIMergeReportModal } from "@/components/ai/AIMergeReportModal";
 import { OverviewHopup } from "@/components/layout/OverviewHopup";
@@ -33,7 +31,6 @@ export default function WorkbenchPage() {
   } = useSnapshotStore();
   const { activePage, theme } = useConfigStore();
 
-  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // Sync theme with HTML document element
@@ -145,16 +142,15 @@ export default function WorkbenchPage() {
           position: "relative",
         }}
       >
-        {activePage !== "ai" && <TopNav onOpenExport={() => setExportDialogOpen(true)} />}
-
         <main
           style={{
             flex: 1,
-            overflowY: activePage === "ai" || activePage === "workbench" ? "hidden" : "auto",
+            overflowY: "hidden",
             position: "relative",
-            paddingBottom: activePage === "ai" || activePage === "workbench" ? 0 : "70px",
+            paddingBottom: 0,
             display: "flex",
             flexDirection: "column",
+            minHeight: 0,
           }}
         >
           {activePage === "workbench" && <WorkbenchView />}
@@ -169,7 +165,6 @@ export default function WorkbenchPage() {
         </main>
       </div>
 
-      <ExportDialog isOpen={exportDialogOpen} onClose={() => setExportDialogOpen(false)} />
       <AIDiffModal isOpen={isAIDiffModalOpen} onClose={() => setIsAIDiffModalOpen(false)} />
       <AIMergeReportModal
         isOpen={Boolean(activeMergeReport)}
