@@ -769,6 +769,33 @@ input, button, select, textarea {
   transform: scale(0.97);
 }
 
+.sr-sidebar-subitem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  min-height: 30px;
+  padding: 0.38rem 0.55rem;
+  border-radius: 0.5rem;
+  font-size: 0.76rem;
+  line-height: 1.25;
+  background-color: transparent;
+  color: var(--text-main);
+  font-weight: 400;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.sr-sidebar-subitem:not([data-active="true"]):hover {
+  background-color: var(--bg-subtle);
+}
+
+.sr-sidebar-subitem[data-active="true"] {
+  background-color: var(--accent-subtle);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sr-dialog-backdrop[data-state="open"],
   .sr-dialog-backdrop[data-state="closed"],

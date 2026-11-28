@@ -304,21 +304,9 @@ export function AppSidebar() {
                   ) : (
                     <>
                       <div
+                        className="sr-sidebar-subitem"
+                        data-active={panelFilter === null ? "true" : "false"}
                         onClick={() => handleSelectSidebarPanel(null)}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: "0.35rem",
-                          padding: "0.4rem 0.5rem",
-                          borderRadius: "0.5rem",
-                          backgroundColor: panelFilter === null ? "var(--accent-subtle)" : "transparent",
-                          color: panelFilter === null ? "var(--accent-text)" : "var(--text-main)",
-                          fontWeight: panelFilter === null ? 600 : 400,
-                          cursor: "pointer",
-                          fontSize: "0.76rem",
-                          transition: "background-color 0.12s ease",
-                        }}
                       >
                         <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           全部标签
@@ -333,21 +321,9 @@ export function AppSidebar() {
                         return (
                           <div
                             key={panel.id}
+                            className="sr-sidebar-subitem"
+                            data-active={isActive ? "true" : "false"}
                             onClick={() => handleSelectSidebarPanel(panel.id)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: "0.35rem",
-                              padding: "0.4rem 0.5rem",
-                              borderRadius: "0.5rem",
-                              backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
-                              color: isActive ? "var(--accent-text)" : "var(--text-main)",
-                              fontWeight: isActive ? 600 : 400,
-                              cursor: "pointer",
-                              fontSize: "0.76rem",
-                              transition: "background-color 0.12s ease",
-                            }}
                             title={`${panel.name} (${panel.count})`}
                           >
                             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -424,23 +400,15 @@ export function AppSidebar() {
                       return (
                         <div
                           key={session.id}
+                          className="sr-sidebar-subitem"
+                          data-active={isActive ? "true" : "false"}
                           onClick={() => {
                             if (!isEditing) {
                               selectAiChatSession(session.id);
                             }
                           }}
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "0.3rem",
-                            padding: "0.4rem 0.5rem",
-                            borderRadius: "0.5rem",
-                            backgroundColor: isActive ? "var(--accent-subtle)" : "transparent",
-                            color: isActive ? "var(--accent-text)" : "var(--text-main)",
                             cursor: isEditing ? "default" : "pointer",
-                            fontSize: "0.76rem",
-                            transition: "background-color 0.12s ease",
                           }}
                         >
                           {isEditing ? (

@@ -617,7 +617,7 @@ export function AIPage() {
       {/* Minimal Top Bar */}
       <header
         style={{
-          height: "48px",
+          height: "50px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
