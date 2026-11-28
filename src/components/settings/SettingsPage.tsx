@@ -1337,6 +1337,16 @@ export function SettingsPage() {
               checked: exemptInternalPages,
               onChange: (checked: boolean) => setExemptInternalPages(checked),
             },
+            {
+              label: "导出时重置快照 ID",
+              checked: uiSettings?.resetSnapshotIdOnExport || false,
+              onChange: (checked: boolean) => setUISettings({ resetSnapshotIdOnExport: checked }),
+            },
+            {
+              label: "导出时更新快照时间",
+              checked: uiSettings?.resetSnapshotTimeOnExport || false,
+              onChange: (checked: boolean) => setUISettings({ resetSnapshotTimeOnExport: checked }),
+            },
           ].map((item) => (
             <label
               key={item.label}

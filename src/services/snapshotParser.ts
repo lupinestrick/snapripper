@@ -268,9 +268,22 @@ export function flattenTabTree(nodes: TabTreeNode[], panelIdFallback = "main"): 
   return result;
 }
 
-export function serializeSnapshot(snapshot: SideberySnapshot, compact = false): string {
+export function serializeSnapshot(
+  snapshot: SideberySnapshot,
+  compact = false,
+  options?: { resetId?: boolean; resetTime?: boolean }
+): string {
   // If the original was Sidebery v5 format with tabs: [ [ [ ... ] ] ], reconstruct that format
   const copy: any = { ...snapshot };
+  if (options?.resetId) {
+    copy.id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `snap_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+  if (options?.resetTime) {
+    copy.time = Date.now();
+  }
 
   if (snapshot.rawTabsFormat) {
     const panelsOrder = snapshot.sidebar?.nav?.filter((p) => p !== "search" && p !== "add_tp") || Object.keys(snapshot.panels || {});

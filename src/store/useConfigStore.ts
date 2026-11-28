@@ -27,6 +27,8 @@ export interface UISettings {
   rulesHideDisabled?: boolean;
   rulesOnlyWithHits?: boolean;
   rulesShowSampleTitles?: boolean;
+  resetSnapshotIdOnExport?: boolean;
+  resetSnapshotTimeOnExport?: boolean;
 }
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
@@ -38,6 +40,8 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   rulesHideDisabled: false,
   rulesOnlyWithHits: false,
   rulesShowSampleTitles: false,
+  resetSnapshotIdOnExport: false,
+  resetSnapshotTimeOnExport: false,
 };
 
 /**

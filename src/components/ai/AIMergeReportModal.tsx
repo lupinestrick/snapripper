@@ -355,7 +355,11 @@ export function AIMergeReportModal({ isOpen, report, onClose }: AIMergeReportMod
       toast.warning("当前没有可导出的快照数据");
       return;
     }
-    const jsonStr = serializeSnapshot(rawSnapshot);
+    const { uiSettings } = useConfigStore.getState();
+    const jsonStr = serializeSnapshot(rawSnapshot, false, {
+      resetId: uiSettings?.resetSnapshotIdOnExport,
+      resetTime: uiSettings?.resetSnapshotTimeOnExport,
+    });
     const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
